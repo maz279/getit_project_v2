@@ -1,0 +1,477 @@
+# Phase 6 Security Hardening Configuration
+# Amazon.com/Shopee.sg Security Excellence Implementation
+
+# Network Policies for Zero-Trust Architecture
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: getit-platform
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-traffic
+  namespace: getit-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: getit-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: getit-frontend
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 5000
+
+---
+# Pod Security Standards
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-platform-secure
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+# Security Context Constraints
+apiVersion: v1
+kind: SecurityContextConstraints
+metadata:
+  name: getit-platform-scc
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 1000
+  - max: 65535
+runAsUser:
+  type: MustRunAsNonRoot
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+volumes:
+- configMap
+- secret
+- emptyDir
+- persistentVolumeClaim
+
+---
+# OPA Gatekeeper Configuration
+apiVersion: config.gatekeeper.sh/v1alpha1
+kind: Config
+metadata:
+  name: config
+  namespace: gatekeeper-system
+spec:
+  match:
+    - excludedNamespaces: ["kube-system", "gatekeeper-system"]
+      processes: ["*"]
+  validation:
+    traces:
+      - user:
+          kind:
+            group: "*"
+            version: "*"
+            kind: "*"
+        kind:
+          group: "*"
+          version: "*"
+          kind: "*"
+
+---
+# Constraint Template for Required Security Context
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: requiredsecuritycontext
+spec:
+  crd:
+    spec:
+      names:
+        kind: RequiredSecurityContext
+      validation:
+        type: object
+        properties:
+          runAsNonRoot:
+            type: boolean
+          runAsUser:
+            type: integer
+          fsGroup:
+            type: integer
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package requiredsecuritycontext
+        
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.runAsNonRoot
+          msg := "Container must run as non-root user"
+        }
+        
+        violation[{"msg": msg}] {
+          not input.review.object.spec.securityContext.runAsUser
+          msg := "Must specify runAsUser in security context"
+        }
+
+---
+# Security Context Constraint
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: RequiredSecurityContext
+metadata:
+  name: must-run-as-nonroot
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+  parameters:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+---
+# Falco Security Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-config
+  namespace: falco
+data:
+  falco.yaml: |
+    rules_file:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/rules.d
+    
+    time_format_iso_8601: true
+    json_output: true
+    json_include_output_property: true
+    
+    priority: debug
+    
+    outputs:
+      rate: 1
+      max_burst: 1000
+    
+    syslog_output:
+      enabled: false
+    
+    file_output:
+      enabled: false
+    
+    stdout_output:
+      enabled: true
+    
+    webserver:
+      enabled: true
+      listen_port: 8765
+      k8s_healthz_endpoint: /healthz
+      ssl_enabled: false
+    
+    grpc:
+      enabled: false
+    
+    grpc_output:
+      enabled: false
+
+---
+# Custom Falco Rules for GetIt Platform
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-custom-rules
+  namespace: falco
+data:
+  getit_rules.yaml: |
+    - rule: Unauthorized API Access
+      desc: Detect unauthorized access to GetIt API endpoints
+      condition: >
+        k8s_audit and
+        ka.verb in (create, update, delete) and
+        ka.uri.path startswith "/api/v1/" and
+        not ka.user.name in (getit-api-service, system:serviceaccount:getit-platform:getit-api)
+      output: >
+        Unauthorized API access detected
+        (user=%ka.user.name verb=%ka.verb uri=%ka.uri.path response_code=%ka.response_code)
+      priority: WARNING
+      tags: [api, security, unauthorized]
+    
+    - rule: Suspicious Database Access
+      desc: Detect suspicious database access patterns
+      condition: >
+        spawned_process and
+        proc.name in (psql, mysql, redis-cli) and
+        not proc.pname in (getit-api, postgres, redis-server)
+      output: >
+        Suspicious database access
+        (command=%proc.cmdline pid=%proc.pid ppid=%proc.ppid user=%user.name)
+      priority: CRITICAL
+      tags: [database, security, suspicious]
+    
+    - rule: Container Privilege Escalation
+      desc: Detect attempts to escalate privileges in containers
+      condition: >
+        spawned_process and
+        proc.name in (sudo, su, setuid) and
+        container.id != host
+      output: >
+        Privilege escalation attempt in container
+        (command=%proc.cmdline container=%container.name image=%container.image.repository)
+      priority: CRITICAL
+      tags: [container, privilege, escalation]
+
+---
+# Vulnerability Scanning Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vulnerability-scan
+  namespace: getit-platform
+spec:
+  schedule: "0 2 * * *" # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trivy-scanner
+            image: aquasec/trivy:latest
+            command:
+            - sh
+            - -c
+            - |
+              echo "Starting vulnerability scan..."
+              
+              # Scan GetIt API image
+              trivy image --format json --output /reports/api-scan.json getit/api:latest
+              
+              # Scan GetIt Frontend image
+              trivy image --format json --output /reports/frontend-scan.json getit/frontend:latest
+              
+              # Scan filesystem
+              trivy fs --format json --output /reports/fs-scan.json /workspace
+              
+              # Generate summary report
+              echo "Vulnerability scan completed at $(date)" > /reports/scan-summary.txt
+              echo "Critical vulnerabilities found:" >> /reports/scan-summary.txt
+              cat /reports/*.json | jq '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | .VulnerabilityID' | wc -l >> /reports/scan-summary.txt
+              
+              # Upload to security dashboard
+              curl -X POST "$SECURITY_WEBHOOK" \
+                -H "Content-Type: application/json" \
+                -d "@/reports/scan-summary.txt"
+            env:
+            - name: SECURITY_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: security-credentials
+                  key: webhook-url
+            volumeMounts:
+            - name: reports
+              mountPath: /reports
+            - name: workspace
+              mountPath: /workspace
+              readOnly: true
+          volumes:
+          - name: reports
+            emptyDir: {}
+          - name: workspace
+            persistentVolumeClaim:
+              claimName: getit-workspace
+          restartPolicy: OnFailure
+
+---
+# Security Audit ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-audit-config
+  namespace: getit-platform
+data:
+  audit-policy.yaml: |
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    # Security-sensitive operations
+    - level: Metadata
+      namespaces: ["getit-platform"]
+      verbs: ["create", "update", "patch", "delete"]
+      resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+      - group: "apps"
+        resources: ["deployments", "statefulsets"]
+    
+    # API access logging
+    - level: Request
+      namespaces: ["getit-platform"]
+      verbs: ["create", "update", "patch"]
+      resources:
+      - group: ""
+        resources: ["pods", "services"]
+    
+    # Authentication failures
+    - level: Metadata
+      omitStages:
+      - RequestReceived
+      namespaces: ["getit-platform"]
+      verbs: ["create"]
+      resources:
+      - group: ""
+        resources: ["events"]
+      namespaceSelector:
+        matchLabels:
+          security: "audit"
+
+---
+# RBAC for Security Monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: security-monitor
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services", "endpoints", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["security.istio.io"]
+  resources: ["authorizationpolicies", "peerauthentications"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: security-monitor-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: security-monitor
+subjects:
+- kind: ServiceAccount
+  name: security-monitor
+  namespace: getit-platform
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: security-monitor
+  namespace: getit-platform
+
+---
+# Istio Security Policies
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: getit-platform
+spec:
+  mtls:
+    mode: STRICT
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-access-control
+  namespace: getit-platform
+spec:
+  selector:
+    matchLabels:
+      app: getit-api
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/getit-platform/sa/getit-frontend"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/api/health", "/api/metrics"]
+
+---
+# Secret Management with External Secrets Operator
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: vault-backend
+  namespace: getit-platform
+spec:
+  provider:
+    vault:
+      server: "https://vault.getit.com.bd"
+      path: "secret"
+      version: "v2"
+      auth:
+        kubernetes:
+          mountPath: "kubernetes"
+          role: "getit-platform"
+          serviceAccountRef:
+            name: "vault-auth"
+
+---
+# Encrypted Secret
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: database-credentials
+  namespace: getit-platform
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: vault-backend
+    kind: SecretStore
+  target:
+    name: database-credentials
+    creationPolicy: Owner
+  data:
+  - secretKey: username
+    remoteRef:
+      key: database
+      property: username
+  - secretKey: password
+    remoteRef:
+      key: database
+      property: password

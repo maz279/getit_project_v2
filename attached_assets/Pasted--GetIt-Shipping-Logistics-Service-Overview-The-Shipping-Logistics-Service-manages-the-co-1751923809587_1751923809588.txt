@@ -1,0 +1,465 @@
+# GetIt Shipping & Logistics Service
+
+## Overview
+The Shipping & Logistics Service manages the complete delivery ecosystem for the GetIt multi-vendor ecommerce platform. It handles integration with multiple courier partners, shipping cost calculation, delivery tracking, logistics optimization, and ensures efficient delivery across all 64 districts of Bangladesh while supporting international shipping.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: PostgreSQL (primary), Redis (caching/real-time data)
+- **Message Queue**: Apache Kafka for tracking events
+- **Mapping Service**: Google Maps API, Mapbox for route optimization
+- **Background Jobs**: Node-cron for scheduled tasks
+- **Real-time Updates**: WebSocket for live tracking
+- **File Storage**: AWS S3 for shipping documents
+
+## Core Responsibilities
+
+### 1. Courier Partner Integration
+- Multiple courier service provider integration
+- Real-time rate comparison and selection
+- Pickup scheduling and coordination
+- Delivery tracking and status updates
+- Return logistics management
+
+### 2. Shipping Cost Calculation
+- Dynamic shipping cost calculation
+- Zone-based pricing models
+- Weight and dimension-based rates
+- Bulk discount calculations
+- Free shipping threshold management
+
+### 3. Delivery Tracking & Management
+- Real-time package tracking
+- Delivery status updates
+- Customer notification system
+- Delivery attempt management
+- Failed delivery handling
+
+### 4. Logistics Optimization
+- Route optimization for deliveries
+- Carrier selection based on performance
+- Delivery time prediction
+- Cost optimization algorithms
+- Capacity planning and load balancing
+
+### 5. Address & Location Management
+- Address validation and standardization
+- GPS coordinate mapping
+- Delivery zone classification
+- Pickup point management
+- Service area coverage mapping
+
+## Key Features
+
+### Bangladesh Courier Partners
+- **Pathao Courier**: Same-day and next-day delivery in major cities
+- **Paperfly**: Nationwide coverage with cash collection
+- **Sundarban Courier**: Economy shipping across Bangladesh
+- **RedX**: Technology-focused delivery service
+- **eCourier**: Specialized ecommerce logistics
+- **SA Paribahan**: Traditional courier with rural reach
+- **Janani Courier**: Local delivery specialists
+
+### International Shipping Partners
+- **DHL Express**: Global express delivery
+- **FedEx**: International shipping solutions
+- **UPS**: Worldwide logistics network
+- **Aramex**: Middle East and Asia coverage
+- **Post Office**: Bangladesh Post international service
+
+### Advanced Features
+- **Smart Routing**: AI-powered delivery route optimization
+- **Predictive Delivery**: Machine learning for delivery time estimation
+- **Dynamic Pricing**: Real-time shipping rate optimization
+- **Bulk Shipping**: Consolidated shipping for multiple orders
+- **White Glove Service**: Premium delivery with setup/installation
+
+## API Endpoints
+
+### Shipping Rate APIs
+```yaml
+Rate Calculation:
+  POST /api/v1/shipping/calculate-rate
+  GET /api/v1/shipping/rates/:orderId
+  POST /api/v1/shipping/rates/compare
+  GET /api/v1/shipping/zones
+  POST /api/v1/shipping/bulk-rates
+
+Service Options:
+  GET /api/v1/shipping/services
+  GET /api/v1/shipping/services/:carrierId
+  POST /api/v1/shipping/service/select
+  GET /api/v1/shipping/delivery-options
+```
+
+### Shipment Management APIs
+```yaml
+Shipment Creation:
+  POST /api/v1/shipping/shipments
+  GET /api/v1/shipping/shipments/:id
+  PUT /api/v1/shipping/shipments/:id
+  DELETE /api/v1/shipping/shipments/:id
+
+Pickup Management:
+  POST /api/v1/shipping/pickup/schedule
+  GET /api/v1/shipping/pickup/:id
+  PUT /api/v1/shipping/pickup/:id/reschedule
+  POST /api/v1/shipping/pickup/:id/cancel
+```
+
+### Tracking APIs
+```yaml
+Real-time Tracking:
+  GET /api/v1/shipping/track/:trackingNumber
+  POST /api/v1/shipping/track/bulk
+  GET /api/v1/shipping/track/:id/history
+  POST /api/v1/shipping/track/webhook
+  GET /api/v1/shipping/track/live/:shipmentId
+
+Delivery Updates:
+  POST /api/v1/shipping/delivery/update
+  GET /api/v1/shipping/delivery/status/:id
+  POST /api/v1/shipping/delivery/confirm
+  POST /api/v1/shipping/delivery/failed
+```
+
+### Address Management APIs
+```yaml
+Address Services:
+  POST /api/v1/shipping/address/validate
+  GET /api/v1/shipping/address/suggestions
+  POST /api/v1/shipping/address/geocode
+  GET /api/v1/shipping/coverage/:postalCode
+  POST /api/v1/shipping/address/standardize
+```
+
+### Return Logistics APIs
+```yaml
+Returns Management:
+  POST /api/v1/shipping/returns/create
+  GET /api/v1/shipping/returns/:id
+  POST /api/v1/shipping/returns/pickup
+  PUT /api/v1/shipping/returns/:id/status
+  GET /api/v1/shipping/returns/tracking/:id
+```
+
+### Admin APIs
+```yaml
+Logistics Administration:
+  GET /api/v1/admin/shipping/dashboard
+  GET /api/v1/admin/shipping/analytics
+  POST /api/v1/admin/shipping/carriers/configure
+  GET /api/v1/admin/shipping/performance
+  POST /api/v1/admin/shipping/zones/update
+```
+
+## Database Schema
+
+### Primary Tables
+```sql
+shipments:
+  - id (Primary Key)
+  - shipment_number (Unique)
+  - order_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - carrier_id (Foreign Key)
+  - service_type
+  - tracking_number
+  - status (created, picked_up, in_transit, out_for_delivery, delivered, failed, returned)
+  - origin_address
+  - destination_address
+  - package_weight
+  - package_dimensions
+  - declared_value
+  - shipping_cost
+  - insurance_value
+  - pickup_date
+  - estimated_delivery_date
+  - actual_delivery_date
+  - delivery_instructions
+  - created_at
+  - updated_at
+
+carriers:
+  - id (Primary Key)
+  - name
+  - code
+  - api_endpoint
+  - api_credentials
+  - supported_services
+  - coverage_areas
+  - rate_structure
+  - is_active
+  - priority
+  - performance_score
+  - last_health_check
+  - configuration
+
+shipping_zones:
+  - id (Primary Key)
+  - zone_name
+  - zone_code
+  - districts
+  - upazilas
+  - postal_codes
+  - delivery_time_min
+  - delivery_time_max
+  - is_express_available
+  - is_cod_available
+  - base_rate
+  - rate_per_kg
+
+tracking_events:
+  - id (Primary Key)
+  - shipment_id (Foreign Key)
+  - event_type
+  - event_description
+  - event_location
+  - event_timestamp
+  - carrier_event_code
+  - is_delivered
+  - created_at
+
+shipping_addresses:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - address_type (pickup, delivery)
+  - contact_name
+  - contact_phone
+  - address_line_1
+  - address_line_2
+  - district
+  - upazila
+  - postal_code
+  - latitude
+  - longitude
+  - delivery_instructions
+  - is_validated
+
+carrier_rates:
+  - id (Primary Key)
+  - carrier_id (Foreign Key)
+  - zone_id (Foreign Key)
+  - service_type
+  - weight_min
+  - weight_max
+  - base_rate
+  - rate_per_kg
+  - fuel_surcharge
+  - service_tax
+  - effective_from
+  - effective_to
+
+delivery_attempts:
+  - id (Primary Key)
+  - shipment_id (Foreign Key)
+  - attempt_number
+  - attempt_date
+  - attempt_time
+  - status (successful, failed, rescheduled)
+  - failure_reason
+  - next_attempt_date
+  - delivery_agent
+  - notes
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **Order Service**: Shipment creation and delivery confirmation
+- **Vendor Service**: Pickup scheduling and vendor notifications
+- **User Service**: Customer delivery preferences and contact details
+- **Payment Service**: COD collection and shipping cost processing
+- **Notification Service**: Delivery updates and tracking notifications
+- **Analytics Service**: Shipping performance and cost analytics
+
+### External Service Integration
+- **Courier Partner APIs**: Real-time rate queries and shipment tracking
+- **Google Maps API**: Address validation and route optimization
+- **SMS Gateway**: Delivery notifications and OTP verification
+- **Weather APIs**: Weather-based delivery planning
+- **Traffic APIs**: Real-time traffic data for route optimization
+
+## Shipping Cost Calculation
+
+### Zone-Based Pricing
+```yaml
+Zone Classification:
+  Zone 1: Dhaka Metropolitan Area
+    - Same day delivery: BDT 60
+    - Next day delivery: BDT 40
+    - Standard delivery: BDT 25
+
+  Zone 2: Major Cities (Chittagong, Sylhet, Khulna, Rajshahi)
+    - Express delivery: BDT 80
+    - Standard delivery: BDT 50
+
+  Zone 3: District Headquarters
+    - Express delivery: BDT 100
+    - Standard delivery: BDT 70
+
+  Zone 4: Rural Areas
+    - Standard delivery: BDT 120
+    - Economy delivery: BDT 80
+
+Weight-Based Rates:
+  - Up to 500g: Base rate
+  - 500g - 1kg: Base rate + 20%
+  - 1kg - 2kg: Base rate + 40%
+  - Above 2kg: Base rate + BDT 20 per additional kg
+```
+
+### Dynamic Pricing Factors
+- **Distance**: Origin to destination distance
+- **Weight & Dimensions**: Package size and weight
+- **Service Type**: Express, standard, economy
+- **Delivery Time**: Same day, next day, 2-3 days
+- **Special Handling**: Fragile, liquid, oversized
+- **COD Charges**: Cash collection fees
+- **Insurance**: Declared value protection
+- **Fuel Surcharge**: Variable fuel costs
+
+## Delivery Tracking System
+
+### Real-Time Tracking
+```yaml
+Tracking States:
+  - Order Confirmed: Shipment created
+  - Picked Up: Package collected from vendor
+  - In Transit: En route to destination
+  - Out for Delivery: Final delivery attempt
+  - Delivered: Successfully delivered
+  - Failed Delivery: Delivery attempt failed
+  - Returned: Package returned to vendor
+
+Tracking Events:
+  - Timestamp of each status change
+  - Location coordinates
+  - Delivery agent information
+  - Customer interaction records
+  - Photo/signature confirmation
+```
+
+### Customer Communication
+- **SMS Notifications**: Key milestone updates
+- **Push Notifications**: Real-time mobile app alerts
+- **Email Updates**: Detailed tracking information
+- **WhatsApp Updates**: Popular messaging platform integration
+- **Voice Calls**: Failed delivery notifications
+
+## Logistics Optimization
+
+### Route Optimization
+```yaml
+Optimization Factors:
+  - Delivery density per area
+  - Traffic patterns and peak hours
+  - Delivery time windows
+  - Vehicle capacity constraints
+  - Driver working hours
+  - Fuel costs and efficiency
+
+AI-Powered Features:
+  - Machine learning for delivery time prediction
+  - Dynamic route adjustment based on traffic
+  - Optimal carrier selection algorithms
+  - Demand forecasting for capacity planning
+  - Predictive analytics for delivery success
+```
+
+### Performance Monitoring
+- **Delivery Success Rate**: Percentage of successful first-time deliveries
+- **On-Time Delivery**: Deliveries within promised timeframe
+- **Average Delivery Time**: Mean time from pickup to delivery
+- **Customer Satisfaction**: Delivery rating and feedback
+- **Cost per Delivery**: Total logistics cost per successful delivery
+
+## Carrier Management
+
+### Carrier Selection Criteria
+```yaml
+Performance Metrics:
+  - Delivery success rate (>95% required)
+  - On-time delivery rate (>90% required)
+  - Customer satisfaction score (>4.0/5.0)
+  - Coverage area completeness
+  - Cost competitiveness
+  - Technology integration quality
+
+Carrier Ranking Algorithm:
+  Weight factors:
+    - Performance: 40%
+    - Cost: 30%
+    - Coverage: 20%
+    - Technology: 10%
+```
+
+### Carrier Integration
+- **API Integration**: Real-time rate queries and booking
+- **Webhook Support**: Automatic tracking updates
+- **Bulk Operations**: Batch shipment processing
+- **Reporting**: Performance and financial reporting
+- **SLA Management**: Service level agreement monitoring
+
+## Return Logistics
+
+### Return Process Flow
+```yaml
+Step 1: Return Initiation
+  - Customer requests return
+  - System validates return eligibility
+  - Generate return shipping label
+  - Schedule pickup or drop-off
+
+Step 2: Return Pickup
+  - Carrier collects package
+  - Return tracking begins
+  - Customer receives confirmation
+  - Package routed to vendor/warehouse
+
+Step 3: Return Processing
+  - Package received and inspected
+  - Return status updated
+  - Refund/exchange processed
+  - Return completed
+```
+
+### Return Shipping Options
+- **Pickup from Customer**: Convenient door-to-door return
+- **Drop-off Points**: Partner locations for package drop-off
+- **Self-Service**: Customer arranges return shipping
+- **Exchange Service**: Direct product exchange
+
+## Special Services
+
+### Cash on Delivery (COD)
+- **COD Collection**: Secure cash handling by delivery agents
+- **COD Verification**: Phone verification before delivery
+- **COD Limits**: Maximum amount per delivery
+- **COD Remittance**: Daily settlement to platform account
+- **COD Risk Management**: Fraud prevention and monitoring
+
+### Express Delivery Services
+- **Same-Day Delivery**: Within major cities
+- **2-Hour Delivery**: Premium express service
+- **Scheduled Delivery**: Customer-preferred time slots
+- **White Glove**: Premium service with setup
+- **Priority Handling**: Expedited processing throughout
+
+## Business Objectives
+
+### Primary Goals
+1. **Delivery Excellence**: Ensure reliable and timely deliveries
+2. **Cost Optimization**: Minimize shipping costs while maintaining quality
+3. **Coverage Expansion**: Reach all areas of Bangladesh efficiently
+4. **Customer Satisfaction**: Provide excellent delivery experience
+5. **Vendor Support**: Enable efficient vendor fulfillment
+
+### Bangladesh Market Alignment
+1. **Rural Reach**: Extend delivery to remote areas
+2. **Local Partnerships**: Collaborate with local courier services
+3. **Flexible Options**: Accommodate local delivery preferences
+4. **Cost Efficiency**: Affordable shipping for all customers
+5. **Infrastructure Adaptation**: Work within Bangladesh's logistics constraints
+
+This Shipping & Logistics Service provides comprehensive delivery management that addresses the unique challenges and opportunities of the Bangladesh market while maintaining international standards for efficiency and customer satisfaction.

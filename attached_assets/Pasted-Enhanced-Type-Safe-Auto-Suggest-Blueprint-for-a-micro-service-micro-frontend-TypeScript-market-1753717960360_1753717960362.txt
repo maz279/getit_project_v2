@@ -1,0 +1,178 @@
+Enhanced Type-Safe Auto-Suggest Blueprint  
+(for a micro-service, micro-frontend, TypeScript marketplace that already has Grok AI, NLP/ML, image search & QR-code search)
+
+──────────────────────────────────  
+1.  Re-check of the previous plan  
+   •  Correct: cold-start vs. warm-start split, Edge-n-gram index, multi-source ranking.  
+   •  Missing: TypeScript contracts, micro-service boundaries, polyglot ML/NLP pipelines, image & QR flows, micro-frontend isolation.  
+   •  Below we patch these gaps.
+
+──────────────────────────────────  
+2.  High-level data flow (bounded contexts)
+
+┌----------------------┐       ┌----------------------┐
+│  Micro-Frontend A    │       │  Micro-Frontend B    │
+│ (React + TS)         │       │ (React + TS)         │
+│ Search bar MFE       │       │ Vendor dashboard MFE │
+└---------┬------------┘       └---------┬------------┘
+          │ gRPC-Web / REST               │
+┌---------▼------------┐       ┌---------▼------------┐
+│  API-Gateway (TS)    │-------┤ Event bus (Kafka)    │
+└---------┬------------┘       └---------┬------------┘
+          │                               │
+┌---------▼------------┐       ┌---------▼------------┐
+│  Suggest-Service (TS)│<------┤ ML-Feature-Service   │
+│  (stateless, 50 ms)  │       │ (Python, Grok AI)    │
+└---------┬------------┘       └---------┬------------┘
+          │                               │
+┌---------▼------------┐       ┌---------▼------------┐
+│  Catalog-Index (OS)  │       │  Query-Log-Index     │
+│  (OpenSearch)        │       │  (OpenSearch)        │
+└----------------------┘       └----------------------┘
+
+Each service owns its data store (polyglot persistence) and communicates only via well-defined APIs.
+
+──────────────────────────────────  
+3.  Service contracts (TypeScript first)
+
+// packages/shared/src/suggest.ts
+export interface SuggestRequest {
+  q: string; // user prefix
+  context: {
+    geo?: string;
+    vendorId?: string;
+    userId?: string;
+    imagePayload?: string; // base64 or S3 key
+    qrPayload?: string;    // decoded string
+  };
+}
+
+export interface SuggestHit {
+  text: string;
+  source: 'catalog' | 'querylog' | 'image' | 'qr' | 'mlgen';
+  score: number;
+  attributes?: Record<string, any>;
+}
+
+──────────────────────────────────  
+4.  Suggest-Service (TypeScript, Node 20)
+
+4.1  Entry point
+
+export async function suggest(req: SuggestRequest): Promise<SuggestHit[]> {
+  const promises = [
+    catalogSuggest(req),
+    querylogSuggest(req),
+    imageSuggest(req),
+    qrSuggest(req),
+    mlGenSuggest(req)
+  ];
+  const buckets = await Promise.allSettled(promises);
+  return mergeAndRank(buckets);
+}
+
+4.2  Image branch (new)
+
+async function imageSuggest(req: SuggestRequest): Promise<SuggestHit[]> {
+  if (!req.context.imagePayload) return [];
+  const labels = await mlFeatureService.detectLabels(req.context.imagePayload);
+  const phrases = labels.map(l => l.description.toLowerCase());
+  return catalogIndex.multiMatch(phrases, { fields: ['name', 'category^2'] });
+}
+
+4.3  QR branch (new)
+
+async function qrSuggest(req: SuggestRequest): Promise<SuggestHit[]> {
+  if (!req.context.qrPayload) return [];
+  const parsed = qrParser.parse(req.context.qrPayload); // may contain SKU or promo
+  return catalogIndex.termQuery(parsed.productCode);
+}
+
+4.4  ML-generated branch (Grok AI)
+
+async function mlGenSuggest(req: SuggestRequest): Promise<SuggestHit[]> {
+  if (req.q.length < 3) return [];
+  const candidates = await mlFeatureService.grokComplete(req.q);
+  return candidates.map(c => ({ text: c, source: 'mlgen', score: c.score }));
+}
+
+4.5  OpenSearch query helper
+
+class CatalogIndex {
+  async multiMatch(phrases: string[], opts: any): Promise<SuggestHit[]> {
+    const body = {
+      query: {
+        bool: {
+          should: phrases.map(p => ({
+            multi_match: {
+              query: p,
+              fields: opts.fields,
+              type: 'phrase_prefix',
+              boost: 1.5
+            }
+          }))
+        }
+      },
+      size: 5
+    };
+    const res = await this.os.search({ index: 'catalog', body });
+    return res.hits.hits.map(h => ({
+      text: h._source.name,
+      source: 'catalog',
+      score: h._score
+    }));
+  }
+}
+
+──────────────────────────────────  
+5.  ML-Feature-Service (Python)
+
+•  Receives base64 image → returns top-5 labels (Grok Vision).  
+•  Receives partial query → returns 10 completions (Grok LLM).  
+•  Publishes metrics on Kafka for online learning.
+
+──────────────────────────────────  
+6.  Data pipelines (catalog & logs)
+
+Catalog nightly job (Spark on Kubernetes)  
+   – Explodes product attributes → Edge-n-grams → OpenSearch bulk index.
+
+Query-log hourly Flink job  
+   – Deduplicates queries → computes CTR score → streams to OpenSearch.
+
+──────────────────────────────────  
+7.  Micro-front-end isolation
+
+Search-bar MFE (single-spa parcel)
+
+import { suggest } from '@marketplace/sdk';
+
+const SearchBar = () => {
+  const { data } = useSWR([input, context], suggest, { suspense: true });
+  return <Dropdown hits={data} />;
+};
+
+Shared SDK package (`@marketplace/sdk`) is generated from OpenAPI spec and ships TypeScript types.
+
+──────────────────────────────────  
+8.  DevOps & observability
+
+•  Each service containerised (Docker) and deployed via Helm on EKS.  
+•  Canary deploys via Argo Rollouts.  
+•  Grafana dashboards: p99 latency, zero-result rate, CTR, Grok token cost.  
+•  Central tracing with OpenTelemetry.
+
+──────────────────────────────────  
+9.  Security & rate-limit
+
+•  API-Gateway enforces OAuth2 + JWT.  
+•  Per-IP rate-limit 100 req/min on /suggest.  
+•  Image & QR payloads scanned by ClamAV side-car.
+
+──────────────────────────────────  
+10.  A/B & online learning
+
+•  Feature-flag service toggles between “catalog-only” vs. “hybrid” ranking.  
+•  Kafka events feed real-time bandit model to re-rank suggestions every 5 min.
+
+This revised blueprint is fully TypeScript-native, respects micro-service & micro-frontend boundaries, and natively incorporates Grok AI, NLP/ML, image and QR-code search without coupling any consumer to the underlying technology choices.

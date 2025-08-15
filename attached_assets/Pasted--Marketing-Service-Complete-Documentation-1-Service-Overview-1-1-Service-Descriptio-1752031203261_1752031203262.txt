@@ -1,0 +1,1212 @@
+# Marketing Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Marketing Service manages comprehensive marketing campaigns, customer engagement, promotional activities, and marketing automation for the GetIt platform. It handles email marketing, SMS campaigns, social media marketing, affiliate programs, loyalty programs, and advanced marketing analytics tailored for Bangladesh's diverse market.
+
+### 1.2 Core Responsibilities
+- **Campaign Management**: Create and manage multi-channel marketing campaigns
+- **Email Marketing**: Automated email campaigns and newsletters
+- **SMS Marketing**: Bulk SMS campaigns with local carrier integration
+- **Segmentation**: Advanced customer segmentation and targeting
+- **Automation**: Marketing automation workflows and triggers
+- **Analytics**: Comprehensive marketing performance analytics
+- **Affiliate Management**: Affiliate and referral program management
+
+### 1.3 Technology Stack
+```yaml
+Service: marketing-service
+Technology: Node.js + Express.js + Python (ML)
+Database: PostgreSQL + MongoDB + Redis
+Email: SendGrid + AWS SES
+SMS: SSL Wireless + Banglalink + Robi
+Analytics: Apache Kafka + Elasticsearch
+ML: TensorFlow + scikit-learn
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- Marketing campaigns table
+CREATE TABLE marketing_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    campaign_name VARCHAR(255) NOT NULL,
+    campaign_name_bn VARCHAR(255), -- Bangla campaign name
+    description TEXT,
+    campaign_type campaign_type NOT NULL,
+    campaign_objective campaign_objective NOT NULL,
+    status campaign_status DEFAULT 'draft',
+    budget DECIMAL(12,2),
+    spent_amount DECIMAL(12,2) DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'BDT',
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    target_audience JSONB,
+    channels JSONB NOT NULL, -- Array of marketing channels
+    content_settings JSONB,
+    automation_rules JSONB,
+    performance_goals JSONB,
+    a_b_test_config JSONB,
+    created_by UUID NOT NULL REFERENCES users(id),
+    approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Email campaigns table
+CREATE TABLE email_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    marketing_campaign_id UUID REFERENCES marketing_campaigns(id),
+    campaign_name VARCHAR(255) NOT NULL,
+    subject_line VARCHAR(255) NOT NULL,
+    subject_line_bn VARCHAR(255), -- Bangla subject
+    sender_name VARCHAR(100) NOT NULL,
+    sender_email VARCHAR(100) NOT NULL,
+    template_id UUID REFERENCES email_templates(id),
+    content JSONB NOT NULL,
+    content_bn JSONB, -- Bangla content
+    send_type send_type DEFAULT 'immediate',
+    scheduled_time TIMESTAMP,
+    timezone VARCHAR(50) DEFAULT 'Asia/Dhaka',
+    recipient_count INTEGER DEFAULT 0,
+    sent_count INTEGER DEFAULT 0,
+    delivered_count INTEGER DEFAULT 0,
+    opened_count INTEGER DEFAULT 0,
+    clicked_count INTEGER DEFAULT 0,
+    unsubscribed_count INTEGER DEFAULT 0,
+    bounced_count INTEGER DEFAULT 0,
+    status email_campaign_status DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SMS campaigns table
+CREATE TABLE sms_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    marketing_campaign_id UUID REFERENCES marketing_campaigns(id),
+    campaign_name VARCHAR(255) NOT NULL,
+    message_content TEXT NOT NULL,
+    message_content_bn TEXT, -- Bangla message
+    sender_id VARCHAR(20),
+    send_type send_type DEFAULT 'immediate',
+    scheduled_time TIMESTAMP,
+    timezone VARCHAR(50) DEFAULT 'Asia/Dhaka',
+    recipient_count INTEGER DEFAULT 0,
+    sent_count INTEGER DEFAULT 0,
+    delivered_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    opt_out_count INTEGER DEFAULT 0,
+    status sms_campaign_status DEFAULT 'draft',
+    carrier_distribution JSONB,
+    cost_per_sms DECIMAL(6,4) DEFAULT 0.50,
+    total_cost DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Customer segments table
+CREATE TABLE customer_segments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    segment_name VARCHAR(255) NOT NULL,
+    segment_name_bn VARCHAR(255), -- Bangla segment name
+    description TEXT,
+    segment_type segment_type NOT NULL,
+    criteria JSONB NOT NULL,
+    is_dynamic BOOLEAN DEFAULT true,
+    customer_count INTEGER DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NOT NULL REFERENCES users(id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Marketing automation workflows table
+CREATE TABLE automation_workflows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    workflow_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    trigger_type trigger_type NOT NULL,
+    trigger_conditions JSONB NOT NULL,
+    workflow_steps JSONB NOT NULL,
+    is_active BOOLEAN DEFAULT false,
+    execution_count INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    last_executed TIMESTAMP,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Affiliate program table
+CREATE TABLE affiliate_programs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    program_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    commission_structure JSONB NOT NULL,
+    terms_and_conditions TEXT,
+    minimum_payout DECIMAL(10,2) DEFAULT 1000.00,
+    payment_frequency payment_frequency DEFAULT 'monthly',
+    cookie_duration_days INTEGER DEFAULT 30,
+    approval_required BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    total_affiliates INTEGER DEFAULT 0,
+    total_sales DECIMAL(12,2) DEFAULT 0,
+    total_commissions_paid DECIMAL(12,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Affiliate partners table
+CREATE TABLE affiliate_partners (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    affiliate_program_id UUID NOT NULL REFERENCES affiliate_programs(id),
+    affiliate_code VARCHAR(50) UNIQUE NOT NULL,
+    status affiliate_status DEFAULT 'pending',
+    referral_link VARCHAR(500),
+    total_clicks INTEGER DEFAULT 0,
+    total_conversions INTEGER DEFAULT 0,
+    total_sales DECIMAL(12,2) DEFAULT 0,
+    total_commission_earned DECIMAL(12,2) DEFAULT 0,
+    commission_pending DECIMAL(12,2) DEFAULT 0,
+    commission_paid DECIMAL(12,2) DEFAULT 0,
+    last_payout_date TIMESTAMP,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, affiliate_program_id)
+);
+
+-- Loyalty programs table
+CREATE TABLE loyalty_programs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    program_name VARCHAR(255) NOT NULL,
+    program_name_bn VARCHAR(255), -- Bangla program name
+    description TEXT,
+    program_type loyalty_program_type NOT NULL,
+    points_earning_rules JSONB NOT NULL,
+    points_redemption_rules JSONB NOT NULL,
+    tier_structure JSONB,
+    expiry_rules JSONB,
+    is_active BOOLEAN DEFAULT true,
+    member_count INTEGER DEFAULT 0,
+    total_points_issued BIGINT DEFAULT 0,
+    total_points_redeemed BIGINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Customer loyalty points table
+CREATE TABLE customer_loyalty_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES users(id),
+    loyalty_program_id UUID NOT NULL REFERENCES loyalty_programs(id),
+    current_balance BIGINT DEFAULT 0,
+    lifetime_earned BIGINT DEFAULT 0,
+    lifetime_redeemed BIGINT DEFAULT 0,
+    tier_level VARCHAR(50),
+    tier_benefits JSONB,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity TIMESTAMP,
+    UNIQUE(customer_id, loyalty_program_id)
+);
+
+-- Promotional offers table
+CREATE TABLE promotional_offers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    offer_name VARCHAR(255) NOT NULL,
+    offer_name_bn VARCHAR(255), -- Bangla offer name
+    description TEXT,
+    offer_type offer_type NOT NULL,
+    discount_type discount_type NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL,
+    minimum_purchase_amount DECIMAL(10,2),
+    maximum_discount_amount DECIMAL(10,2),
+    applicable_products JSONB,
+    applicable_categories JSONB,
+    usage_limit INTEGER,
+    usage_count INTEGER DEFAULT 0,
+    customer_usage_limit INTEGER DEFAULT 1,
+    valid_from TIMESTAMP NOT NULL,
+    valid_until TIMESTAMP NOT NULL,
+    promotion_code VARCHAR(50) UNIQUE,
+    auto_apply BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Marketing analytics table
+CREATE TABLE marketing_analytics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type analytics_entity_type NOT NULL,
+    entity_id UUID NOT NULL,
+    date DATE NOT NULL,
+    metrics JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(entity_type, entity_id, date)
+);
+
+-- Email templates table
+CREATE TABLE email_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID REFERENCES vendors(id),
+    template_name VARCHAR(255) NOT NULL,
+    template_category template_category NOT NULL,
+    subject_line VARCHAR(255) NOT NULL,
+    html_content TEXT NOT NULL,
+    text_content TEXT,
+    variables JSONB,
+    is_responsive BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    usage_count INTEGER DEFAULT 0,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Marketing events log table
+CREATE TABLE marketing_events_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES users(id),
+    event_type marketing_event_type NOT NULL,
+    event_data JSONB NOT NULL,
+    campaign_id UUID,
+    channel marketing_channel,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_agent TEXT,
+    ip_address INET,
+    referrer VARCHAR(500)
+);
+
+-- Create custom types
+CREATE TYPE campaign_type AS ENUM ('awareness', 'acquisition', 'retention', 'conversion', 'loyalty', 'reactivation');
+CREATE TYPE campaign_objective AS ENUM ('brand_awareness', 'lead_generation', 'sales', 'app_downloads', 'website_traffic', 'engagement');
+CREATE TYPE campaign_status AS ENUM ('draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled');
+CREATE TYPE send_type AS ENUM ('immediate', 'scheduled', 'triggered');
+CREATE TYPE email_campaign_status AS ENUM ('draft', 'scheduled', 'sending', 'sent', 'paused', 'cancelled');
+CREATE TYPE sms_campaign_status AS ENUM ('draft', 'scheduled', 'sending', 'sent', 'paused', 'cancelled');
+CREATE TYPE segment_type AS ENUM ('demographic', 'behavioral', 'geographic', 'psychographic', 'custom');
+CREATE TYPE trigger_type AS ENUM ('user_action', 'date_based', 'event_based', 'api_trigger');
+CREATE TYPE payment_frequency AS ENUM ('weekly', 'monthly', 'quarterly');
+CREATE TYPE affiliate_status AS ENUM ('pending', 'approved', 'suspended', 'rejected');
+CREATE TYPE loyalty_program_type AS ENUM ('points', 'tiers', 'cashback', 'hybrid');
+CREATE TYPE offer_type AS ENUM ('coupon', 'flash_sale', 'bundle', 'bogo', 'free_shipping');
+CREATE TYPE discount_type AS ENUM ('percentage', 'fixed_amount', 'free_shipping', 'buy_x_get_y');
+CREATE TYPE analytics_entity_type AS ENUM ('campaign', 'email_campaign', 'sms_campaign', 'segment', 'affiliate', 'loyalty_program');
+CREATE TYPE template_category AS ENUM ('welcome', 'promotional', 'transactional', 'newsletter', 'abandoned_cart', 'reactivation');
+CREATE TYPE marketing_event_type AS ENUM ('email_sent', 'email_opened', 'email_clicked', 'sms_sent', 'sms_delivered', 'page_view', 'purchase', 'signup');
+CREATE TYPE marketing_channel AS ENUM ('email', 'sms', 'push_notification', 'social_media', 'affiliate', 'direct', 'organic_search', 'paid_search');
+
+-- Create indexes
+CREATE INDEX idx_marketing_campaigns_vendor ON marketing_campaigns(vendor_id);
+CREATE INDEX idx_marketing_campaigns_status ON marketing_campaigns(status);
+CREATE INDEX idx_email_campaigns_marketing_campaign ON email_campaigns(marketing_campaign_id);
+CREATE INDEX idx_customer_segments_vendor ON customer_segments(vendor_id);
+CREATE INDEX idx_affiliate_partners_user ON affiliate_partners(user_id);
+CREATE INDEX idx_customer_loyalty_points_customer ON customer_loyalty_points(customer_id);
+CREATE INDEX idx_marketing_events_log_customer ON marketing_events_log(customer_id);
+CREATE INDEX idx_marketing_events_log_timestamp ON marketing_events_log(timestamp DESC);
+```
+
+### 2.2 MongoDB Collections
+```javascript
+// Real-time campaign performance
+{
+    _id: ObjectId,
+    campaign_id: "uuid",
+    campaign_type: "email",
+    real_time_metrics: {
+        sent: 5420,
+        delivered: 5180,
+        opened: 1244,
+        clicked: 289,
+        conversions: 45,
+        revenue: 125000.00
+    },
+    performance_timeline: [
+        {
+            timestamp: ISODate,
+            metric: "opened",
+            value: 1244,
+            rate: 0.24
+        }
+    ],
+    audience_engagement: {
+        by_location: {
+            "Dhaka": { opened: 650, clicked: 145 },
+            "Chittagong": { opened: 280, clicked: 62 }
+        },
+        by_device: {
+            "mobile": { opened: 890, clicked: 205 },
+            "desktop": { opened: 354, clicked: 84 }
+        }
+    },
+    a_b_test_results: {
+        variant_a: { sent: 2710, opened: 622, clicked: 144 },
+        variant_b: { sent: 2710, opened: 622, clicked: 145 }
+    },
+    updated_at: ISODate
+}
+
+// Customer journey tracking
+{
+    _id: ObjectId,
+    customer_id: "uuid",
+    journey_data: [
+        {
+            touchpoint: "email_opened",
+            campaign_id: "uuid",
+            timestamp: ISODate,
+            data: {
+                subject: "Flash Sale: 50% Off Electronics",
+                opened_on: "mobile"
+            }
+        },
+        {
+            touchpoint: "website_visit",
+            timestamp: ISODate,
+            data: {
+                source: "email",
+                page: "/electronics/flash-sale"
+            }
+        },
+        {
+            touchpoint: "purchase",
+            timestamp: ISODate,
+            data: {
+                order_id: "uuid",
+                amount: 2500.00,
+                products: ["product_uuid1"]
+            }
+        }
+    ],
+    attribution: {
+        first_touch: "email_campaign_uuid",
+        last_touch: "email_campaign_uuid",
+        conversion_path: ["email", "website", "purchase"]
+    },
+    customer_lifetime_value: 15000.00,
+    updated_at: ISODate
+}
+
+// Marketing automation execution
+{
+    _id: ObjectId,
+    workflow_id: "uuid",
+    customer_id: "uuid",
+    execution_id: "exec_uuid",
+    current_step: 2,
+    steps_completed: [
+        {
+            step_id: 1,
+            step_type: "wait",
+            executed_at: ISODate,
+            status: "completed"
+        },
+        {
+            step_id: 2,
+            step_type: "send_email",
+            executed_at: ISODate,
+            status: "completed",
+            result: {
+                email_sent: true,
+                message_id: "msg_uuid"
+            }
+        }
+    ],
+    next_execution: ISODate,
+    status: "running", // running, completed, failed, paused
+    started_at: ISODate
+}
+
+// Personalization profiles
+{
+    _id: ObjectId,
+    customer_id: "uuid",
+    profile_data: {
+        preferences: {
+            categories: ["electronics", "fashion"],
+            brands: ["apple", "samsung"],
+            price_range: { min: 1000, max: 50000 },
+            communication_frequency: "weekly"
+        },
+        behavior_data: {
+            avg_order_value: 3500.00,
+            purchase_frequency: "monthly",
+            preferred_channels: ["email", "sms"],
+            active_hours: ["19:00", "22:00"],
+            device_preference: "mobile"
+        },
+        engagement_scores: {
+            email: 0.75,
+            sms: 0.85,
+            push: 0.45,
+            social: 0.65
+        },
+        predicted_metrics: {
+            next_purchase_probability: 0.68,
+            churn_probability: 0.15,
+            lifetime_value: 25000.00
+        }
+    },
+    last_updated: ISODate
+}
+```
+
+### 2.3 Redis Schema
+```javascript
+// Campaign performance cache
+CAMPAIGN_METRICS:{campaign_id} = {
+    sent: 5420,
+    opened: 1244,
+    clicked: 289,
+    conversions: 45,
+    revenue: 125000.00,
+    open_rate: 0.229,
+    click_rate: 0.053,
+    conversion_rate: 0.008
+}
+
+// Real-time audience counters
+SEGMENT_COUNT:{segment_id} = 15420
+
+// A/B test assignments
+AB_TEST:{campaign_id}:{customer_id} = "variant_a"
+
+// Email send queue
+EMAIL_QUEUE = LIST[email_job1, email_job2, ...]
+
+// SMS send queue
+SMS_QUEUE = LIST[sms_job1, sms_job2, ...]
+
+// Rate limiting for campaigns
+CAMPAIGN_RATE_LIMIT:{campaign_id} = {
+    hourly_sent: 500,
+    daily_sent: 5000,
+    limit_reached: false
+}
+
+// Customer communication frequency
+CUSTOMER_COMM_FREQ:{customer_id} = {
+    emails_this_week: 3,
+    sms_this_week: 2,
+    last_email: timestamp,
+    last_sms: timestamp
+}
+
+// Trending campaigns
+TRENDING_CAMPAIGNS = SORTED_SET[campaign_id:performance_score]
+```
+
+## 3. Folder Structure
+
+```
+marketing-service/
+├── src/
+│   ├── controllers/
+│   │   ├── campaign-controller.js          # Marketing campaign management
+│   │   ├── email-campaign-controller.js    # Email campaign management
+│   │   ├── sms-campaign-controller.js      # SMS campaign management
+│   │   ├── segmentation-controller.js      # Customer segmentation
+│   │   ├── automation-controller.js        # Marketing automation
+│   │   ├── affiliate-controller.js         # Affiliate program management
+│   │   ├── loyalty-controller.js           # Loyalty program management
+│   │   ├── promotion-controller.js         # Promotional offers
+│   │   └── analytics-controller.js         # Marketing analytics
+│   ├── models/
+│   │   ├── MarketingCampaign.js            # Marketing campaign model
+│   │   ├── EmailCampaign.js                # Email campaign model
+│   │   ├── SMSCampaign.js                  # SMS campaign model
+│   │   ├── CustomerSegment.js              # Customer segment model
+│   │   ├── AutomationWorkflow.js           # Automation workflow model
+│   │   ├── AffiliateProgram.js             # Affiliate program model
+│   │   ├── LoyaltyProgram.js               # Loyalty program model
+│   │   ├── PromotionalOffer.js             # Promotional offer model
+│   │   └── EmailTemplate.js                # Email template model
+│   ├── routes/
+│   │   ├── campaign-routes.js              # Campaign management endpoints
+│   │   ├── email-routes.js                 # Email campaign endpoints
+│   │   ├── sms-routes.js                   # SMS campaign endpoints
+│   │   ├── segmentation-routes.js          # Segmentation endpoints
+│   │   ├── automation-routes.js            # Automation endpoints
+│   │   ├── affiliate-routes.js             # Affiliate endpoints
+│   │   ├── loyalty-routes.js               # Loyalty endpoints
+│   │   └── analytics-routes.js             # Analytics endpoints
+│   ├── services/
+│   │   ├── campaign-service.js             # Campaign management logic
+│   │   ├── email-service.js                # Email sending service
+│   │   ├── sms-service.js                  # SMS sending service
+│   │   ├── segmentation-service.js         # Customer segmentation logic
+│   │   ├── automation-service.js           # Marketing automation engine
+│   │   ├── affiliate-service.js            # Affiliate program logic
+│   │   ├── loyalty-service.js              # Loyalty program logic
+│   │   ├── personalization-service.js      # Content personalization
+│   │   ├── analytics-service.js            # Marketing analytics
+│   │   └── attribution-service.js          # Marketing attribution
+│   ├── middleware/
+│   │   ├── marketing-auth.js               # Marketing authorization
+│   │   ├── campaign-validation.js          # Campaign validation
+│   │   ├── rate-limiting.js                # Campaign rate limiting
+│   │   ├── consent-validation.js           # Marketing consent validation
+│   │   └── unsubscribe-handler.js          # Unsubscribe handling
+│   ├── utils/
+│   │   ├── email-utils.js                  # Email utilities
+│   │   ├── sms-utils.js                    # SMS utilities
+│   │   ├── segmentation-utils.js           # Segmentation utilities
+│   │   ├── template-engine.js              # Template processing engine
+│   │   ├── ab-test-utils.js                # A/B testing utilities
+│   │   └── analytics-utils.js              # Analytics calculation utilities
+│   ├── automation/
+│   │   ├── workflow-engine.js              # Automation workflow engine
+│   │   ├── trigger-processor.js            # Trigger event processor
+│   │   ├── action-executor.js              # Automation action executor
+│   │   ├── condition-evaluator.js          # Condition evaluation engine
+│   │   └── workflow-scheduler.js           # Workflow scheduling
+│   ├── ml/
+│   │   ├── customer-segmentation-ml.py     # ML-based customer segmentation
+│   │   ├── churn-prediction.py             # Customer churn prediction
+│   │   ├── ltv-prediction.py               # Lifetime value prediction
+│   │   ├── content-personalization.py      # Content personalization ML
+│   │   ├── send-time-optimization.py       # Optimal send time prediction
+│   │   └── campaign-optimization.py        # Campaign performance optimization
+│   ├── workers/
+│   │   ├── email-sender-worker.js          # Email sending worker
+│   │   ├── sms-sender-worker.js            # SMS sending worker
+│   │   ├── automation-worker.js            # Automation execution worker
+│   │   ├── analytics-worker.js             # Analytics calculation worker
+│   │   └── segmentation-worker.js          # Segmentation update worker
+│   ├── integrations/
+│   │   ├── sendgrid-integration.js         # SendGrid email integration
+│   │   ├── ssl-wireless-integration.js     # SSL Wireless SMS integration
+│   │   ├── banglalink-integration.js       # Banglalink SMS integration
+│   │   ├── social-media-integration.js     # Social media platform integration
+│   │   └── analytics-integration.js        # External analytics integration
+│   ├── config/
+│   │   ├── email-config.js                 # Email service configuration
+│   │   ├── sms-config.js                   # SMS service configuration
+│   │   ├── automation-config.js            # Automation configuration
+│   │   ├── analytics-config.js             # Analytics configuration
+│   │   └── ml-config.js                    # ML model configuration
+│   └── app.js                              # Express application setup
+├── bangladesh-marketing/                   # Bangladesh-specific marketing
+│   ├── local-carrier-integration.js       # Local SMS carrier integration
+│   ├── cultural-campaign-templates.js     # Cultural campaign templates
+│   ├── festival-marketing-automation.js   # Festival-based automation
+│   ├── bengali-content-optimization.js    # Bengali content optimization
+│   └── local-compliance-handler.js        # Local marketing compliance
+├── email-marketing/                       # Email marketing engine
+│   ├── email-composer.js                  # Email composition engine
+│   ├── template-renderer.js               # Email template rendering
+│   ├── deliverability-optimizer.js        # Email deliverability optimization
+│   ├── unsubscribe-handler.js             # Unsubscribe management
+│   ├── bounce-handler.js                  # Bounce handling
+│   └── reputation-manager.js              # Sender reputation management
+├── sms-marketing/                         # SMS marketing engine
+│   ├── sms-composer.js                    # SMS composition engine
+│   ├── carrier-router.js                  # SMS carrier routing
+│   ├── delivery-optimizer.js              # SMS delivery optimization
+│   ├── opt-out-handler.js                 # SMS opt-out management
+│   └── cost-optimizer.js                  # SMS cost optimization
+├── personalization/                       # Marketing personalization
+│   ├── content-personalizer.js            # Content personalization engine
+│   ├── product-recommender.js             # Product recommendation for marketing
+│   ├── send-time-optimizer.js             # Optimal send time calculation
+│   ├── frequency-optimizer.js             # Communication frequency optimization
+│   └── channel-optimizer.js               # Channel preference optimization
+├── analytics/                             # Marketing analytics
+│   ├── campaign-analytics.js              # Campaign performance analytics
+│   ├── customer-analytics.js              # Customer behavior analytics
+│   ├── attribution-analytics.js           # Marketing attribution analysis
+│   ├── roi-calculator.js                  # Marketing ROI calculation
+│   ├── cohort-analyzer.js                 # Customer cohort analysis
+│   └── funnel-analyzer.js                 # Conversion funnel analysis
+├── compliance/                            # Marketing compliance
+│   ├── gdpr-compliance.js                 # GDPR compliance handling
+│   ├── can-spam-compliance.js             # CAN-SPAM compliance
+│   ├── bangladesh-compliance.js           # Bangladesh marketing law compliance
+│   ├── consent-manager.js                 # Marketing consent management
+│   └── privacy-handler.js                 # Privacy preference handling
+├── tests/
+│   ├── unit/
+│   │   ├── campaign-service.test.js
+│   │   ├── email-service.test.js
+│   │   ├── sms-service.test.js
+│   │   ├── segmentation.test.js
+│   │   └── automation-engine.test.js
+│   ├── integration/
+│   │   ├── email-campaign-flow.test.js
+│   │   ├── sms-campaign-flow.test.js
+│   │   └── automation-flow.test.js
+│   └── performance/
+│       ├── email-sending-performance.test.js
+│       └── segmentation-performance.test.js
+├── localization/                          # Multi-language support
+│   ├── en/
+│   │   ├── marketing-messages.json        # English marketing messages
+│   │   ├── email-templates.json           # English email templates
+│   │   ├── sms-templates.json             # English SMS templates
+│   │   └── campaign-copy.json             # English campaign copy
+│   └── bn/                               # Bangla translations
+│       ├── marketing-messages.json        # Bangla marketing messages
+│       ├── email-templates.json           # Bangla email templates
+│       ├── sms-templates.json             # Bangla SMS templates
+│       └── campaign-copy.json             # Bangla campaign copy
+├── documentation/                         # Marketing service documentation
+│   ├── api-documentation/
+│   │   ├── campaign-apis.md
+│   │   ├── email-apis.md
+│   │   ├── sms-apis.md
+│   │   └── analytics-apis.md
+│   ├── integration-guides/
+│   │   ├── email-provider-setup.md
+│   │   ├── sms-carrier-setup.md
+│   │   └── automation-setup.md
+│   └── best-practices/
+│       ├── email-marketing-guide.md
+│       ├── sms-marketing-guide.md
+│       └── automation-strategies.md
+├── docker-compose.yml                     # Multi-service composition
+├── Dockerfile                            # Docker configuration
+├── requirements.txt                       # Python dependencies (for ML)
+├── package.json                          # Node.js dependencies
+└── README.md                             # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 Campaign Management APIs
+```javascript
+// Create marketing campaign
+POST /api/v1/marketing/campaigns
+Body: {
+    campaign_name: "Eid Collection Launch",
+    campaign_name_bn: "ঈদ কালেকশন লঞ্চ",
+    description: "Launch campaign for new Eid collection",
+    campaign_type: "acquisition",
+    campaign_objective: "sales",
+    budget: 50000.00,
+    start_date: "2024-04-10T00:00:00Z",
+    end_date: "2024-04-25T23:59:59Z",
+    channels: ["email", "sms", "social_media"],
+    target_audience: {
+        segments: ["segment_uuid1", "segment_uuid2"],
+        demographics: {
+            age_range: [18, 45],
+            locations: ["Dhaka", "Chittagong"]
+        }
+    },
+    performance_goals: {
+        target_reach: 10000,
+        target_conversions: 500,
+        target_revenue: 1000000.00
+    }
+}
+
+// Get campaigns
+GET /api/v1/marketing/campaigns
+Query: ?status=active&campaign_type=acquisition&page=1&limit=20
+Response: {
+    campaigns: [
+        {
+            id: "uuid",
+            campaign_name: "Eid Collection Launch",
+            status: "active",
+            budget: 50000.00,
+            spent_amount: 15000.00,
+            performance: {
+                reach: 7500,
+                conversions: 245,
+                revenue: 485000.00,
+                roi: 3.23
+            },
+            start_date: "2024-04-10T00:00:00Z",
+            end_date: "2024-04-25T23:59:59Z"
+        }
+    ],
+    total_count: 15,
+    summary: {
+        total_budget: 250000.00,
+        total_spent: 95000.00,
+        total_revenue: 2150000.00,
+        overall_roi: 2.26
+    }
+}
+
+// Update campaign
+PUT /api/v1/marketing/campaigns/:campaign_id
+Body: {
+    budget: 75000.00,
+    end_date: "2024-04-30T23:59:59Z"
+}
+
+// Get campaign analytics
+GET /api/v1/marketing/campaigns/:campaign_id/analytics
+Response: {
+    overview: {
+        total_reach: 8500,
+        unique_clicks: 1250,
+        conversions: 245,
+        revenue: 485000.00,
+        cost_per_acquisition: 61.22,
+        return_on_ad_spend: 3.23
+    },
+    channel_performance: {
+        email: { reach: 5000, conversions: 150, revenue: 300000.00 },
+        sms: { reach: 2800, conversions: 75, revenue: 125000.00 },
+        social_media: { reach: 700, conversions: 20, revenue: 60000.00 }
+    },
+    audience_insights: {
+        top_performing_segments: [...],
+        geographic_performance: {...},
+        demographic_breakdown: {...}
+    }
+}
+```
+
+### 4.2 Email Campaign APIs
+```javascript
+// Create email campaign
+POST /api/v1/marketing/email-campaigns
+Body: {
+    campaign_name: "Eid Special Offers",
+    subject_line: "🌙 Exclusive Eid Offers - Up to 50% Off!",
+    subject_line_bn: "🌙 বিশেষ ঈদ অফার - ৫০% পর্যন্ত ছাড়!",
+    sender_name: "GetIt Team",
+    sender_email: "offers@getit.com.bd",
+    template_id: "template_uuid",
+    content: {
+        headline: "Celebrate Eid with Amazing Offers",
+        products: ["product_uuid1", "product_uuid2"],
+        cta_text: "Shop Now",
+        cta_link: "https://getit.com.bd/eid-offers"
+    },
+    send_type: "scheduled",
+    scheduled_time: "2024-04-15T09:00:00Z",
+    target_segments: ["segment_uuid1", "segment_uuid2"]
+}
+
+// Send test email
+POST /api/v1/marketing/email-campaigns/:campaign_id/test
+Body: {
+    test_emails: ["test@example.com", "marketing@company.com"],
+    test_data: {
+        customer_name: "John Doe",
+        personalized_products: [...]
+    }
+}
+
+// Get email campaign performance
+GET /api/v1/marketing/email-campaigns/:campaign_id/performance
+Response: {
+    campaign_info: {
+        name: "Eid Special Offers",
+        sent_at: "2024-04-15T09:00:00Z",
+        total_sent: 8500
+    },
+    delivery_metrics: {
+        delivered: 8200,
+        bounced: 300,
+        delivery_rate: 0.965
+    },
+    engagement_metrics: {
+        opened: 2050,
+        clicked: 485,
+        unsubscribed: 25,
+        open_rate: 0.25,
+        click_rate: 0.057,
+        click_to_open_rate: 0.237
+    },
+    conversion_metrics: {
+        conversions: 95,
+        revenue: 285000.00,
+        conversion_rate: 0.011,
+        revenue_per_email: 33.53
+    },
+    top_performing_links: [
+        {
+            url: "https://getit.com.bd/eid-offers",
+            clicks: 320,
+            click_rate: 0.039
+        }
+    ]
+}
+
+// Manage unsubscribes
+GET /api/v1/marketing/email-campaigns/unsubscribes
+POST /api/v1/marketing/email-campaigns/unsubscribe
+Body: {
+    email: "customer@example.com",
+    reason: "too_frequent"
+}
+```
+
+### 4.3 SMS Campaign APIs
+```javascript
+// Create SMS campaign
+POST /api/v1/marketing/sms-campaigns
+Body: {
+    campaign_name: "Flash Sale Alert",
+    message_content: "🔥 Flash Sale: 50% off Electronics! Only 2 hours left. Shop now: bit.ly/getit-flash",
+    message_content_bn: "🔥 ফ্ল্যাশ সেল: ইলেকট্রনিক্সে ৫০% ছাড়! মাত্র ২ ঘন্টা বাকি। এখনই কিনুন: bit.ly/getit-flash",
+    sender_id: "GetIt",
+    send_type: "immediate",
+    target_segments: ["high_value_customers"],
+    carrier_preference: "ssl_wireless"
+}
+
+// Get SMS campaign performance
+GET /api/v1/marketing/sms-campaigns/:campaign_id/performance
+Response: {
+    campaign_info: {
+        name: "Flash Sale Alert",
+        sent_at: "2024-04-15T14:00:00Z",
+        total_sent: 2500
+    },
+    delivery_metrics: {
+        delivered: 2420,
+        failed: 80,
+        delivery_rate: 0.968
+    },
+    engagement_metrics: {
+        clicks: 485,
+        click_rate: 0.194,
+        opt_outs: 5
+    },
+    carrier_distribution: {
+        "Grameenphone": 1200,
+        "Banglalink": 650,
+        "Robi": 550,
+        "Teletalk": 100
+    },
+    cost_analysis: {
+        total_cost: 1250.00,
+        cost_per_sms: 0.50,
+        cost_per_click: 2.58
+    }
+}
+
+// SMS opt-out management
+POST /api/v1/marketing/sms-campaigns/opt-out
+Body: {
+    phone_number: "+8801712345678",
+    opt_out_reason: "not_interested"
+}
+
+// Get SMS delivery status
+GET /api/v1/marketing/sms-campaigns/:campaign_id/delivery-status
+Query: ?phone=+8801712345678
+```
+
+### 4.4 Customer Segmentation APIs
+```javascript
+// Create customer segment
+POST /api/v1/marketing/segments
+Body: {
+    segment_name: "High Value Customers",
+    segment_name_bn: "উচ্চ মূল্যের ক্রেতা",
+    description: "Customers with lifetime value > 50,000 BDT",
+    segment_type: "behavioral",
+    criteria: {
+        conditions: [
+            {
+                field: "customer_lifetime_value",
+                operator: "greater_than",
+                value: 50000
+            },
+            {
+                field: "last_purchase_date",
+                operator: "within_days",
+                value: 90
+            }
+        ],
+        logic: "AND"
+    },
+    is_dynamic: true
+}
+
+// Get segments
+GET /api/v1/marketing/segments
+Response: {
+    segments: [
+        {
+            id: "uuid",
+            segment_name: "High Value Customers",
+            customer_count: 1250,
+            last_updated: "2024-04-15T10:00:00Z",
+            growth_rate: 0.15, // 15% growth this month
+            avg_order_value: 3500.00
+        }
+    ]
+}
+
+// Get segment customers
+GET /api/v1/marketing/segments/:segment_id/customers
+Query: ?page=1&limit=100&sort=customer_lifetime_value_desc
+Response: {
+    customers: [
+        {
+            customer_id: "uuid",
+            email: "john@example.com",
+            phone: "+8801712345678",
+            customer_lifetime_value: 85000.00,
+            last_purchase_date: "2024-04-10T00:00:00Z",
+            total_orders: 25,
+            avg_order_value: 3400.00
+        }
+    ],
+    segment_insights: {
+        avg_customer_lifetime_value: 62500.00,
+        avg_order_frequency: "monthly",
+        top_categories: ["electronics", "fashion"],
+        preferred_communication_channels: ["email", "sms"]
+    }
+}
+
+// Export segment
+POST /api/v1/marketing/segments/:segment_id/export
+Body: {
+    format: "csv", // csv, xlsx, json
+    fields: ["email", "phone", "customer_lifetime_value", "last_purchase_date"]
+}
+```
+
+### 4.5 Marketing Automation APIs
+```javascript
+// Create automation workflow
+POST /api/v1/marketing/automation/workflows
+Body: {
+    workflow_name: "Welcome Series",
+    description: "3-email welcome series for new customers",
+    trigger_type: "user_action",
+    trigger_conditions: {
+        event: "user_registered",
+        filters: {
+            registration_source: "website"
+        }
+    },
+    workflow_steps: [
+        {
+            step_id: 1,
+            type: "wait",
+            duration: "1_hour"
+        },
+        {
+            step_id: 2,
+            type: "send_email",
+            template_id: "welcome_email_1",
+            personalization: true
+        },
+        {
+            step_id: 3,
+            type: "wait",
+            duration: "3_days"
+        },
+        {
+            step_id: 4,
+            type: "condition",
+            condition: {
+                field: "email_opened",
+                operator: "equals",
+                value: true
+            },
+            if_true: 5,
+            if_false: 6
+        },
+        {
+            step_id: 5,
+            type: "send_email",
+            template_id: "welcome_email_2_engaged"
+        },
+        {
+            step_id: 6,
+            type: "send_email",
+            template_id: "welcome_email_2_not_engaged"
+        }
+    ]
+}
+
+// Get workflow performance
+GET /api/v1/marketing/automation/workflows/:workflow_id/performance
+Response: {
+    workflow_info: {
+        name: "Welcome Series",
+        status: "active",
+        execution_count: 1250,
+        success_rate: 0.92
+    },
+    step_performance: [
+        {
+            step_id: 2,
+            step_type: "send_email",
+            executions: 1250,
+            successes: 1220,
+            success_rate: 0.976
+        }
+    ],
+    conversion_metrics: {
+        workflow_completions: 920,
+        completion_rate: 0.736,
+        conversions: 185,
+        conversion_rate: 0.148,
+        revenue: 465000.00
+    }
+}
+
+// Pause/Resume workflow
+PUT /api/v1/marketing/automation/workflows/:workflow_id/status
+Body: {
+    status: "paused", // active, paused
+    reason: "Updating email templates"
+}
+```
+
+### 4.6 Loyalty Program APIs
+```javascript
+// Create loyalty program
+POST /api/v1/marketing/loyalty/programs
+Body: {
+    program_name: "GetIt Rewards",
+    program_name_bn: "গেটইট রিওয়ার্ডস",
+    description: "Earn points on every purchase and redeem for discounts",
+    program_type: "points",
+    points_earning_rules: {
+        purchase_points: 1, // 1 point per BDT spent
+        signup_bonus: 500,
+        review_bonus: 50,
+        referral_bonus: 1000
+    },
+    points_redemption_rules: {
+        minimum_redemption: 100,
+        redemption_rate: 1, // 1 point = 1 BDT
+        maximum_redemption_per_order: 5000
+    },
+    tier_structure: {
+        "bronze": { min_points: 0, benefits: ["free_shipping_over_1000"] },
+        "silver": { min_points: 10000, benefits: ["free_shipping", "priority_support"] },
+        "gold": { min_points: 25000, benefits: ["free_shipping", "priority_support", "exclusive_offers"] }
+    },
+    expiry_rules: {
+        points_expire: true,
+        expiry_months: 12
+    }
+}
+
+// Get customer loyalty status
+GET /api/v1/marketing/loyalty/customers/:customer_id
+Response: {
+    customer_id: "uuid",
+    program_id: "uuid",
+    current_balance: 2500,
+    lifetime_earned: 15000,
+    lifetime_redeemed: 12500,
+    tier_level: "silver",
+    tier_benefits: ["free_shipping", "priority_support"],
+    points_expiring_soon: {
+        amount: 500,
+        expiry_date: "2024-05-15T00:00:00Z"
+    },
+    earning_history: [...],
+    redemption_history: [...]
+}
+
+// Redeem loyalty points
+POST /api/v1/marketing/loyalty/redeem
+Body: {
+    customer_id: "uuid",
+    points_to_redeem: 1000,
+    redemption_type: "discount", // discount, product, gift_card
+    order_id: "uuid"
+}
+
+// Award loyalty points
+POST /api/v1/marketing/loyalty/award
+Body: {
+    customer_id: "uuid",
+    points: 500,
+    reason: "product_review",
+    order_id: "uuid",
+    product_id: "uuid"
+}
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local SMS Integration
+- **Carrier Integration**: Direct integration with Grameenphone, Banglalink, Robi, Teletalk
+- **Cost Optimization**: Dynamic carrier routing for cost optimization
+- **Delivery Reports**: Real-time SMS delivery status from local carriers
+- **Bulk SMS Rates**: Negotiated bulk SMS rates with local carriers
+- **Unicode Support**: Full Unicode support for Bengali SMS content
+
+### 5.2 Cultural Marketing
+- **Festival Campaigns**: Automated campaigns for Eid, Durga Puja, Pohela Boishakh
+- **Religious Sensitivity**: Content filters ensuring religious sensitivity
+- **Local Language Content**: Native Bengali content creation and optimization
+- **Cultural Personalization**: Content adapted to local cultural preferences
+- **Regional Preferences**: Marketing adapted to different regions of Bangladesh
+
+### 5.3 Local Compliance
+- **BTRC Compliance**: Compliance with Bangladesh Telecommunication Regulatory Commission
+- **Spam Protection**: Anti-spam measures compliant with local regulations
+- **Opt-out Management**: Proper opt-out mechanisms for SMS and email
+- **Data Protection**: Compliance with Bangladesh data protection laws
+- **Marketing Hour Restrictions**: Respect for local time zones and business hours
+
+### 5.4 Mobile-First Marketing
+- **Mobile-Optimized Content**: All content optimized for mobile devices
+- **App Push Integration**: Deep integration with mobile app push notifications
+- **Mobile-Friendly Templates**: Email and landing page templates optimized for mobile
+- **SMS-First Strategy**: SMS as primary communication channel in Bangladesh
+- **Mobile Analytics**: Mobile-specific marketing analytics and insights
+
+## 6. Advanced Marketing Features
+
+### 6.1 AI-Powered Marketing
+- **Predictive Analytics**: AI models for customer behavior prediction
+- **Content Optimization**: AI-powered content optimization
+- **Send Time Optimization**: ML-based optimal send time prediction
+- **Customer Lifetime Value Prediction**: AI models for CLV prediction
+- **Churn Prevention**: AI-powered churn prediction and prevention campaigns
+
+### 6.2 Marketing Automation
+- **Trigger-Based Campaigns**: Event-driven marketing automation
+- **Drip Campaigns**: Multi-step nurturing campaigns
+- **Behavioral Targeting**: Campaigns based on customer behavior
+- **Dynamic Content**: Personalized content based on customer data
+- **Cross-Channel Orchestration**: Coordinated campaigns across channels
+
+### 6.3 Advanced Analytics
+- **Attribution Modeling**: Multi-touch attribution analysis
+- **Cohort Analysis**: Customer cohort performance tracking
+- **Funnel Analysis**: Marketing funnel optimization
+- **ROI Calculation**: Comprehensive marketing ROI analysis
+- **Predictive Insights**: Predictive analytics for marketing optimization
+
+## 7. Performance & Metrics
+
+### 7.1 Email Marketing KPIs
+- **Delivery Rate**: Target 95%+ email delivery rate
+- **Open Rate**: Target 25%+ open rate for promotional emails
+- **Click Rate**: Target 3%+ click-through rate
+- **Conversion Rate**: Target 1%+ email-to-purchase conversion
+- **Unsubscribe Rate**: Keep below 0.5% per campaign
+
+### 7.2 SMS Marketing KPIs
+- **Delivery Rate**: Target 98%+ SMS delivery rate
+- **Click Rate**: Target 10%+ SMS click-through rate
+- **Opt-out Rate**: Keep below 1% per campaign
+- **Response Rate**: Target 15%+ response rate for interactive SMS
+- **Cost per Conversion**: Optimize cost per SMS conversion
+
+### 7.3 Overall Marketing KPIs
+- **Customer Acquisition Cost (CAC)**: Track and optimize CAC across channels
+- **Return on Marketing Investment (ROMI)**: Target 4:1 ROMI
+- **Customer Lifetime Value (CLV)**: Increase CLV through marketing
+- **Marketing Qualified Leads (MQLs)**: Quality lead generation metrics
+- **Brand Awareness**: Track brand awareness and consideration metrics
+
+This comprehensive marketing service provides sophisticated multi-channel marketing capabilities with advanced automation, personalization, and analytics specifically optimized for Bangladesh's market with strong cultural awareness and local compliance.

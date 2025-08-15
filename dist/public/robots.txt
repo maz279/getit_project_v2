@@ -1,0 +1,32 @@
+User-agent: *
+Allow: /
+
+# Product pages
+Allow: /products/
+Allow: /categories/
+Allow: /vendors/
+Allow: /search
+
+# Static assets
+Allow: /images/
+Allow: /icons/
+Allow: /static/
+
+# API endpoints should not be crawled
+Disallow: /api/
+Disallow: /admin/
+
+# Private user areas
+Disallow: /profile/
+Disallow: /checkout/
+Disallow: /cart/
+
+# Bangladesh specific pages allowed
+Allow: /bn/
+Allow: /bangla/
+
+# Sitemap location
+Sitemap: https://getit.com.bd/sitemap.xml
+
+# Crawl-delay for Bangladesh market optimization
+Crawl-delay: 1

@@ -1,0 +1,410 @@
+# HashiCorp Vault Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Secret Management and Encryption
+
+# =============================================================================
+# VAULT SERVER CONFIGURATION
+# =============================================================================
+ui = true
+disable_mlock = true
+
+# API listener
+listener "tcp" {
+  address = "0.0.0.0:8200"
+  tls_disable = true
+  tls_cert_file = "/vault/certs/vault.crt"
+  tls_key_file = "/vault/certs/vault.key"
+  tls_min_version = "tls12"
+}
+
+# Cluster listener for HA
+listener "tcp" {
+  address = "0.0.0.0:8201"
+  cluster_address = "0.0.0.0:8201"
+  tls_disable = true
+}
+
+# Storage backend (Consul for production, file for development)
+storage "consul" {
+  address = "consul:8500"
+  path = "vault/"
+  service = "vault"
+  check_timeout = "5s"
+  max_parallel = "128"
+  consistency_mode = "strong"
+}
+
+# Alternative file storage for development
+# storage "file" {
+#   path = "/vault/data"
+# }
+
+# PostgreSQL storage for enterprise features
+storage "postgresql" {
+  connection_url = "postgres://vault:VAULT_PASSWORD@postgres:5432/vault?sslmode=disable"
+  table = "vault_kv_store"
+  ha_enabled = "true"
+  ha_table = "vault_ha_locks"
+}
+
+# Cluster configuration
+cluster_name = "getit-bangladesh-vault"
+cluster_addr = "https://vault:8201"
+api_addr = "https://vault.getit.com.bd:8200"
+
+# High Availability
+ha_storage "consul" {
+  address = "consul:8500"
+  path = "vault/"
+  service = "vault"
+  cluster_addr = "https://vault:8201"
+  redirect_addr = "https://vault.getit.com.bd:8200"
+  disable_clustering = "false"
+}
+
+# Seal configuration (Auto-unseal with AWS KMS in production)
+seal "awskms" {
+  region = "ap-southeast-1"
+  kms_key_id = "arn:aws:kms:ap-southeast-1:ACCOUNT-ID:key/KEY-ID"
+  endpoint = "https://kms.ap-southeast-1.amazonaws.com"
+}
+
+# Telemetry
+telemetry {
+  prometheus_retention_time = "30s"
+  disable_hostname = true
+  usage_gauge_period = "5m"
+  maximum_gauge_cardinality = 500
+  statsite_address = "statsd:8125"
+  statsd_address = "statsd:8125"
+  dogstatsd_addr = "datadog:8125"
+  dogstatsd_tags = ["environment:production", "service:vault", "region:bangladesh"]
+}
+
+# Entropy configuration
+entropy "seal" {
+  mode = "augmentation"
+}
+
+# Logging
+log_level = "INFO"
+log_format = "json"
+log_file = "/vault/logs/vault.log"
+log_rotate_duration = "24h"
+log_rotate_bytes = 104857600  # 100MB
+log_rotate_max_files = 10
+
+# Cache
+cache {
+  size = "128MB"
+}
+
+# Sentinel (Enterprise feature)
+sentinel {
+  additional_enabled_modules = []
+}
+
+# License (Enterprise)
+license_path = "/vault/license/vault.hclic"
+
+# Default lease TTL and max lease TTL
+default_lease_ttl = "24h"
+max_lease_ttl = "168h"  # 7 days
+
+# Plugin directory
+plugin_directory = "/vault/plugins"
+
+# Raw storage endpoint
+raw_storage_endpoint = true
+
+# Bangladesh specific configuration
+custom_metadata {
+  environment = "production"
+  region = "bangladesh"
+  timezone = "Asia/Dhaka"
+  compliance = "bangladesh-dpa"
+  data_residency = "bangladesh"
+  encryption_standard = "aes-256-gcm"
+}
+
+# Performance settings
+disable_indexing = false
+disable_performance_standby = false
+disable_sealwrap = false
+
+# API rate limiting
+api_rate_limit {
+  rate = 10000
+  burst = 1000
+  disable = false
+}
+
+# Request limiter
+request_limiter {
+  disable = false
+}
+
+# Activity log
+activity_log {
+  default_report_months = 12
+  retention_months = 24
+}
+
+# Audit devices will be configured via API/CLI
+# Sample audit configuration (to be applied after initialization):
+# vault audit enable file file_path=/vault/logs/audit.log
+
+# =============================================================================
+# VAULT POLICIES FOR GETIT BANGLADESH
+# =============================================================================
+
+# Admin policy
+admin_policy = <<EOF
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+EOF
+
+# Application policy for backend services
+app_policy = <<EOF
+# Database credentials
+path "database/creds/getit-backend" {
+  capabilities = ["read"]
+}
+
+path "database/creds/getit-readonly" {
+  capabilities = ["read"]
+}
+
+# API keys and secrets
+path "secret/data/getit/api/*" {
+  capabilities = ["read"]
+}
+
+# Payment gateway secrets
+path "secret/data/getit/payments/*" {
+  capabilities = ["read"]
+}
+
+# Bangladesh mobile banking secrets
+path "secret/data/getit/bangladesh/mobile-banking/*" {
+  capabilities = ["read"]
+}
+
+# Notification service secrets
+path "secret/data/getit/notifications/*" {
+  capabilities = ["read"]
+}
+
+# AWS secrets
+path "secret/data/getit/aws/*" {
+  capabilities = ["read"]
+}
+
+# Encryption keys
+path "transit/encrypt/getit-backend" {
+  capabilities = ["update"]
+}
+
+path "transit/decrypt/getit-backend" {
+  capabilities = ["update"]
+}
+
+# PKI for TLS certificates
+path "pki/issue/getit-com-bd" {
+  capabilities = ["create", "update"]
+}
+EOF
+
+# DevOps policy
+devops_policy = <<EOF
+# Full access to secrets
+path "secret/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# Database secret engine
+path "database/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# Transit secret engine
+path "transit/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# PKI secret engine
+path "pki/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# Auth methods
+path "auth/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# System operations
+path "sys/auth" {
+  capabilities = ["read"]
+}
+
+path "sys/auth/*" {
+  capabilities = ["create", "update", "delete", "sudo"]
+}
+
+path "sys/policies/acl" {
+  capabilities = ["list"]
+}
+
+path "sys/policies/acl/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# Audit operations
+path "sys/audit" {
+  capabilities = ["read", "sudo"]
+}
+
+path "sys/audit/*" {
+  capabilities = ["create", "update", "delete", "sudo"]
+}
+EOF
+
+# Bangladesh operations policy
+bangladesh_ops_policy = <<EOF
+# Bangladesh specific secrets
+path "secret/data/getit/bangladesh/*" {
+  capabilities = ["read", "list"]
+}
+
+# Mobile banking credentials
+path "secret/data/getit/bangladesh/mobile-banking/bkash" {
+  capabilities = ["read"]
+}
+
+path "secret/data/getit/bangladesh/mobile-banking/nagad" {
+  capabilities = ["read"]
+}
+
+path "secret/data/getit/bangladesh/mobile-banking/rocket" {
+  capabilities = ["read"]
+}
+
+# Courier service credentials
+path "secret/data/getit/bangladesh/courier/pathao" {
+  capabilities = ["read"]
+}
+
+path "secret/data/getit/bangladesh/courier/paperfly" {
+  capabilities = ["read"]
+}
+
+# SMS and notification services
+path "secret/data/getit/bangladesh/sms/*" {
+  capabilities = ["read"]
+}
+
+# Localization secrets
+path "secret/data/getit/bangladesh/localization/*" {
+  capabilities = ["read"]
+}
+EOF
+
+# Monitoring policy
+monitoring_policy = <<EOF
+# Read access to monitoring secrets
+path "secret/data/getit/monitoring/*" {
+  capabilities = ["read"]
+}
+
+# Prometheus secrets
+path "secret/data/getit/monitoring/prometheus" {
+  capabilities = ["read"]
+}
+
+# Grafana secrets
+path "secret/data/getit/monitoring/grafana" {
+  capabilities = ["read"]
+}
+
+# Alertmanager secrets
+path "secret/data/getit/monitoring/alertmanager" {
+  capabilities = ["read"]
+}
+
+# Elasticsearch secrets
+path "secret/data/getit/monitoring/elasticsearch" {
+  capabilities = ["read"]
+}
+EOF
+
+# =============================================================================
+# SECRET ENGINES CONFIGURATION
+# =============================================================================
+
+# KV v2 secret engine configuration
+secret_engines = {
+  "secret/" = {
+    type = "kv-v2"
+    description = "GetIt Bangladesh application secrets"
+    options = {
+      version = "2"
+      max_versions = 10
+      cas_required = false
+      delete_version_after = "3h"
+    }
+  }
+
+  "database/" = {
+    type = "database"
+    description = "Dynamic database credentials"
+    config = {
+      max_open_connections = 4
+      max_idle_connections = 0
+      max_connection_lifetime = "0s"
+    }
+  }
+
+  "transit/" = {
+    type = "transit"
+    description = "Encryption as a service"
+  }
+
+  "pki/" = {
+    type = "pki"
+    description = "TLS certificate management"
+    config = {
+      max_lease_ttl = "8760h"  # 1 year
+    }
+  }
+
+  "aws/" = {
+    type = "aws"
+    description = "AWS IAM credential management"
+  }
+}
+
+# =============================================================================
+# AUTH METHODS CONFIGURATION
+# =============================================================================
+
+auth_methods = {
+  "kubernetes/" = {
+    type = "kubernetes"
+    description = "Kubernetes service account authentication"
+  }
+
+  "aws/" = {
+    type = "aws"
+    description = "AWS IAM authentication"
+  }
+
+  "jwt/" = {
+    type = "jwt"
+    description = "JWT authentication for CI/CD"
+  }
+
+  "ldap/" = {
+    type = "ldap"
+    description = "LDAP authentication for employees"
+  }
+}

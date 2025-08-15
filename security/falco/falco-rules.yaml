@@ -1,0 +1,353 @@
+# Falco Runtime Security Rules for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Runtime Security and Threat Detection
+
+# =============================================================================
+# CUSTOM RULES FOR GETIT BANGLADESH
+# =============================================================================
+
+# Bangladesh E-commerce Application Security Rules
+- rule: GetIt Suspicious Network Activity
+  desc: Detect suspicious network connections from GetIt containers
+  condition: >
+    spawned_process and container and
+    proc.name in (nc, ncat, netcat, socat, curl, wget) and
+    container.image.repository matches "getit" and
+    not proc.pname in (node, npm, nginx, postgres)
+  output: >
+    Suspicious network activity in GetIt container
+    (user=%user.name proc=%proc.name container=%container.name image=%container.image.repository:%container.image.tag)
+  priority: WARNING
+  tags: [network, getit, bangladesh]
+
+- rule: GetIt Payment Service Anomaly
+  desc: Detect anomalous behavior in payment processing containers
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit.*payment" and
+    (proc.name in (sh, bash, zsh, fish) or
+     proc.name contains "python" or
+     proc.name contains "node")
+  output: >
+    Anomalous process in payment service container
+    (user=%user.name proc=%proc.name container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [payment, security, getit, bangladesh]
+
+- rule: GetIt Database Access Violation
+  desc: Detect unauthorized database access attempts
+  condition: >
+    spawned_process and container and
+    proc.name in (psql, mysql, mongo, redis-cli) and
+    not container.image.repository matches "postgres" and
+    not container.image.repository matches "redis" and
+    not container.image.repository matches "backup"
+  output: >
+    Unauthorized database access attempt
+    (user=%user.name proc=%proc.name container=%container.name cmd=%proc.cmdline)
+  priority: CRITICAL
+  tags: [database, security, getit]
+
+# Bangladesh Mobile Banking Security
+- rule: GetIt Mobile Banking Credential Access
+  desc: Detect access to mobile banking credential files
+  condition: >
+    open_read and fd.name contains "bkash" or
+    fd.name contains "nagad" or
+    fd.name contains "rocket" or
+    fd.name contains "mobile-banking"
+  output: >
+    Mobile banking credential file accessed
+    (user=%user.name proc=%proc.name file=%fd.name container=%container.name)
+  priority: WARNING
+  tags: [mobile-banking, credentials, bangladesh, getit]
+
+- rule: GetIt Sensitive Data Exfiltration
+  desc: Detect potential data exfiltration from GetIt containers
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    proc.name in (scp, rsync, curl, wget) and
+    proc.args contains "upload" or
+    proc.args contains "POST" or
+    proc.args contains "PUT"
+  output: >
+    Potential data exfiltration detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: CRITICAL
+  tags: [exfiltration, data, security, getit]
+
+# Container Runtime Security
+- rule: GetIt Container Escape Attempt
+  desc: Detect container escape attempts in GetIt infrastructure
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    (proc.name in (docker, kubectl, crictl) or
+     proc.args contains "privileged" or
+     proc.args contains "host-network" or
+     proc.args contains "host-pid")
+  output: >
+    Container escape attempt detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: CRITICAL
+  tags: [container-escape, security, getit]
+
+- rule: GetIt Privilege Escalation
+  desc: Detect privilege escalation attempts
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    (proc.name in (sudo, su, passwd) or
+     proc.args contains "chmod 777" or
+     proc.args contains "chown root")
+  output: >
+    Privilege escalation attempt detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: CRITICAL
+  tags: [privilege-escalation, security, getit]
+
+# File System Security
+- rule: GetIt Sensitive File Access
+  desc: Detect access to sensitive configuration files
+  condition: >
+    open_read and fd.name contains "/etc/passwd" or
+    fd.name contains "/etc/shadow" or
+    fd.name contains ".env" or
+    fd.name contains "secret" or
+    fd.name contains "private" or
+    fd.name contains "key"
+  output: >
+    Sensitive file accessed
+    (user=%user.name proc=%proc.name file=%fd.name container=%container.name)
+  priority: WARNING
+  tags: [filesystem, security, getit, sensitive-data]
+
+- rule: GetIt Configuration Tampering
+  desc: Detect tampering with GetIt configuration files
+  condition: >
+    modify_file and container and
+    container.image.repository matches "getit" and
+    (fd.name contains "config" or
+     fd.name contains ".json" or
+     fd.name contains ".yml" or
+     fd.name contains ".yaml")
+  output: >
+    Configuration file modified
+    (user=%user.name proc=%proc.name file=%fd.name container=%container.name)
+  priority: WARNING
+  tags: [configuration, tampering, getit]
+
+# Network Security Rules
+- rule: GetIt Outbound Connection to Suspicious IPs
+  desc: Detect connections to known malicious IP ranges
+  condition: >
+    outbound and fd.type=ipv4 and
+    container.image.repository matches "getit" and
+    (fd.rip="0.0.0.0" or
+     fd.rip startswith "192.168." or
+     fd.rip startswith "10." or
+     fd.rip startswith "172.")
+  output: >
+    Suspicious outbound connection
+    (user=%user.name proc=%proc.name remote_ip=%fd.rip remote_port=%fd.rport container=%container.name)
+  priority: WARNING
+  tags: [network, security, getit, suspicious-ip]
+
+- rule: GetIt Crypto Mining Activity
+  desc: Detect potential cryptocurrency mining activity
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    (proc.name contains "mine" or
+     proc.name contains "miner" or
+     proc.name contains "xmrig" or
+     proc.args contains "mining" or
+     proc.args contains "stratum")
+  output: >
+    Potential crypto mining activity detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: CRITICAL
+  tags: [crypto-mining, security, getit]
+
+# Bangladesh Specific Security Rules
+- rule: GetIt Bangladesh Compliance Violation
+  desc: Detect activities that may violate Bangladesh data protection laws
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    (proc.args contains "export" and proc.args contains "customer" or
+     proc.args contains "transfer" and proc.args contains "data" or
+     proc.args contains "backup" and proc.args contains "offshore")
+  output: >
+    Potential Bangladesh DPA compliance violation
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: HIGH
+  tags: [compliance, bangladesh, dpa, getit]
+
+- rule: GetIt Festival Season Security
+  desc: Enhanced monitoring during Bangladesh festival seasons
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    proc.name in (rm, mv, cp) and
+    (proc.args contains "promo" or
+     proc.args contains "festival" or
+     proc.args contains "eid" or
+     proc.args contains "pohela")
+  output: >
+    File operation on festival content during high-traffic period
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: INFO
+  tags: [festival, monitoring, bangladesh, getit]
+
+# API Security Rules
+- rule: GetIt API Abuse Detection
+  desc: Detect potential API abuse or rate limiting bypass
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit.*api" and
+    proc.name in (curl, wget, python, node) and
+    proc.args contains "loop" or
+    proc.args contains "while" or
+    proc.args contains "for"
+  output: >
+    Potential API abuse or automated request detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: WARNING
+  tags: [api, abuse, security, getit]
+
+- rule: GetIt SQL Injection Attempt
+  desc: Detect potential SQL injection attempts
+  condition: >
+    spawned_process and container and
+    container.image.repository matches "getit" and
+    (proc.args contains "DROP TABLE" or
+     proc.args contains "DELETE FROM" or
+     proc.args contains "INSERT INTO" or
+     proc.args contains "UPDATE SET" or
+     proc.args contains "UNION SELECT" or
+     proc.args contains "1=1" or
+     proc.args contains "OR 1")
+  output: >
+    Potential SQL injection attempt detected
+    (user=%user.name proc=%proc.name args=%proc.args container=%container.name)
+  priority: CRITICAL
+  tags: [sql-injection, security, database, getit]
+
+# =============================================================================
+# MACRO DEFINITIONS FOR GETIT BANGLADESH
+# =============================================================================
+
+- macro: getit_containers
+  condition: >
+    container.image.repository matches "getit" or
+    container.image.repository matches "registry.gitlab.com/getit-bangladesh"
+
+- macro: getit_payment_containers
+  condition: >
+    container.image.repository matches "getit.*payment" or
+    container.image.repository matches "getit.*backend" and
+    container.name contains "payment"
+
+- macro: getit_database_containers
+  condition: >
+    container.image.repository matches "postgres" or
+    container.image.repository matches "redis" or
+    container.image.repository matches "elasticsearch"
+
+- macro: bangladesh_payment_processes
+  condition: >
+    proc.name in (bkash, nagad, rocket) or
+    proc.args contains "mobile-banking" or
+    proc.args contains "bkash" or
+    proc.args contains "nagad" or
+    proc.args contains "rocket"
+
+- macro: sensitive_getit_files
+  condition: >
+    fd.name contains ".env" or
+    fd.name contains "secret" or
+    fd.name contains "private" or
+    fd.name contains "key" or
+    fd.name contains "password" or
+    fd.name contains "token" or
+    fd.name contains "certificate" or
+    fd.name contains "mobile-banking" or
+    fd.name contains "payment"
+
+# =============================================================================
+# LIST DEFINITIONS
+# =============================================================================
+
+- list: getit_allowed_processes
+  items: [node, npm, nginx, postgres, redis-server, java, python3, gunicorn, uwsgi]
+
+- list: getit_sensitive_files
+  items: [".env", "secret.json", "private.key", "certificate.pem", "mobile-banking.json"]
+
+- list: bangladesh_mobile_banking_keywords
+  items: ["bkash", "nagad", "rocket", "mobile-banking", "mfs", "wallet"]
+
+- list: getit_admin_users
+  items: ["admin", "root", "devops", "sysadmin"]
+
+- list: suspicious_network_tools
+  items: [nc, ncat, netcat, socat, telnet, nmap, masscan]
+
+- list: crypto_mining_processes
+  items: [xmrig, minergate, cpuminer, cgminer, bfgminer, ethminer]
+
+# =============================================================================
+# CUSTOM OUTPUT FIELDS
+# =============================================================================
+
+- macro: getit_output_fields
+  condition: >
+    (timestamp=%evt.time.iso8601
+     user=%user.name
+     proc=%proc.name
+     pid=%proc.pid
+     container=%container.name
+     image=%container.image.repository:%container.image.tag
+     namespace=%k8s.ns.name
+     pod=%k8s.pod.name
+     node=%k8s.node.name)
+
+# =============================================================================
+# FALCO CONFIGURATION
+# =============================================================================
+
+falco_priority_levels:
+  - EMERGENCY
+  - ALERT  
+  - CRITICAL
+  - ERROR
+  - WARNING
+  - NOTICE
+  - INFO
+  - DEBUG
+
+falco_output_channels:
+  - stdout
+  - file
+  - syslog
+  - json_output
+
+falco_file_output:
+  enabled: true
+  keep_alive: false
+  filename: /var/log/falco/falco_events.log
+
+falco_json_output:
+  enabled: true
+  include_output_property: true
+  include_tags_property: true
+
+falco_syslog_output:
+  enabled: true
+  facility: local0
+
+falco_grpc_output:
+  enabled: true
+  bind_address: "0.0.0.0:5060"
+  threadiness: 8

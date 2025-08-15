@@ -1,0 +1,454 @@
+# GetIt Product Catalog Service
+
+## Overview
+The Product Catalog Service manages the entire product ecosystem for the GetIt multi-vendor ecommerce platform. It handles product listings, categories, inventory tracking, search functionality, and product recommendations while supporting Bangladesh-specific product requirements and local market preferences.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Databases**: 
+  - MongoDB (primary product data, flexible schema)
+  - PostgreSQL (relational metadata, categories)
+  - Elasticsearch (search indexing and analytics)
+- **Image Processing**: Sharp.js, ImageMagick
+- **File Storage**: AWS S3 / CDN integration
+- **Search Engine**: Elasticsearch with Bangla language analyzer
+- **Caching**: Redis for frequent queries
+
+## Core Responsibilities
+
+### 1. Product Management
+- Product creation, editing, and deletion
+- Product variant management (size, color, style)
+- Bulk product import/export functionality
+- Product approval workflow for quality control
+- Rich media management (images, videos, documents)
+
+### 2. Category Management
+- Hierarchical category structure
+- Bangladesh-specific product categories
+- Dynamic category creation and management
+- Category-based product attributes
+- Category performance analytics
+
+### 3. Inventory Management
+- Real-time inventory tracking per vendor
+- Multi-location inventory support
+- Stock level alerts and notifications
+- Inventory movement tracking
+- Reserved inventory for pending orders
+
+### 4. Search & Discovery
+- Advanced product search with filters
+- Elasticsearch-powered full-text search
+- Bangla language search support
+- Visual search capabilities
+- Voice search integration
+
+### 5. Product Recommendations
+- Collaborative filtering algorithms
+- Content-based recommendations
+- Seasonal and trend-based suggestions
+- Cross-selling and upselling recommendations
+- Personalized product discovery
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **Local Product Categories**: Traditional clothing, handicrafts, local foods
+- **Measurement Units**: Support for local units (maund, seer, tola)
+- **Bangla Descriptions**: Full Unicode support for Bangla product descriptions
+- **Cultural Products**: Festival-specific products and seasonal items
+- **Local Brands**: Special support for Bangladesh brands and manufacturers
+
+### Advanced Features
+- **Product Variants**: Comprehensive variant management system
+- **Bundle Products**: Product bundling and combo offers
+- **Digital Products**: Support for digital downloads and services
+- **Pre-order Management**: Handle products not yet in stock
+- **Product Ratings**: Customer review and rating system integration
+
+### Quality Control Features
+- **Content Moderation**: Automated and manual content review
+- **Image Quality Checks**: Automated image quality validation
+- **Duplicate Detection**: Prevent duplicate product listings
+- **Policy Compliance**: Ensure products meet platform policies
+- **Vendor Product Limits**: Manage product listing quotas per vendor
+
+## API Endpoints
+
+### Product Management APIs
+```yaml
+Product CRUD:
+  GET /api/v1/products
+  POST /api/v1/products
+  GET /api/v1/products/:id
+  PUT /api/v1/products/:id
+  DELETE /api/v1/products/:id
+  PATCH /api/v1/products/:id/status
+
+Product Variants:
+  GET /api/v1/products/:id/variants
+  POST /api/v1/products/:id/variants
+  PUT /api/v1/products/:id/variants/:variantId
+  DELETE /api/v1/products/:id/variants/:variantId
+
+Bulk Operations:
+  POST /api/v1/products/bulk-import
+  POST /api/v1/products/bulk-update
+  GET /api/v1/products/export
+  POST /api/v1/products/bulk-delete
+```
+
+### Category Management APIs
+```yaml
+Categories:
+  GET /api/v1/categories
+  POST /api/v1/categories
+  GET /api/v1/categories/:id
+  PUT /api/v1/categories/:id
+  DELETE /api/v1/categories/:id
+  GET /api/v1/categories/:id/products
+
+Category Hierarchy:
+  GET /api/v1/categories/tree
+  GET /api/v1/categories/:id/children
+  GET /api/v1/categories/:id/ancestors
+  POST /api/v1/categories/:id/move
+```
+
+### Search & Discovery APIs
+```yaml
+Search:
+  GET /api/v1/products/search
+  POST /api/v1/products/search/advanced
+  GET /api/v1/products/search/suggestions
+  GET /api/v1/products/search/filters
+
+Recommendations:
+  GET /api/v1/products/recommendations
+  GET /api/v1/products/:id/related
+  GET /api/v1/products/trending
+  GET /api/v1/products/popular
+  GET /api/v1/products/seasonal
+```
+
+### Inventory Management APIs
+```yaml
+Inventory:
+  GET /api/v1/inventory/:productId
+  PUT /api/v1/inventory/:productId
+  POST /api/v1/inventory/:productId/adjust
+  GET /api/v1/inventory/low-stock
+  POST /api/v1/inventory/reserve
+  POST /api/v1/inventory/release
+```
+
+### Admin APIs
+```yaml
+Product Administration:
+  GET /api/v1/admin/products/pending
+  POST /api/v1/admin/products/:id/approve
+  POST /api/v1/admin/products/:id/reject
+  GET /api/v1/admin/products/reports
+
+Quality Control:
+  GET /api/v1/admin/products/flagged
+  POST /api/v1/admin/products/:id/flag
+  GET /api/v1/admin/products/duplicates
+  POST /api/v1/admin/products/merge
+```
+
+## Database Schema
+
+### MongoDB Collections
+```javascript
+products: {
+  _id: ObjectId,
+  vendorId: ObjectId,
+  name: String,
+  nameEn: String,
+  nameBn: String,
+  description: String,
+  descriptionEn: String,
+  descriptionBn: String,
+  category: {
+    primary: ObjectId,
+    secondary: [ObjectId],
+    breadcrumb: [String]
+  },
+  brand: String,
+  sku: String,
+  variants: [{
+    id: ObjectId,
+    name: String,
+    attributes: Map,
+    price: Number,
+    comparePrice: Number,
+    inventory: {
+      quantity: Number,
+      reserved: Number,
+      available: Number
+    },
+    images: [String],
+    weight: Number,
+    dimensions: Object
+  }],
+  images: [String],
+  videos: [String],
+  documents: [String],
+  attributes: Map,
+  specifications: Object,
+  tags: [String],
+  status: String,
+  visibility: String,
+  seo: {
+    title: String,
+    description: String,
+    keywords: [String],
+    slug: String
+  },
+  pricing: {
+    basePrice: Number,
+    currency: String,
+    taxClass: String,
+    comparePrice: Number
+  },
+  inventory: {
+    trackQuantity: Boolean,
+    totalQuantity: Number,
+    reservedQuantity: Number,
+    availableQuantity: Number,
+    lowStockThreshold: Number
+  },
+  shipping: {
+    weight: Number,
+    dimensions: Object,
+    shippingClass: String,
+    freeShipping: Boolean
+  },
+  ratings: {
+    average: Number,
+    count: Number,
+    distribution: Object
+  },
+  metrics: {
+    views: Number,
+    clicks: Number,
+    orders: Number,
+    revenue: Number
+  },
+  createdAt: Date,
+  updatedAt: Date,
+  publishedAt: Date
+}
+
+categories: {
+  _id: ObjectId,
+  name: String,
+  nameEn: String,
+  nameBn: String,
+  description: String,
+  parentId: ObjectId,
+  level: Number,
+  path: String,
+  slug: String,
+  image: String,
+  icon: String,
+  attributes: [Object],
+  isActive: Boolean,
+  sortOrder: Number,
+  productCount: Number,
+  seo: Object,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### PostgreSQL Tables
+```sql
+product_metadata:
+  - id (Primary Key)
+  - product_id (MongoDB ObjectId)
+  - vendor_id
+  - category_id
+  - status
+  - created_at
+  - updated_at
+  - indexed_at
+
+inventory_movements:
+  - id (Primary Key)
+  - product_id
+  - variant_id
+  - movement_type
+  - quantity
+  - reference_id
+  - notes
+  - created_at
+
+product_approvals:
+  - id (Primary Key)
+  - product_id
+  - status
+  - reviewer_id
+  - reviewed_at
+  - comments
+  - created_at
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **Vendor Service**: Product ownership and permissions
+- **Order Service**: Inventory reservation and product availability
+- **Search Service**: Search indexing and query processing
+- **Analytics Service**: Product performance metrics
+- **Inventory Service**: Stock level management
+- **Cart Service**: Product availability and pricing
+- **User Service**: Personalized recommendations
+
+### External Service Integration
+- **CDN Providers**: Image and media delivery
+- **Image Processing Services**: Automated image optimization
+- **Translation Services**: Automatic product translation
+- **Government APIs**: Product compliance and certification
+- **Shipping Calculators**: Product-based shipping cost calculation
+
+## Search & Discovery Engine
+
+### Elasticsearch Configuration
+```yaml
+Indices:
+  products_en: English product search
+  products_bn: Bangla product search
+  categories: Category search
+  brands: Brand search
+
+Analyzers:
+  bangla_analyzer:
+    - Bangla tokenizer
+    - Bangla stemmer
+    - Synonyms mapping
+    - Phonetic matching
+  
+  english_analyzer:
+    - Standard tokenizer
+    - Lowercase filter
+    - Stemmer
+    - Synonyms
+```
+
+### Search Features
+- **Auto-complete**: Real-time search suggestions
+- **Faceted Search**: Filter by category, price, brand, ratings
+- **Semantic Search**: Understanding search intent
+- **Visual Search**: Search by product images
+- **Voice Search**: Bangla and English voice queries
+- **Fuzzy Matching**: Handle spelling mistakes and variations
+
+## Inventory Management
+
+### Inventory Tracking
+```yaml
+Stock Levels:
+  - Available: Current sellable quantity
+  - Reserved: Quantity held for pending orders
+  - Committed: Quantity allocated for specific orders
+  - Damaged: Quantity marked as unsellable
+  - In Transit: Quantity being moved between locations
+
+Inventory Actions:
+  - Adjustment: Manual stock level changes
+  - Reservation: Hold stock for pending orders
+  - Release: Free up reserved stock
+  - Sale: Reduce stock for completed orders
+  - Return: Increase stock for returned items
+```
+
+### Low Stock Management
+- Automated low stock alerts
+- Vendor notification system
+- Automatic product hiding when out of stock
+- Restock request system
+- Demand forecasting for reordering
+
+## Product Recommendations
+
+### Recommendation Algorithms
+```yaml
+Collaborative Filtering:
+  - Users who bought this also bought
+  - Similar customer preferences
+  - Purchase pattern analysis
+
+Content-Based:
+  - Similar product attributes
+  - Same category products
+  - Brand-based recommendations
+
+Hybrid Approach:
+  - Combine multiple algorithms
+  - Machine learning optimization
+  - A/B testing for effectiveness
+
+Contextual Recommendations:
+  - Seasonal products
+  - Festival-specific items
+  - Location-based suggestions
+  - Time-sensitive offers
+```
+
+## Quality Control & Moderation
+
+### Content Moderation
+- **Automated Checks**: Prohibited keywords, inappropriate images
+- **Manual Review**: Human moderation for edge cases
+- **Community Reporting**: User-reported content issues
+- **Vendor Self-Moderation**: Vendor responsibility for content quality
+
+### Image Quality Control
+- **Resolution Requirements**: Minimum image dimensions
+- **Format Standards**: Supported file formats and sizes
+- **Content Guidelines**: Product photography standards
+- **Automated Processing**: Image compression and optimization
+
+## Performance Optimization
+
+### Caching Strategy
+```yaml
+Cache Layers:
+  L1 - Application Cache: Frequently accessed products
+  L2 - Redis Cache: Search results and recommendations
+  L3 - CDN Cache: Product images and static content
+  L4 - Database Cache: Query result caching
+
+Cache Invalidation:
+  - Product updates trigger cache refresh
+  - Inventory changes invalidate product cache
+  - Category changes affect related products
+  - Time-based cache expiration
+```
+
+### Database Optimization
+- **Indexing Strategy**: Optimized for search and filtering
+- **Sharding**: Distribute products across multiple databases
+- **Read Replicas**: Separate read and write operations
+- **Query Optimization**: Efficient query patterns
+
+## Business Objectives
+
+### Primary Goals
+1. **Product Discovery**: Enable easy product finding and exploration
+2. **Vendor Success**: Support vendor product management and sales
+3. **Search Quality**: Provide relevant and accurate search results
+4. **Inventory Accuracy**: Maintain real-time inventory information
+5. **Performance**: Fast product browsing and search experience
+
+### Bangladesh Market Alignment
+1. **Local Products**: Showcase Bangladesh-made products and crafts
+2. **Cultural Relevance**: Support for traditional and cultural products
+3. **Language Support**: Comprehensive Bangla language support
+4. **Local Brands**: Promote Bangladesh brands and manufacturers
+5. **Mobile Optimization**: Optimized for mobile-first shopping behavior
+
+This Product Catalog Service provides a comprehensive, scalable, and culturally-aware product management system that supports the diverse needs of Bangladesh's ecommerce market while maintaining high performance and user experience standards.

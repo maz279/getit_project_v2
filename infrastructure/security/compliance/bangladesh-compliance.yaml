@@ -1,0 +1,248 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bangladesh-compliance-config
+  namespace: getit-security
+  labels:
+    component: compliance
+    country: bangladesh
+    regulation: digital-commerce-act
+data:
+  digital-commerce-act.json: |
+    {
+      "complianceFramework": "Bangladesh Digital Commerce Act 2020",
+      "requirements": {
+        "dataLocalization": {
+          "enabled": true,
+          "requirements": [
+            "Customer data must be stored within Bangladesh borders",
+            "Financial transaction data retention for 5 years",
+            "Cross-border data transfer requires explicit consent"
+          ],
+          "implementation": {
+            "dataResidency": "Bangladesh",
+            "backupLocation": "In-country only",
+            "cloudProvider": "Local or compliant international"
+          }
+        },
+        "financialCompliance": {
+          "enabled": true,
+          "requirements": [
+            "Bangladesh Bank payment regulations compliance",
+            "AML (Anti-Money Laundering) procedures",
+            "KYC (Know Your Customer) verification",
+            "Transaction monitoring and reporting"
+          ],
+          "implementation": {
+            "paymentGateways": ["bKash", "Nagad", "Rocket", "SSL Commerz"],
+            "transactionLimits": {
+              "daily": "500000 BDT",
+              "monthly": "2000000 BDT"
+            },
+            "kycRequirements": {
+              "nationalId": "mandatory",
+              "bankAccount": "mandatory for vendors",
+              "tradeLicense": "mandatory for businesses"
+            }
+          }
+        },
+        "consumerProtection": {
+          "enabled": true,
+          "requirements": [
+            "Clear terms and conditions in Bengali",
+            "Dispute resolution mechanism",
+            "Return and refund policy",
+            "Customer data protection"
+          ],
+          "implementation": {
+            "disputeResolution": "7-day response time",
+            "refundPolicy": "14-day return window",
+            "languageSupport": ["Bengali", "English"],
+            "dataRetention": "As per customer consent"
+          }
+        },
+        "taxCompliance": {
+          "enabled": true,
+          "requirements": [
+            "VAT registration and collection",
+            "Income tax compliance",
+            "Digital service tax",
+            "Automated tax calculation"
+          ],
+          "implementation": {
+            "vatRate": "15%",
+            "incomeTaxRate": "Variable based on income slab",
+            "digitalServiceTax": "Applicable for international services",
+            "taxReporting": "Monthly to NBR"
+          }
+        }
+      },
+      "monitoring": {
+        "auditLog": {
+          "enabled": true,
+          "retention": "7 years",
+          "scope": ["all financial transactions", "data access", "system changes"]
+        },
+        "reporting": {
+          "frequency": "monthly",
+          "recipients": ["Bangladesh Bank", "NBR", "BTRC"],
+          "format": "Digital and physical"
+        }
+      }
+    }
+
+  bangladesh-bank-regulations.json: |
+    {
+      "framework": "Bangladesh Bank Payment System Regulations",
+      "paymentServiceProviders": {
+        "bkash": {
+          "license": "Mobile Financial Services",
+          "compliance": "Full regulatory compliance",
+          "monitoring": "Real-time transaction monitoring",
+          "limits": {
+            "dailyTransaction": "500000 BDT",
+            "monthlyTransaction": "2000000 BDT"
+          }
+        },
+        "nagad": {
+          "license": "Mobile Financial Services", 
+          "compliance": "Full regulatory compliance",
+          "monitoring": "Real-time transaction monitoring",
+          "limits": {
+            "dailyTransaction": "500000 BDT",
+            "monthlyTransaction": "2000000 BDT"
+          }
+        },
+        "rocket": {
+          "license": "Mobile Financial Services",
+          "compliance": "Full regulatory compliance", 
+          "monitoring": "Real-time transaction monitoring",
+          "limits": {
+            "dailyTransaction": "500000 BDT",
+            "monthlyTransaction": "2000000 BDT"
+          }
+        },
+        "ssl_commerz": {
+          "license": "Payment Gateway",
+          "compliance": "Banking regulations compliance",
+          "monitoring": "Card transaction monitoring",
+          "limits": {
+            "dailyTransaction": "1000000 BDT",
+            "monthlyTransaction": "5000000 BDT"
+          }
+        }
+      },
+      "amlRequirements": {
+        "transactionMonitoring": "Mandatory for transactions above 25000 BDT",
+        "suspiciousActivityReporting": "Within 48 hours to Bangladesh Bank",
+        "customerDueDiligence": "Enhanced for high-risk customers",
+        "recordKeeping": "5 years minimum"
+      },
+      "cybersecurity": {
+        "iso27001": "Mandatory compliance",
+        "pcidss": "Required for card transactions",
+        "dataEncryption": "AES-256 minimum",
+        "accessControl": "Multi-factor authentication mandatory"
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-protection-config
+  namespace: getit-security
+  labels:
+    component: compliance
+    type: data-protection
+data:
+  gdpr-compliance.json: |
+    {
+      "framework": "GDPR Compliance for International Users",
+      "dataProcessing": {
+        "lawfulBasis": "Contract and legitimate interest",
+        "consentManagement": "Explicit opt-in required",
+        "dataMinimization": "Collect only necessary data",
+        "purposeLimitation": "Use data only for stated purposes"
+      },
+      "userRights": {
+        "rightToAccess": "30-day response time",
+        "rightToRectification": "Immediate correction upon request",
+        "rightToErasure": "30-day deletion process",
+        "rightToPortability": "Machine-readable format",
+        "rightToObject": "Opt-out mechanisms available"
+      },
+      "dataProtection": {
+        "encryptionAtRest": "AES-256",
+        "encryptionInTransit": "TLS 1.3",
+        "accessControl": "Role-based with MFA",
+        "dataRetention": "As per user consent or legal requirement"
+      },
+      "breachNotification": {
+        "authorityNotification": "72 hours",
+        "userNotification": "Without undue delay for high risk",
+        "documentation": "Detailed incident reports"
+      }
+    }
+
+  security-standards.json: |
+    {
+      "framework": "Enterprise Security Standards",
+      "iso27001": {
+        "informationSecurity": "Comprehensive ISMS implementation",
+        "riskAssessment": "Annual risk assessment and mitigation",
+        "incidentResponse": "24/7 security operations center",
+        "businessContinuity": "RTO: 4 hours, RPO: 1 hour"
+      },
+      "pciDss": {
+        "cardDataProtection": "No storage of sensitive authentication data",
+        "accessControl": "Unique ID assignment and secure authentication",
+        "networkSecurity": "Encrypted transmission over open networks",
+        "vulnerabilityManagement": "Regular security testing and monitoring"
+      },
+      "sox": {
+        "financialReporting": "Automated controls for financial data",
+        "accessControl": "Segregation of duties for financial systems",
+        "changeManagement": "Approved change control processes",
+        "monitoring": "Continuous monitoring of financial controls"
+      }
+    }
+
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-platform-psp
+  namespace: getit-security
+  labels:
+    component: security
+    type: pod-security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true

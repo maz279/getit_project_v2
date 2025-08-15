@@ -1,0 +1,227 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: getit-production
+  labels:
+    app: user-service
+    platform: getit-bangladesh
+    component: configuration
+    domain: authentication
+  annotations:
+    description: "GetIt Bangladesh User Service Configuration"
+    contact: "backend-team@getit.com.bd"
+data:
+  # JWT Configuration
+  jwt-expires-in: "7d"
+  jwt-refresh-expires-in: "30d"
+  jwt-algorithm: "HS256"
+  jwt-issuer: "getit-bangladesh"
+  jwt-audience: "getit-users"
+  
+  # Password Configuration
+  password-salt-rounds: "12"
+  password-min-length: "8"
+  password-require-uppercase: "true"
+  password-require-lowercase: "true"
+  password-require-numbers: "true"
+  password-require-symbols: "true"
+  password-max-age-days: "90"
+  
+  # Session Configuration
+  session-max-age: "604800000"  # 7 days in milliseconds
+  session-secure: "true"
+  session-http-only: "true"
+  session-same-site: "strict"
+  
+  # OTP Configuration
+  otp-expires-in: "300000"  # 5 minutes in milliseconds
+  otp-length: "6"
+  otp-max-attempts: "3"
+  otp-resend-delay: "60000"  # 1 minute
+  otp-cleanup-interval: "3600000"  # 1 hour
+  
+  # Rate Limiting Configuration
+  rate-limit-window-ms: "900000"  # 15 minutes
+  rate-limit-max-requests: "100"
+  login-rate-limit-max: "5"
+  registration-rate-limit-max: "3"
+  password-reset-rate-limit-max: "3"
+  otp-request-rate-limit-max: "5"
+  
+  # Email Configuration
+  email-verification-required: "true"
+  email-verification-expires: "86400000"  # 24 hours
+  email-template-path: "/app/templates/email"
+  email-from-name: "GetIt Bangladesh"
+  email-from-address: "noreply@getit.com.bd"
+  
+  # Phone Configuration
+  phone-verification-required: "true"
+  phone-verification-expires: "1800000"  # 30 minutes
+  bangladesh-phone-regex: "^\\+8801[3-9]\\d{8}$"
+  international-phone-enabled: "true"
+  
+  # Profile Configuration
+  profile-image-max-size: "5242880"  # 5MB
+  profile-image-allowed-types: "image/jpeg,image/png,image/webp"
+  profile-update-rate-limit: "10"
+  
+  # Security Configuration
+  account-lockout-enabled: "true"
+  account-lockout-attempts: "5"
+  account-lockout-duration: "1800000"  # 30 minutes
+  account-lockout-progressive: "true"
+  
+  # Two-Factor Authentication
+  two-factor-enabled: "true"
+  two-factor-issuer: "GetIt Bangladesh"
+  two-factor-window: "1"
+  two-factor-backup-codes: "10"
+  
+  # Bangladesh-specific Configuration
+  bangladesh-nid-validation: "true"
+  bangladesh-nid-regex: "^[0-9]{10}$|^[0-9]{13}$|^[0-9]{17}$"
+  bangladesh-divisions: "dhaka,chittagong,sylhet,rangpur,rajshahi,khulna,barisal,mymensingh"
+  bangladesh-timezone: "Asia/Dhaka"
+  bangladesh-locale: "bn-BD"
+  bangladesh-currency: "BDT"
+  
+  # Social Login Configuration
+  social-login-enabled: "true"
+  google-login-enabled: "true"
+  facebook-login-enabled: "true"
+  apple-login-enabled: "false"
+  social-account-linking: "true"
+  
+  # Privacy Configuration
+  data-retention-days: "2555"  # 7 years for Bangladesh compliance
+  gdpr-compliance: "true"
+  bangladesh-privacy-compliance: "true"
+  data-export-enabled: "true"
+  data-deletion-enabled: "true"
+  
+  # Audit Configuration
+  audit-log-enabled: "true"
+  audit-log-events: "login,logout,register,password_change,profile_update,security_change"
+  audit-log-retention: "2555"  # 7 years
+  
+  # Performance Configuration
+  user-cache-ttl: "3600000"  # 1 hour
+  session-cache-ttl: "1800000"  # 30 minutes
+  profile-cache-ttl: "7200000"  # 2 hours
+  
+  # Feature Flags
+  feature-registration-open: "true"
+  feature-email-login: "true"
+  feature-phone-login: "true"
+  feature-social-login: "true"
+  feature-guest-checkout: "true"
+  feature-newsletter-signup: "true"
+  feature-referral-program: "true"
+  
+  # Notification Preferences
+  default-email-notifications: "true"
+  default-sms-notifications: "true"
+  default-push-notifications: "true"
+  marketing-opt-in-default: "false"
+  
+  # User Segmentation
+  user-segmentation-enabled: "true"
+  vip-user-threshold: "50000"  # Spend 50,000 BDT
+  loyalty-program-enabled: "true"
+  
+  # Address Configuration
+  address-max-count: "5"
+  address-validation-enabled: "true"
+  bangladesh-postal-code-regex: "^[0-9]{4}$"
+  
+  # Database Configuration
+  db-connection-pool-min: "5"
+  db-connection-pool-max: "20"
+  db-query-timeout: "30000"
+  db-idle-timeout: "600000"
+  
+  # Logging Configuration
+  log-level: "info"
+  log-user-actions: "true"
+  log-security-events: "true"
+  log-performance-metrics: "true"
+  
+  # Health Check Configuration
+  health-check-interval: "30000"
+  health-check-timeout: "5000"
+  dependency-check-enabled: "true"
+  
+  # Environment Configuration
+  environment: "production"
+  debug-mode: "false"
+  maintenance-mode: "false"
+  api-version: "v1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-email-templates
+  namespace: getit-production
+  labels:
+    app: user-service
+    platform: getit-bangladesh
+    component: email-templates
+data:
+  welcome-email.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>GetIt Bangladesh এ স্বাগতম</title>
+    </head>
+    <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #e74c3c;">GetIt Bangladesh এ স্বাগতম!</h1>
+            <p>প্রিয় {{name}},</p>
+            <p>GetIt Bangladesh এ আপনাকে স্বাগতম জানাই। আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।</p>
+            <p>এখনই শপিং শুরু করুন এবং বাংলাদেশের সেরা অনলাইন মার্কেটপ্লেসের সুবিধা নিন।</p>
+            <a href="{{verificationLink}}" style="background-color: #e74c3c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ইমেইল যাচাই করুন</a>
+        </div>
+    </body>
+    </html>
+  
+  password-reset.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>পাসওয়ার্ড রিসেট - GetIt Bangladesh</title>
+    </head>
+    <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #e74c3c;">পাসওয়ার্ড রিসেট</h1>
+            <p>প্রিয় {{name}},</p>
+            <p>আপনার পাসওয়ার্ড রিসেট করার জন্য অনুরোধ পেয়েছি।</p>
+            <p>নিচের লিঙ্কে ক্লিক করে নতুন পাসওয়ার্ড সেট করুন:</p>
+            <a href="{{resetLink}}" style="background-color: #e74c3c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">পাসওয়ার্ড রিসেট করুন</a>
+            <p>এই লিঙ্কটি ৩০ মিনিটের জন্য কার্যকর।</p>
+        </div>
+    </body>
+    </html>
+  
+  otp-verification.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>OTP যাচাইকরণ - GetIt Bangladesh</title>
+    </head>
+    <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #e74c3c;">OTP যাচাইকরণ</h1>
+            <p>প্রিয় {{name}},</p>
+            <p>আপনার OTP কোড:</p>
+            <div style="font-size: 24px; font-weight: bold; text-align: center; background-color: #f8f9fa; padding: 20px; margin: 20px 0;">
+                {{otpCode}}
+            </div>
+            <p>এই কোডটি ৫ মিনিটের জন্য কার্যকর।</p>
+        </div>
+    </body>
+    </html>

@@ -1,0 +1,26 @@
+🔎  Second-pass Forensic – line-by-line, only **confirmed** issues (no duplicates from round 1).
+
+Key: ✅ = still a real problem, ❌ = not a problem on second look, 🆕 = new finding.
+
+1. ✅ crypto.randomUUID – still missing import.  
+2. ✅ constructor race – async init called inside sync constructor.  
+3. ✅ stubbed helpers – still return stubs.  
+4. ✅ userSearchPreferences uniqueness assumption – no `orderBy`/`where` beyond userId.  
+5. ✅ Map<string, any> – no runtime key validation.  
+6. ✅ searchCache – declared but never read or written; memory leak risk.  
+7. ✅ mlEnhancements serialisation – contains literal `.accuracy`, will stringify to `{}` for functions.  
+8. ✅ price regex greedy quantifier – still greedy.  
+9. ✅ error swallowed in storeSearchData – only console.error.  
+10. ✅ stop-word list incompleteness – unchanged.  
+11. ❌ duplicate intent keywords – harmless; first match wins is acceptable.  
+12. ❌ browser crypto.randomUUID – not relevant for server-side file.  
+13. ❌ db import side-effect – acceptable for service layer, provided DI is used elsewhere.  
+14. 🆕 `nlpProcessor.translateQuery` is assigned but never implemented – runtime call will throw `TypeError: this.nlpProcessor.translateQuery is not a function`.  
+15. 🆕 `getPersonalizedResults` fetches preferences with `limit(1)` but does **not** `orderBy` any timestamp or priority; if multiple rows exist, deterministic order is **not guaranteed**.  
+16. 🆕 `combineSearchResults` stub returns `[]` – will always yield empty list, masking all search modalities.  
+17. 🆕 `applyMLRanking` stub returns input array without re-ordering – ranking is a no-op.  
+18. 🆕 `calculateSearchScore` stub always returns `0.8` – metrics are meaningless.  
+19. 🆕 `searchProducts`, `searchPages`, `searchFAQs`, `searchKnowledgeBase`, `performTextSearch`, `performSemanticSearch` all return empty arrays – real search paths are dead code.  
+20. 🆕 `generateRelatedQueries` stub causes `relatedQueries: []` in every response, breaking the API contract shown in `AISearchResponse`.
+
+Verified: original findings hold, plus six new stub-related critical failures.

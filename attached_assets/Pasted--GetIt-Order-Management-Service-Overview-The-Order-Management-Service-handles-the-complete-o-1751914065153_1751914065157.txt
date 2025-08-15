@@ -1,0 +1,470 @@
+# GetIt Order Management Service
+
+## Overview
+The Order Management Service handles the complete order lifecycle for the GetIt multi-vendor ecommerce platform. It manages order creation, multi-vendor order splitting, status tracking, invoice generation, and return/refund processing while supporting Bangladesh-specific requirements like Cash on Delivery (COD) and local tax calculations.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: PostgreSQL (primary), Redis (session/cache)
+- **Message Queue**: Redis Bull Queue for background processing
+- **PDF Generation**: Puppeteer for invoice and receipt generation
+- **Background Jobs**: Node-cron for scheduled tasks
+- **Event Streaming**: Apache Kafka for order events
+- **File Storage**: AWS S3 for order documents
+
+## Core Responsibilities
+
+### 1. Order Processing
+- Order creation and validation
+- Multi-vendor order splitting and coordination
+- Real-time order status tracking
+- Order modification and cancellation
+- Priority order handling (express, urgent)
+
+### 2. Payment Coordination
+- Payment method validation and processing
+- COD (Cash on Delivery) management
+- Payment status synchronization
+- Refund processing coordination
+- Multiple payment method support per order
+
+### 3. Inventory Management
+- Real-time inventory reservation
+- Stock verification before order confirmation
+- Automatic inventory release on cancellation
+- Back-order management
+- Pre-order processing
+
+### 4. Document Generation
+- Order confirmation emails
+- Invoice generation with tax calculations
+- Receipt generation for completed orders
+- Shipping labels and packing slips
+- Return authorization documents
+
+### 5. Multi-Vendor Coordination
+- Order splitting by vendor
+- Vendor notification and communication
+- Independent fulfillment tracking
+- Consolidated customer communication
+- Vendor-specific shipping and handling
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **Cash on Delivery (COD)**: Comprehensive COD management system
+- **VAT Calculation**: Automated VAT calculation as per Bangladesh tax laws
+- **Local Currency**: Bangladesh Taka (BDT) as primary currency
+- **District-wise Delivery**: Support for all 64 districts of Bangladesh
+- **Festival Season Handling**: Special processing during Eid, Durga Puja, etc.
+
+### Advanced Order Features
+- **Multi-vendor Orders**: Single order spanning multiple vendors
+- **Partial Fulfillment**: Support for partial order completion
+- **Split Delivery**: Different delivery dates for different items
+- **Gift Orders**: Gift wrapping and personalized messages
+- **Subscription Orders**: Recurring order management
+
+### Customer Experience Features
+- **Real-time Tracking**: Live order status updates
+- **Communication Hub**: Centralized order communication
+- **Easy Returns**: Simplified return initiation process
+- **Order History**: Comprehensive order management for customers
+- **Reorder Functionality**: Quick reordering of previous purchases
+
+## API Endpoints
+
+### Order Creation & Management APIs
+```yaml
+Order Operations:
+  POST /api/v1/orders
+  GET /api/v1/orders/:id
+  PUT /api/v1/orders/:id
+  DELETE /api/v1/orders/:id
+  PATCH /api/v1/orders/:id/status
+
+Order Listing:
+  GET /api/v1/orders
+  GET /api/v1/orders/history
+  GET /api/v1/orders/search
+  GET /api/v1/orders/filter
+
+Order Actions:
+  POST /api/v1/orders/:id/cancel
+  POST /api/v1/orders/:id/modify
+  POST /api/v1/orders/:id/confirm
+  POST /api/v1/orders/:id/fulfill
+```
+
+### Vendor Order Management APIs
+```yaml
+Vendor Operations:
+  GET /api/v1/vendor/orders
+  GET /api/v1/vendor/orders/:id
+  PATCH /api/v1/vendor/orders/:id/status
+  POST /api/v1/vendor/orders/:id/ship
+  POST /api/v1/vendor/orders/:id/delivery-update
+
+Fulfillment:
+  POST /api/v1/vendor/orders/:id/pack
+  POST /api/v1/vendor/orders/:id/dispatch
+  PUT /api/v1/vendor/orders/:id/tracking
+  POST /api/v1/vendor/orders/:id/deliver
+```
+
+### Return & Refund APIs
+```yaml
+Returns:
+  POST /api/v1/orders/:id/return-request
+  GET /api/v1/orders/:id/returns
+  PUT /api/v1/returns/:id/status
+  POST /api/v1/returns/:id/approve
+  POST /api/v1/returns/:id/process
+
+Refunds:
+  POST /api/v1/orders/:id/refund
+  GET /api/v1/refunds/:id
+  PUT /api/v1/refunds/:id/status
+  POST /api/v1/refunds/:id/process
+```
+
+### Document Generation APIs
+```yaml
+Documents:
+  GET /api/v1/orders/:id/invoice
+  GET /api/v1/orders/:id/receipt
+  GET /api/v1/orders/:id/shipping-label
+  GET /api/v1/orders/:id/packing-slip
+  POST /api/v1/orders/:id/download-documents
+```
+
+### Admin APIs
+```yaml
+Order Administration:
+  GET /api/v1/admin/orders
+  GET /api/v1/admin/orders/dashboard
+  POST /api/v1/admin/orders/:id/intervene
+  GET /api/v1/admin/orders/analytics
+  POST /api/v1/admin/orders/bulk-update
+```
+
+## Database Schema
+
+### Primary Tables
+```sql
+orders:
+  - id (Primary Key)
+  - order_number (Unique)
+  - customer_id (Foreign Key)
+  - order_date
+  - status (pending, confirmed, processing, shipped, delivered, cancelled)
+  - payment_status (pending, paid, failed, refunded)
+  - payment_method
+  - subtotal
+  - tax_amount
+  - shipping_amount
+  - discount_amount
+  - total_amount
+  - currency (BDT, USD, EUR)
+  - shipping_address
+  - billing_address
+  - customer_notes
+  - admin_notes
+  - delivery_instructions
+  - estimated_delivery_date
+  - actual_delivery_date
+  - cancelled_at
+  - cancelled_reason
+  - created_at
+  - updated_at
+
+order_items:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - product_id (Foreign Key)
+  - variant_id
+  - product_name
+  - product_sku
+  - quantity
+  - unit_price
+  - total_price
+  - tax_amount
+  - vendor_commission
+  - status
+  - created_at
+
+vendor_orders:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - vendor_order_number
+  - status
+  - items_count
+  - subtotal
+  - tax_amount
+  - shipping_amount
+  - total_amount
+  - fulfillment_status
+  - shipped_at
+  - delivered_at
+  - tracking_number
+  - carrier_name
+  - created_at
+  - updated_at
+
+order_status_history:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - status
+  - changed_by
+  - changed_at
+  - notes
+  - metadata
+
+order_payments:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - payment_method
+  - amount
+  - currency
+  - transaction_id
+  - gateway_response
+  - status
+  - processed_at
+
+order_returns:
+  - id (Primary Key)
+  - order_id (Foreign Key)
+  - order_item_id (Foreign Key)
+  - reason
+  - description
+  - status
+  - return_type (refund, exchange, store_credit)
+  - approved_by
+  - approved_at
+  - processed_at
+  - refund_amount
+  - created_at
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **User Service**: Customer authentication and profile data
+- **Vendor Service**: Vendor information and capabilities
+- **Product Service**: Product details and availability
+- **Inventory Service**: Stock reservation and management
+- **Payment Service**: Payment processing and validation
+- **Shipping Service**: Delivery coordination and tracking
+- **Notification Service**: Order updates and communication
+- **Analytics Service**: Order metrics and reporting
+
+### External Service Integration
+- **Payment Gateways**: bKash, Nagad, Rocket, Stripe, PayPal
+- **Shipping Partners**: Pathao, Paperfly, Sundarban, RedX, eCourier
+- **Tax Calculation Services**: Bangladesh VAT and customs duty
+- **SMS Providers**: Order status notifications
+- **Email Services**: Order confirmations and updates
+
+## Order Processing Workflow
+
+### Single Vendor Order Flow
+```yaml
+Step 1: Order Creation
+  - Validate customer and products
+  - Check inventory availability
+  - Calculate pricing and taxes
+  - Create order record
+
+Step 2: Payment Processing
+  - Validate payment method
+  - Process payment or setup COD
+  - Reserve inventory
+  - Confirm order
+
+Step 3: Vendor Notification
+  - Notify vendor of new order
+  - Provide fulfillment details
+  - Set fulfillment deadline
+  - Start tracking timeline
+
+Step 4: Fulfillment
+  - Vendor packs the order
+  - Generate shipping label
+  - Hand over to carrier
+  - Update tracking information
+
+Step 5: Delivery & Completion
+  - Track delivery progress
+  - Confirm delivery
+  - Release payment to vendor
+  - Request customer feedback
+```
+
+### Multi-Vendor Order Flow
+```yaml
+Step 1: Order Splitting
+  - Identify unique vendors in cart
+  - Create sub-orders for each vendor
+  - Calculate shipping per vendor
+  - Coordinate payment processing
+
+Step 2: Independent Processing
+  - Each vendor processes their items
+  - Individual tracking numbers
+  - Separate fulfillment timelines
+  - Coordinated customer communication
+
+Step 3: Consolidated Updates
+  - Aggregate status updates
+  - Unified customer dashboard
+  - Single communication channel
+  - Combined delivery tracking
+```
+
+## Payment Integration
+
+### Supported Payment Methods
+```yaml
+Digital Payments:
+  - bKash (Mobile Financial Service)
+  - Nagad (Digital Financial Service)
+  - Rocket (Mobile Banking)
+  - Visa/Mastercard (International cards)
+  - PayPal (International)
+
+Traditional Payments:
+  - Cash on Delivery (COD)
+  - Bank Transfer
+  - Check Payment (for B2B)
+
+Payment Features:
+  - Split payments across methods
+  - Partial payments and installments
+  - Automatic payment retry
+  - Refund processing
+  - Payment verification
+```
+
+### COD Management
+- **COD Verification**: Phone verification before delivery
+- **Collection Tracking**: Money collection status
+- **Failed Delivery**: Return to vendor coordination
+- **COD Limits**: Maximum COD amount per customer
+- **Risk Assessment**: COD fraud prevention
+
+## Tax Calculation
+
+### Bangladesh Tax Structure
+```yaml
+VAT Calculation:
+  Standard Rate: 15% on most products
+  Reduced Rate: 5% on essential items
+  Zero Rate: Books, medicines, education materials
+  Exempt: Certain food items and services
+
+Custom Duty:
+  Imported Products: Variable rates by category
+  Local Products: No customs duty
+  Special Economic Zones: Preferential rates
+
+Tax Compliance:
+  - Automatic tax calculation
+  - Tax invoice generation
+  - Monthly VAT reporting
+  - Customs duty documentation
+```
+
+## Return & Refund Management
+
+### Return Policy Framework
+```yaml
+Return Reasons:
+  - Defective product
+  - Wrong product received
+  - Size/color mismatch
+  - Changed mind (within policy)
+  - Damaged during shipping
+
+Return Timeline:
+  - Electronics: 7 days
+  - Fashion: 14 days
+  - Books: 30 days
+  - Perishables: No returns
+  - Custom products: No returns
+
+Refund Methods:
+  - Original payment method
+  - Store credit
+  - Bank transfer
+  - Mobile wallet refund
+```
+
+### Return Processing Workflow
+1. Customer initiates return request
+2. System validates return eligibility
+3. Vendor approves/rejects request
+4. Generate return shipping label
+5. Customer ships product back
+6. Vendor inspects returned product
+7. Process refund or exchange
+8. Update customer and close case
+
+## Performance Monitoring
+
+### Key Performance Indicators
+- **Order Processing Time**: Average time from order to confirmation
+- **Fulfillment Rate**: Percentage of orders fulfilled on time
+- **Order Accuracy**: Correct orders vs. total orders
+- **Return Rate**: Percentage of orders returned
+- **Customer Satisfaction**: Order rating and feedback scores
+
+### Real-time Metrics
+- Orders per minute/hour/day
+- Average order value
+- Peak order processing capacity
+- System response times
+- Error rates and types
+
+## Business Logic
+
+### Order Prioritization
+```yaml
+Priority Levels:
+  Critical: Same-day delivery orders
+  High: Express delivery orders
+  Normal: Standard delivery orders
+  Low: Pre-orders and back-orders
+
+Festival Season:
+  - 3x normal processing capacity
+  - Extended customer service hours
+  - Special delivery arrangements
+  - Priority vendor support
+```
+
+### Inventory Coordination
+- Real-time stock checking before order confirmation
+- Automatic inventory reservation on order creation
+- Inventory release on order cancellation
+- Back-order management for out-of-stock items
+- Vendor notification for low stock items
+
+## Business Objectives
+
+### Primary Goals
+1. **Order Accuracy**: Ensure correct and complete orders
+2. **Processing Speed**: Fast order processing and fulfillment
+3. **Customer Satisfaction**: Positive order experience
+4. **Vendor Success**: Support vendor order management
+5. **Operational Efficiency**: Streamlined order operations
+
+### Bangladesh Market Alignment
+1. **COD Support**: Comprehensive cash-on-delivery management
+2. **Local Compliance**: Meet Bangladesh tax and regulatory requirements
+3. **Multi-language**: Bangla and English order communication
+4. **Festival Adaptability**: Handle seasonal shopping patterns
+5. **Rural Reach**: Support delivery to remote areas
+
+This Order Management Service provides a robust, scalable, and locally-adapted order processing system that handles the complexity of multi-vendor operations while maintaining excellent customer experience and operational efficiency specific to the Bangladesh market.

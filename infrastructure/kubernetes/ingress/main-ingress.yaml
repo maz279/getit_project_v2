@@ -1,0 +1,452 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: getit-main-ingress
+  namespace: getit-production
+  labels:
+    app: ingress
+    platform: getit-bangladesh
+    component: traffic-routing
+    tier: infrastructure
+  annotations:
+    # AWS ALB Configuration
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:123456789012:certificate/getit-bangladesh-ssl-cert"
+    
+    # Security Configuration
+    alb.ingress.kubernetes.io/security-groups: "sg-getit-alb-security-group"
+    alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:ap-southeast-1:123456789012:regional/webacl/getit-bangladesh-waf/12345678-1234-1234-1234-123456789012"
+    
+    # Load Balancer Configuration
+    alb.ingress.kubernetes.io/load-balancer-name: "getit-bangladesh-main-alb"
+    alb.ingress.kubernetes.io/group.name: "getit-bangladesh"
+    alb.ingress.kubernetes.io/group.order: "1"
+    
+    # Health Check Configuration
+    alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    
+    # Performance Configuration
+    alb.ingress.kubernetes.io/deregistration-delay-timeout-seconds: "30"
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http.drop_invalid_header_fields.enabled=true,
+      routing.http.preserve_host_header.enabled=true,
+      routing.http.x_amzn_trace_id.enabled=true,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=getit-bangladesh-alb-logs,
+      access_logs.s3.prefix=main-ingress
+    
+    # Rate Limiting and DDoS Protection
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://getit.com.bd,https://vendor.getit.com.bd,https://admin.getit.com.bd"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type,Authorization,X-Requested-With,X-API-Key,X-User-Agent,X-Device-ID"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com;" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+spec:
+  tls:
+  - hosts:
+    - getit.com.bd
+    - www.getit.com.bd
+    - api.getit.com.bd
+    secretName: getit-bangladesh-tls-secret
+  - hosts:
+    - vendor.getit.com.bd
+    secretName: vendor-getit-bangladesh-tls-secret
+  - hosts:
+    - admin.getit.com.bd
+    secretName: admin-getit-bangladesh-tls-secret
+  rules:
+  # Main Customer Web Application
+  - host: getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: customer-web
+            port:
+              number: 3000
+  - host: www.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: customer-web
+            port:
+              number: 3000
+  
+  # API Gateway Routes
+  - host: api.getit.com.bd
+    http:
+      paths:
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 80
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 80
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 9090
+  
+  # Mobile API (subdomain routing)
+  - host: mobile.getit.com.bd
+    http:
+      paths:
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 80
+  
+  # Vendor Dashboard Application
+  - host: vendor.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vendor-dashboard
+            port:
+              number: 3001
+      - path: /api/v1/vendor
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 80
+  
+  # Admin Panel Application
+  - host: admin.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-panel
+            port:
+              number: 3002
+      - path: /api/v1/admin
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: getit-microservices-ingress
+  namespace: getit-production
+  labels:
+    app: microservices-ingress
+    platform: getit-bangladesh
+    component: microservice-routing
+    tier: infrastructure
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: "getit-bangladesh-internal"
+    alb.ingress.kubernetes.io/group.order: "2"
+    alb.ingress.kubernetes.io/load-balancer-name: "getit-bangladesh-internal-alb"
+    
+    # Internal Security
+    alb.ingress.kubernetes.io/security-groups: "sg-getit-internal-alb-security-group"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  rules:
+  # Internal API for microservice communication
+  - host: internal.getit.com.bd
+    http:
+      paths:
+      # User Service
+      - path: /api/v1/users
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 3000
+      
+      # Payment Service
+      - path: /api/v1/payments
+        pathType: Prefix
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 3004
+      
+      # Order Service
+      - path: /api/v1/orders
+        pathType: Prefix
+        backend:
+          service:
+            name: order-service
+            port:
+              number: 3003
+      
+      # Product Service
+      - path: /api/v1/products
+        pathType: Prefix
+        backend:
+          service:
+            name: product-service
+            port:
+              number: 3002
+      
+      # Vendor Service
+      - path: /api/v1/vendors
+        pathType: Prefix
+        backend:
+          service:
+            name: vendor-service
+            port:
+              number: 3001
+      
+      # Analytics Service
+      - path: /api/v1/analytics
+        pathType: Prefix
+        backend:
+          service:
+            name: analytics-service
+            port:
+              number: 3009
+      
+      # Notification Service
+      - path: /api/v1/notifications
+        pathType: Prefix
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 3007
+      
+      # Search Service
+      - path: /api/v1/search
+        pathType: Prefix
+        backend:
+          service:
+            name: search-service
+            port:
+              number: 3008
+      
+      # ML Service
+      - path: /api/v1/ml
+        pathType: Prefix
+        backend:
+          service:
+            name: ml-service
+            port:
+              number: 3010
+      
+      # Finance Service
+      - path: /api/v1/finance
+        pathType: Prefix
+        backend:
+          service:
+            name: finance-service
+            port:
+              number: 3011
+      
+      # Inventory Service
+      - path: /api/v1/inventory
+        pathType: Prefix
+        backend:
+          service:
+            name: inventory-service
+            port:
+              number: 3005
+      
+      # Shipping Service
+      - path: /api/v1/shipping
+        pathType: Prefix
+        backend:
+          service:
+            name: shipping-service
+            port:
+              number: 3006
+      
+      # Localization Service
+      - path: /api/v1/localization
+        pathType: Prefix
+        backend:
+          service:
+            name: localization-service
+            port:
+              number: 3012
+      
+      # Review Service
+      - path: /api/v1/reviews
+        pathType: Prefix
+        backend:
+          service:
+            name: review-service
+            port:
+              number: 3013
+      
+      # Support Service
+      - path: /api/v1/support
+        pathType: Prefix
+        backend:
+          service:
+            name: support-service
+            port:
+              number: 3014
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: getit-monitoring-ingress
+  namespace: getit-monitoring
+  labels:
+    app: monitoring-ingress
+    platform: getit-bangladesh
+    component: monitoring-routing
+    tier: infrastructure
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: "getit-bangladesh-monitoring"
+    alb.ingress.kubernetes.io/group.order: "3"
+    
+    # Security for monitoring access
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  rules:
+  # Monitoring Infrastructure
+  - host: monitoring.getit.com.bd
+    http:
+      paths:
+      # Prometheus
+      - path: /prometheus
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+      
+      # Grafana
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+      
+      # Kibana (ELK Stack)
+      - path: /kibana
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: 5601
+      
+      # Jaeger Tracing
+      - path: /jaeger
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger-query
+            port:
+              number: 16686
+      
+      # AlertManager
+      - path: /alertmanager
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: getit-bangladesh-tls-secret
+  namespace: getit-production
+  labels:
+    app: tls-certificates
+    platform: getit-bangladesh
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCkdldEl0X0JhbmdsYWRlc2hfVExTX0NlcnRpZmljYXRlX0ZvckdldEl0LmNvbS5iZApTVVBFUl9TRUNVUkVfQ0VSVElGSUNBVEVfRU5DT0RFRApFTkRfQ0VSVElGSUNBVEUKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCkdldEl0X0JhbmdsYWRlc2hfVExTX1ByaXZhdGVfS2V5X0ZvckdldEl0LmNvbS5iZApTVVBFUl9TRUNVUkVfUFJJVkFURV9LRVlfRU5DT0RFRApFTkRfUFJJVkFURV9LRVkKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vendor-getit-bangladesh-tls-secret
+  namespace: getit-production
+  labels:
+    app: tls-certificates
+    platform: getit-bangladesh
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tClZlbmRvcl9HZXRJdF9CYW5nbGFkZXNoX1RMU19DZXJ0aWZpY2F0ZV9Gb3JWZW5kb3IuZ2V0aXQuY29tLmJkClNVUEVSX1NFQ1VSRV9DRVJUSUZJQ0FURV9FTkNPREVECkVORF9DRVJUSUZJQ0FURQOTLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tClZlbmRvcl9HZXRJdF9CYW5nbGFkZXNoX1RMU19Qcml2YXRlX0tleV9Gb3JWZW5kb3IuZ2V0aXQuY29tLmJkClNVUEVSX1NFQ1VSRV9QUklWQVRFX0tFWV9FTkNPREVECkVORF9QUklWQVRFX0tFWQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0t
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-getit-bangladesh-tls-secret
+  namespace: getit-production
+  labels:
+    app: tls-certificates
+    platform: getit-bangladesh
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCkFkbWluX0dldEl0X0JhbmdsYWRlc2hfVExTX0NlcnRpZmljYXRlX0ZvckFkbWluLmdldGl0LmNvbS5iZApTVVBFUl9TRUNVUkVfQ0VSVElGSUNBVEVfRU5DT0RFRApFTkRfQ0VSVElGSUNBVEUKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCkFkbWluX0dldEl0X0JhbmdsYWRlc2hfVExTX1ByaXZhdGVfS2V5X0ZvckFkbWluLmdldGl0LmNvbS5iZApTVVBFUl9TRUNVUkVfUFJJVkFURV9LRVlfRU5DT0RFRApFTkRfUFJJVkFURV9LRVkKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ==

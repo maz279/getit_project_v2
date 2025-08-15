@@ -1,0 +1,281 @@
+# Docker Compose for GetIt Bangladesh Development Environment
+# Amazon.com/Shopee.sg-Level Local Development Setup
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # DATABASE SERVICES
+  # =============================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: getit-postgres-dev
+    environment:
+      POSTGRES_DB: getit_development
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d getit_development"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: getit-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # ELASTICSEARCH & MONITORING
+  # =============================================================================
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: getit-elasticsearch-dev
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: getit-kibana-dev
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =============================================================================
+  # APPLICATION SERVICES
+  # =============================================================================
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      target: production
+    container_name: getit-backend-dev
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/getit_development
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      JWT_SECRET: dev-jwt-secret-key-change-in-production
+      ENCRYPTION_KEY: dev-encryption-key-change-in-production
+      SESSION_SECRET: dev-session-secret-change-in-production
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: debug
+      ENABLE_DEBUG: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/app/server:cached
+      - ./shared:/app/shared:cached
+      - ./logs:/app/logs
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: builder
+    container_name: getit-frontend-dev
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:3000
+      VITE_WS_URL: ws://localhost:3000
+      VITE_CDN_URL: http://localhost:3000/static
+      VITE_SENTRY_DSN: ""
+      VITE_GA_TRACKING_ID: ""
+      VITE_FACEBOOK_APP_ID: ""
+      VITE_GOOGLE_MAPS_API_KEY: ""
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app/client:cached
+      - ./shared:/app/shared:cached
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - getit-network
+    restart: unless-stopped
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # DEVELOPMENT TOOLS
+  # =============================================================================
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: getit-mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - getit-network
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: getit-adminer-dev
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: flat
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - getit-network
+    restart: unless-stopped
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: getit-redis-commander-dev
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - getit-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # PROXY & LOAD BALANCER
+  # =============================================================================
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: getit-nginx-dev
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx-dev.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/sites-available:/etc/nginx/sites-available
+      - ./docker/ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - getit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  getit-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  backend_node_modules:
+    driver: local
+  frontend_node_modules:
+    driver: local
+
+# =============================================================================
+# DEVELOPMENT COMMANDS
+# =============================================================================
+
+# Available commands:
+# docker-compose up -d                    # Start all services in background
+# docker-compose up backend frontend      # Start only app services
+# docker-compose logs -f backend          # Follow backend logs
+# docker-compose exec backend npm test    # Run tests in backend container
+# docker-compose exec postgres psql -U postgres -d getit_development  # Access database
+# docker-compose down -v                  # Stop and remove all containers and volumes

@@ -1,0 +1,281 @@
+/**
+ * Phase 2: Mobile-First Responsive Design System
+ * Amazon.com/Shopee.sg-Level Mobile-First Breakpoints
+ * Optimized for Bangladesh mobile users
+ */
+
+// Phase 2 Mobile-First Breakpoint System
+$breakpoints: (
+  mobile: 320px,   // Bangladesh mobile average
+  tablet: 768px,   // Tablet landscape
+  desktop: 1024px, // Desktop minimum
+  wide: 1200px     // Wide desktop
+);
+
+// Responsive mixins
+@mixin mobile-up {
+  @media (min-width: #{map-get($breakpoints, mobile)}) {
+    @content;
+  }
+}
+
+@mixin tablet-up {
+  @media (min-width: #{map-get($breakpoints, tablet)}) {
+    @content;
+  }
+}
+
+@mixin desktop-up {
+  @media (min-width: #{map-get($breakpoints, desktop)}) {
+    @content;
+  }
+}
+
+@mixin wide-up {
+  @media (min-width: #{map-get($breakpoints, wide)}) {
+    @content;
+  }
+}
+
+// Touch-specific breakpoints
+@mixin touch-device {
+  @media (hover: none) and (pointer: coarse) {
+    @content;
+  }
+}
+
+@mixin hover-device {
+  @media (hover: hover) and (pointer: fine) {
+    @content;
+  }
+}
+
+// Container system
+.container {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 1rem;
+  margin: 0 auto;
+
+  @include tablet-up {
+    padding: 0 1.5rem;
+    max-width: 768px;
+  }
+
+  @include desktop-up {
+    padding: 0 2rem;
+    max-width: 1024px;
+  }
+
+  @include wide-up {
+    padding: 0 2rem;
+    max-width: 1200px;
+  }
+}
+
+// Grid system
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(1, 1fr);
+
+  @include tablet-up {
+    gap: 1.5rem;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @include desktop-up {
+    gap: 2rem;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  @include wide-up {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+// Responsive typography
+.text-responsive {
+  font-size: 0.875rem;
+  line-height: 1.5;
+
+  @include tablet-up {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  @include desktop-up {
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+}
+
+// Component sizing standards
+.component-base {
+  // Mobile-first base styles
+  padding: 1rem;
+  border-radius: 0.5rem;
+  
+  @include tablet-up {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+  }
+  
+  @include desktop-up {
+    padding: 2rem;
+    border-radius: 1rem;
+  }
+}
+
+// Button sizing
+.btn-responsive {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  min-height: 44px; // Touch target minimum
+  
+  @include tablet-up {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+    min-height: 48px;
+  }
+  
+  @include desktop-up {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    min-height: 52px;
+  }
+}
+
+// Card responsive
+.card-responsive {
+  @extend .component-base;
+  margin-bottom: 1rem;
+  
+  @include tablet-up {
+    margin-bottom: 1.5rem;
+  }
+  
+  @include desktop-up {
+    margin-bottom: 2rem;
+  }
+}
+
+// Navigation responsive
+.nav-responsive {
+  // Mobile: Stack vertically
+  flex-direction: column;
+  gap: 0.5rem;
+  
+  @include tablet-up {
+    flex-direction: row;
+    gap: 1rem;
+  }
+  
+  @include desktop-up {
+    gap: 2rem;
+  }
+}
+
+// Image responsive
+.img-responsive {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  
+  // Mobile: Square aspect ratio
+  aspect-ratio: 1 / 1;
+  
+  @include tablet-up {
+    aspect-ratio: 4 / 3;
+  }
+  
+  @include desktop-up {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+// Form responsive
+.form-responsive {
+  .form-group {
+    margin-bottom: 1rem;
+    
+    @include tablet-up {
+      margin-bottom: 1.5rem;
+    }
+  }
+  
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    
+    @include tablet-up {
+      flex-direction: row;
+      gap: 1.5rem;
+    }
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    min-height: 44px;
+    
+    @include tablet-up {
+      padding: 0.875rem;
+      min-height: 48px;
+    }
+    
+    @include desktop-up {
+      padding: 1rem;
+      min-height: 52px;
+    }
+  }
+}
+
+// Table responsive
+.table-responsive {
+  overflow-x: auto;
+  
+  table {
+    width: 100%;
+    min-width: 600px;
+    
+    @include tablet-up {
+      min-width: 800px;
+    }
+    
+    @include desktop-up {
+      min-width: 100%;
+    }
+  }
+}
+
+// Utility classes
+.show-mobile {
+  display: block;
+  
+  @include tablet-up {
+    display: none;
+  }
+}
+
+.show-tablet {
+  display: none;
+  
+  @include tablet-up {
+    display: block;
+  }
+  
+  @include desktop-up {
+    display: none;
+  }
+}
+
+.show-desktop {
+  display: none;
+  
+  @include desktop-up {
+    display: block;
+  }
+}

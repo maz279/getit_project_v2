@@ -1,0 +1,39 @@
+Failed to parse conversational AI response: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+overrideMethod @ hook.js:608
+(anonymous) @ AISearchBar.tsx:629
+await in (anonymous)
+(anonymous) @ AISearchBar.tsx:843
+callCallback2 @ chunk-RPCDYKBN.js?v=0ebebf42:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=0ebebf42:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=0ebebf42:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=0ebebf42:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=0ebebf42:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=0ebebf42:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=0ebebf42:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=0ebebf42:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=0ebebf42:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this warning
+Header.tsx:541 Legacy search callback: help me to find pet []
+UnifiedSearchResults.tsx:319 Error fetching Grok AI recommendations: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+overrideMethod @ hook.js:608
+fetchGroqAIRecommendations @ UnifiedSearchResults.tsx:319
+await in fetchGroqAIRecommendations
+(anonymous) @ UnifiedSearchResults.tsx:328
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=0ebebf42:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=0ebebf42:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=0ebebf42:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=0ebebf42:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=0ebebf42:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=0ebebf42:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=0ebebf42:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:19328
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+AISearchBar.tsx:629 Failed to parse conversational AI response: SyntaxError: Failed to execute 'json' on 'Response': Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+    at AISearchBar.tsx:624:57

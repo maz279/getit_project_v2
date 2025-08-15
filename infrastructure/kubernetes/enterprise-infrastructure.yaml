@@ -1,0 +1,277 @@
+# Phase 5 Enterprise Infrastructure - Kubernetes Configuration
+# Amazon.com/Shopee.sg-Level Infrastructure with Auto-scaling & Service Mesh
+# Author: GetIt Platform Team
+# Version: 5.0.0
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-enterprise
+  labels:
+    name: getit-enterprise
+    version: "5.0.0"
+    tier: enterprise
+
+---
+# Horizontal Pod Autoscaler for GetIt Application
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-app-hpa
+  namespace: getit-enterprise
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-app
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+# Vertical Pod Autoscaler for GetIt Application
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: getit-app-vpa
+  namespace: getit-enterprise
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-app
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: getit-app
+      maxAllowed:
+        cpu: 2
+        memory: 4Gi
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+
+---
+# Service Mesh - Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: getit-gateway
+  namespace: getit-enterprise
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "getit.bangladesh.com"
+    - "*.getit.bangladesh.com"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: getit-tls-cert
+    hosts:
+    - "getit.bangladesh.com"
+    - "*.getit.bangladesh.com"
+
+---
+# Virtual Service for Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: getit-vs
+  namespace: getit-enterprise
+spec:
+  hosts:
+  - "getit.bangladesh.com"
+  gateways:
+  - getit-gateway
+  http:
+  - match:
+    - headers:
+        canary:
+          exact: "true"
+    route:
+    - destination:
+        host: getit-app-canary
+        port:
+          number: 5000
+      weight: 100
+  - route:
+    - destination:
+        host: getit-app-stable
+        port:
+          number: 5000
+      weight: 90
+    - destination:
+        host: getit-app-canary
+        port:
+          number: 5000
+      weight: 10
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+
+---
+# Destination Rules for Load Balancing
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: getit-destination-rule
+  namespace: getit-enterprise
+spec:
+  host: getit-app
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 10
+    circuitBreaker:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+  - name: canary
+    labels:
+      version: canary
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: getit-network-policy
+  namespace: getit-enterprise
+spec:
+  podSelector:
+    matchLabels:
+      app: getit-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - podSelector:
+        matchLabels:
+          app: getit-app
+    ports:
+    - protocol: TCP
+      port: 5000
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 5432
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: getit-pdb
+  namespace: getit-enterprise
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: getit-app
+
+---
+# Resource Quota
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: getit-resource-quota
+  namespace: getit-enterprise
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+
+---
+# Limit Range
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: getit-limit-range
+  namespace: getit-enterprise
+spec:
+  limits:
+  - default:
+      cpu: 500m
+      memory: 1Gi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    type: Container
+  - max:
+      storage: 10Gi
+    type: PersistentVolumeClaim

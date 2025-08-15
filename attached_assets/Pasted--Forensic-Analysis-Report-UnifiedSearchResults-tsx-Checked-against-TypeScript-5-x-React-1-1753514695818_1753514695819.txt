@@ -1,0 +1,109 @@
+🔍 Forensic Analysis Report – `UnifiedSearchResults.tsx`  
+Checked against: TypeScript 5.x, React 18, Next.js 14, ESLint “strict”, WCAG 2.2, OWASP Top-10, Node 20 LTS.
+
+────────────────────────────────────────
+1. CRITICAL TYPE / COMPILE ERRORS
+────────────────────────────────────────
+1.1 Missing import – Recommendation & InfoByte  
+• Line 39, 41, 45, 164, 186  
+  Recommendation & InfoByte are referenced but never defined or imported.  
+  ➜ Fix: add the interfaces or import from their source modules.
+
+1.2 No overload for fetch that matches POST body  
+• Line 124, 128, 133  
+  fetch() is called with `body: JSON.stringify({ query, language, userHistory, limit })`.  
+  `userHistory` is not declared anywhere → TS2339.  
+  ➜ Fix: delete or declare `userHistory: any[]`.
+
+1.3 Array.isArray(legacyResults) narrowing unsafe  
+• Line 255, 260, 266  
+  `legacyResults` is declared as `SearchResult[] | null | undefined`; accessing `.length` after narrowing may still be undefined.  
+  ➜ Add explicit null check: `legacyResults && legacyResults.length > 0`.
+
+1.4 useState<Recommendation[]> without type import  
+• Line 164 – setGroqRecommendations expects Recommendation[] but Recommendation is unknown.  
+  ➜ Same as 1.1.
+
+────────────────────────────────────────
+2. RUNTIME / LOGIC ERRORS
+────────────────────────────────────────
+2.1 Possible null-pointer in handleProductClick  
+• Line 318 – `result.url?.trim()` may be empty string; empty string is truthy but fails URL constructor.  
+  ➜ Change to `if (result.url && URL.canParse(result.url))`.
+
+2.2 XSS in dangerouslySetInnerHTML  
+• Line 512 – conversationalResponse is escaped with `.replace(/</g,'&lt;')` but still allows double-quotes and other HTML entities via “dangerouslySetInnerHTML”.  
+  ➜ Use a proper sanitizer (DOMPurify) or render as plain text.
+
+2.3 Duplicate key risk  
+• Line 392, 471 – fallback keys (`product-${index}`, `nav-result-${index}`) can collide if server returns numeric IDs.  
+  ➜ Prefix with scope: `unified-product-${index}`.
+
+2.4 Potential memory leak  
+• fetchGroqAIRecommendations is triggered on every query change; if query changes rapidly, multiple in-flight requests may resolve out-of-order.  
+  ➜ AbortController or debounce.
+
+2.5 Empty recommendations array fallback  
+• generateRecommendations returns empty array when Groq fails; no user feedback.  
+  ➜ Surface error state.
+
+────────────────────────────────────────
+3. ACCESSIBILITY (WCAG 2.2)
+────────────────────────────────────────
+3.1 Non-unique aria-labels  
+• Line 486 – multiple “Learn More” buttons have identical aria-labels.  
+  ➜ Include product title: `aria-label="Learn more about ${title}"`.
+
+3.2 Keyboard trap on cards  
+• Cards have onClick and onKeyDown but no focus ring style; focus may be invisible.  
+  ➜ Add `focus:ring-2 focus:ring-offset-2`.
+
+3.3 Missing lang attribute  
+• No `lang={language}` on any text container; screen readers will mispronounce Bengali.  
+  ➜ Wrap Bengali content in `<span lang="bn">`.
+
+3.4 Color-contrast failures  
+• Badges with `bg-yellow-100 text-yellow-800` on white card = 2.9:1 (fails 4.5:1).  
+  ➜ Darken text to `text-yellow-900`.
+
+────────────────────────────────────────
+4. SECURITY / BEST-PRACTICE
+────────────────────────────────────────
+4.1 Missing Referrer-Policy  
+• External links (Line 318, 471) use `window.open(url, '_blank')`; should include `rel="noopener noreferrer"`.  
+  ➜ Add programmatically: `window.open(url, '_blank', 'noopener,noreferrer')`.
+
+4.2 Exposure of internal API endpoint  
+• `apiEndpoint` prop is logged on error; could leak backend URL.  
+  ➜ Sanitize logs.
+
+4.3 Unsafe regex in conversationalResponse  
+• `.replace(/</g,'&lt;')` does not escape `&`, allowing double-encode attacks.  
+  ➜ Use library escape-html or React’s built-in text rendering.
+
+────────────────────────────────────────
+5. PERFORMANCE
+────────────────────────────────────────
+5.1 useMemo over-fetching  
+• Line 243 – `memoizedContent` recalculates on every `searchResults` change even when unchanged.  
+  ➜ Add deep-equal comparison or use React.memo on child components.
+
+5.2 Unnecessary re-render of section navigation  
+• Section buttons (line 191) are rendered inline; wrap with React.memo or extract.
+
+────────────────────────────────────────
+6. MISCELLANEOUS
+────────────────────────────────────────
+6.1 CSS class “animate-in slide-in-from-bottom-4” used but not defined; Tailwind plugin required.  
+6.2 `line-clamp-2` (line 486) is a Tailwind plugin; ensure `@tailwindcss/line-clamp` is installed.  
+6.3 Unused imports: Clock, Globe, Users, Zap imported but not used in final render.
+
+────────────────────────────────────────
+7. SUMMARY – ACTION ITEMS
+────────────────────────────────────────
+A. Add missing interfaces or imports for Recommendation & InfoByte.  
+B. Declare `userHistory` or remove from fetch body.  
+C. Replace `dangerouslySetInnerHTML` with sanitized JSX.  
+D. Fix all null-guard and type-narrowing warnings.  
+E. Improve accessibility: unique aria-labels, visible focus rings, lang attributes.  
+F. Ensure color contrast ≥ 4.5:1 and add `noopener noreferrer` on external links.

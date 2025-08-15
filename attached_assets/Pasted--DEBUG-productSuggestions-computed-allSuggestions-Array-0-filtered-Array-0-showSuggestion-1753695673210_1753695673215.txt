@@ -1,0 +1,40 @@
+🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+Header.tsx:48 Popular locations loaded: 14 locations
+FooterAnalytics.tsx:47 Footer Analytics Event: {type: 'view', element: 'footer-load', metadata: {…}, timestamp: 1753695584429}
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:2018 🔧 DEBUG: Frontend received suggestions data: {success: true, data: Array(6), metadata: {…}}
+AISearchBar.tsx:2019 🔧 DEBUG: Navigation data: {success: true, data: {…}, metadata: {…}}
+AISearchBar.tsx:2025 🔧 DEBUG: Processing suggestions data array: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2032 🔧 DEBUG: Mapped suggestions: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2053 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(6), length: 6}
+AISearchBar.tsx:2057 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(6), filtered: Array(6), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(6), filtered: Array(0), showSuggestions: true}
+AISearchBar.tsx:2255 🎯 DEBUG: Google-style suggestion clicked: {text: 'shampoo for oily hair', type: 'completion', isTrusted: true}
+AISearchBar.tsx:2270 ✅ DEBUG: Navigating to search results for: shampoo for oily hair
+AISearchBar.tsx:2018 🔧 DEBUG: Frontend received suggestions data: {success: true, data: Array(6), metadata: {…}}
+AISearchBar.tsx:2019 🔧 DEBUG: Navigation data: {success: true, data: {…}, metadata: {…}}
+AISearchBar.tsx:2025 🔧 DEBUG: Processing suggestions data array: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2032 🔧 DEBUG: Mapped suggestions: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2053 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(6), length: 6}
+AISearchBar.tsx:2057 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(6), filtered: Array(6), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(6), filtered: Array(0), showSuggestions: true}
+SearchResultsPage.tsx:174 Search error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+overrideMethod @ hook.js:608
+(anonymous) @ SearchResultsPage.tsx:174
+await in (anonymous)
+(anonymous) @ SearchResultsPage.tsx:195
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=0ebebf42:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=0ebebf42:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=0ebebf42:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=0ebebf42:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=0ebebf42:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=0ebebf42:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=0ebebf42:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:19328
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error

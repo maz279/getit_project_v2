@@ -1,0 +1,620 @@
+# KYC Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The KYC (Know Your Customer) Service manages identity verification, document validation, and compliance processes for vendors and high-value customers on the GetIt platform, ensuring regulatory compliance with Bangladesh financial regulations and international standards.
+
+### 1.2 Core Responsibilities
+- **Identity Verification**: Verify customer and vendor identities
+- **Document Validation**: Validate official documents (NID, passport, trade license)
+- **Risk Assessment**: Assess customer and vendor risk profiles
+- **Compliance Management**: Ensure compliance with local and international regulations
+- **Fraud Prevention**: Detect fraudulent identity documents and applications
+- **Audit Trail**: Maintain complete audit logs for compliance
+
+### 1.3 Technology Stack
+```yaml
+Service: kyc-service
+Technology: Node.js + Express.js + Python (for ML)
+Database: PostgreSQL + MongoDB
+Document Storage: AWS S3 + CloudFront
+OCR Engine: Google Cloud Vision API + Tesseract
+ML Framework: TensorFlow + scikit-learn
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- KYC applications table
+CREATE TABLE kyc_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    application_type kyc_application_type NOT NULL, -- individual, business, vendor
+    status kyc_status DEFAULT 'pending',
+    risk_level risk_level DEFAULT 'medium',
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP,
+    reviewed_by UUID REFERENCES admin_users(id),
+    auto_verification_score DECIMAL(5,2),
+    manual_review_required BOOLEAN DEFAULT false,
+    rejection_reason TEXT,
+    expiry_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Document submissions table
+CREATE TABLE document_submissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    document_type document_type NOT NULL,
+    document_number VARCHAR(100),
+    file_url VARCHAR(500) NOT NULL,
+    file_size INTEGER,
+    file_format VARCHAR(10),
+    ocr_confidence DECIMAL(5,2),
+    extracted_data JSONB,
+    verification_status verification_status DEFAULT 'pending',
+    verification_details JSONB,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    verified_at TIMESTAMP
+);
+
+-- Identity verification table
+CREATE TABLE identity_verifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    verification_method verification_method NOT NULL,
+    verification_data JSONB NOT NULL,
+    confidence_score DECIMAL(5,2),
+    status verification_status DEFAULT 'pending',
+    verified_at TIMESTAMP,
+    expiry_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Business registrations table (for vendors)
+CREATE TABLE business_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    business_name VARCHAR(255) NOT NULL,
+    business_name_bn VARCHAR(255), -- Bangla business name
+    trade_license_number VARCHAR(100) NOT NULL,
+    tin_number VARCHAR(50),
+    vat_registration_number VARCHAR(50),
+    business_type business_type NOT NULL,
+    registration_date DATE,
+    business_address JSONB NOT NULL,
+    authorized_person JSONB NOT NULL,
+    bank_account_details JSONB,
+    verification_status verification_status DEFAULT 'pending',
+    verified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- KYC risk assessments table
+CREATE TABLE kyc_risk_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    risk_factors JSONB NOT NULL,
+    risk_score DECIMAL(5,2) NOT NULL,
+    risk_level risk_level NOT NULL,
+    assessment_details JSONB,
+    assessed_by assessment_source DEFAULT 'automated',
+    assessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Compliance checks table
+CREATE TABLE compliance_checks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    check_type compliance_check_type NOT NULL,
+    check_result compliance_result NOT NULL,
+    check_details JSONB,
+    external_reference VARCHAR(255),
+    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- KYC audit logs table
+CREATE TABLE kyc_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kyc_application_id UUID NOT NULL REFERENCES kyc_applications(id),
+    action kyc_action NOT NULL,
+    performed_by UUID,
+    old_status kyc_status,
+    new_status kyc_status,
+    details JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create custom types
+CREATE TYPE kyc_application_type AS ENUM ('individual', 'business', 'vendor');
+CREATE TYPE kyc_status AS ENUM ('pending', 'under_review', 'approved', 'rejected', 'expired', 'suspended');
+CREATE TYPE risk_level AS ENUM ('low', 'medium', 'high', 'critical');
+CREATE TYPE document_type AS ENUM ('nid', 'passport', 'driving_license', 'trade_license', 'tin_certificate', 'bank_statement', 'utility_bill', 'photo');
+CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'failed', 'expired');
+CREATE TYPE verification_method AS ENUM ('document_ocr', 'biometric', 'video_call', 'manual_review');
+CREATE TYPE business_type AS ENUM ('sole_proprietorship', 'partnership', 'private_limited', 'public_limited', 'cooperative');
+CREATE TYPE assessment_source AS ENUM ('automated', 'manual', 'external');
+CREATE TYPE compliance_check_type AS ENUM ('sanctions_list', 'pep_check', 'adverse_media', 'bangladesh_bank_check');
+CREATE TYPE compliance_result AS ENUM ('clear', 'match_found', 'inconclusive', 'error');
+CREATE TYPE kyc_action AS ENUM ('created', 'submitted', 'reviewed', 'approved', 'rejected', 'updated', 'expired');
+
+-- Create indexes
+CREATE INDEX idx_kyc_applications_user_id ON kyc_applications(user_id);
+CREATE INDEX idx_kyc_applications_status ON kyc_applications(status);
+CREATE INDEX idx_document_submissions_kyc_app ON document_submissions(kyc_application_id);
+CREATE INDEX idx_identity_verifications_kyc_app ON identity_verifications(kyc_application_id);
+CREATE INDEX idx_business_registrations_kyc_app ON business_registrations(kyc_application_id);
+```
+
+### 2.2 MongoDB Document Schema
+```javascript
+// OCR extraction results
+{
+    _id: ObjectId,
+    document_id: "uuid",
+    extraction_timestamp: ISODate,
+    ocr_engine: "google_vision", // google_vision, tesseract, aws_textract
+    confidence_score: 0.95,
+    extracted_fields: {
+        nid_number: "1234567890123",
+        full_name: "John Doe",
+        full_name_bn: "জন ডো",
+        father_name: "James Doe",
+        mother_name: "Jane Doe",
+        date_of_birth: "1990-01-15",
+        address: "123 Main St, Dhaka",
+        issue_date: "2020-01-01",
+        blood_group: "A+"
+    },
+    raw_text: "Full OCR extracted text...",
+    bounding_boxes: [
+        {
+            field: "nid_number",
+            coordinates: [[100, 50], [200, 50], [200, 70], [100, 70]],
+            confidence: 0.98
+        }
+    ]
+}
+
+// Face verification results
+{
+    _id: ObjectId,
+    verification_id: "uuid",
+    timestamp: ISODate,
+    face_detection: {
+        faces_detected: 1,
+        primary_face: {
+            confidence: 0.97,
+            bounding_box: [150, 100, 250, 200],
+            landmarks: {
+                eyes: [[175, 125], [225, 125]],
+                nose: [200, 150],
+                mouth: [200, 175]
+            },
+            quality_score: 0.89
+        }
+    },
+    face_comparison: {
+        document_photo_vs_selfie: 0.92,
+        liveness_score: 0.94,
+        spoof_detection: {
+            is_live: true,
+            confidence: 0.95
+        }
+    }
+}
+
+// Risk assessment details
+{
+    _id: ObjectId,
+    assessment_id: "uuid",
+    user_id: "uuid",
+    assessment_date: ISODate,
+    risk_factors: {
+        document_authenticity: {
+            score: 0.95,
+            factors: ["font_consistency", "security_features", "template_matching"]
+        },
+        identity_consistency: {
+            score: 0.88,
+            factors: ["name_matching", "date_consistency", "photo_matching"]
+        },
+        behavioral_analysis: {
+            score: 0.75,
+            factors: ["application_timing", "device_fingerprint", "location_analysis"]
+        },
+        external_validation: {
+            score: 0.92,
+            factors: ["government_database_check", "sanctions_screening"]
+        }
+    },
+    final_risk_score: 0.875,
+    risk_level: "low",
+    recommendations: ["auto_approve", "periodic_review"]
+}
+```
+
+## 3. Folder Structure
+
+```
+kyc-service/
+├── src/
+│   ├── controllers/
+│   │   ├── kyc-application-controller.js   # KYC application management
+│   │   ├── document-controller.js          # Document upload and validation
+│   │   ├── verification-controller.js      # Identity verification
+│   │   ├── business-kyc-controller.js      # Business/vendor KYC
+│   │   ├── compliance-controller.js        # Compliance checks
+│   │   └── admin-controller.js             # Admin KYC management
+│   ├── models/
+│   │   ├── KYCApplication.js               # Main KYC application model
+│   │   ├── DocumentSubmission.js          # Document submission model
+│   │   ├── IdentityVerification.js        # Identity verification model
+│   │   ├── BusinessRegistration.js        # Business registration model
+│   │   ├── RiskAssessment.js              # Risk assessment model
+│   │   ├── ComplianceCheck.js             # Compliance check model
+│   │   └── AuditLog.js                    # Audit log model
+│   ├── routes/
+│   │   ├── kyc-routes.js                  # KYC application endpoints
+│   │   ├── document-routes.js             # Document management endpoints
+│   │   ├── verification-routes.js         # Verification endpoints
+│   │   ├── business-routes.js             # Business KYC endpoints
+│   │   └── admin-routes.js                # Admin endpoints
+│   ├── services/
+│   │   ├── kyc-application-service.js     # KYC application logic
+│   │   ├── document-validation-service.js # Document validation
+│   │   ├── ocr-service.js                 # OCR processing
+│   │   ├── face-verification-service.js   # Face verification
+│   │   ├── risk-assessment-service.js     # Risk assessment logic
+│   │   ├── compliance-service.js          # Compliance checking
+│   │   ├── business-verification-service.js # Business verification
+│   │   └── audit-service.js               # Audit logging
+│   ├── middleware/
+│   │   ├── kyc-auth.js                    # KYC authorization
+│   │   ├── document-upload.js             # Document upload middleware
+│   │   ├── rate-limiting.js               # KYC rate limiting
+│   │   └── audit-logging.js               # Audit logging middleware
+│   ├── utils/
+│   │   ├── document-utils.js              # Document processing utilities
+│   │   ├── validation-utils.js            # KYC validation utilities
+│   │   ├── encryption-utils.js            # Data encryption utilities
+│   │   ├── compliance-utils.js            # Compliance utilities
+│   │   └── notification-utils.js          # KYC notification utilities
+│   ├── ml/
+│   │   ├── document-classifier.py         # Document type classification
+│   │   ├── fraud-detector.py              # Fraud detection model
+│   │   ├── risk-scorer.py                 # Risk scoring model
+│   │   ├── face-verification.py           # Face verification model
+│   │   └── authenticity-checker.py        # Document authenticity checker
+│   ├── config/
+│   │   ├── database.js                    # Database configuration
+│   │   ├── storage.js                     # File storage configuration
+│   │   ├── ocr-config.js                  # OCR service configuration
+│   │   ├── ml-config.js                   # ML model configuration
+│   │   └── compliance-config.js           # Compliance rules configuration
+│   └── app.js                             # Express application setup
+├── bangladesh-compliance/                 # Bangladesh-specific compliance
+│   ├── nid-verification.js                # NID verification with govt APIs
+│   ├── trade-license-verification.js      # Trade license verification
+│   ├── bangladesh-bank-compliance.js      # Bangladesh Bank compliance
+│   ├── aml-compliance.js                  # Anti-Money Laundering compliance
+│   └── local-sanctions-check.js           # Local sanctions list checking
+├── document-processing/                   # Document processing
+│   ├── image-preprocessor.js              # Image preprocessing
+│   ├── ocr-engine.js                      # OCR processing engine
+│   ├── document-classifier.js             # Document type classification
+│   ├── authenticity-checker.js            # Document authenticity verification
+│   └── template-matcher.js                # Document template matching
+├── fraud-detection/                       # Fraud detection
+│   ├── document-fraud-detector.js         # Document fraud detection
+│   ├── identity-fraud-detector.js         # Identity fraud detection
+│   ├── behavioral-analyzer.js             # Behavioral pattern analysis
+│   ├── device-fingerprinting.js           # Device fingerprinting
+│   └── anomaly-detector.js                # Anomaly detection
+├── integrations/                          # External integrations
+│   ├── government-apis/
+│   │   ├── nid-verification-api.js        # NID verification API
+│   │   ├── passport-verification-api.js   # Passport verification API
+│   │   └── trade-license-api.js           # Trade license verification API
+│   ├── third-party-verification/
+│   │   ├── jumio-integration.js           # Jumio verification
+│   │   ├── onfido-integration.js          # Onfido verification
+│   │   └── trulioo-integration.js         # Trulioo global verification
+│   └── sanctions-screening/
+│       ├── ofac-screening.js              # OFAC sanctions screening
+│       ├── un-screening.js                # UN sanctions screening
+│       └── local-screening.js             # Local sanctions screening
+├── tests/
+│   ├── unit/
+│   │   ├── kyc-application.test.js
+│   │   ├── document-validation.test.js
+│   │   ├── ocr-service.test.js
+│   │   ├── risk-assessment.test.js
+│   │   └── fraud-detection.test.js
+│   ├── integration/
+│   │   ├── kyc-flow.test.js
+│   │   ├── document-processing.test.js
+│   │   └── compliance-checks.test.js
+│   └── e2e/
+│       ├── complete-kyc-flow.test.js
+│       └── business-verification.test.js
+├── localization/                          # Multi-language support
+│   ├── en/
+│   │   ├── kyc-messages.json              # English KYC messages
+│   │   ├── document-requirements.json     # English document requirements
+│   │   └── compliance-messages.json       # English compliance messages
+│   └── bn/                               # Bangla translations
+│       ├── kyc-messages.json              # Bangla KYC messages
+│       ├── document-requirements.json     # Bangla document requirements
+│       └── compliance-messages.json       # Bangla compliance messages
+├── documentation/                         # KYC service documentation
+│   ├── api-documentation/
+│   │   ├── kyc-apis.md
+│   │   ├── document-apis.md
+│   │   └── verification-apis.md
+│   ├── compliance-guides/
+│   │   ├── bangladesh-compliance.md
+│   │   ├── international-compliance.md
+│   │   └── audit-procedures.md
+│   └── integration-guides/
+│       ├── vendor-kyc-integration.md
+│       ├── customer-kyc-integration.md
+│       └── admin-panel-integration.md
+├── docker-compose.yml                     # Multi-service composition
+├── Dockerfile                            # Docker configuration
+├── requirements.txt                       # Python dependencies (for ML)
+├── package.json                          # Node.js dependencies
+└── README.md                             # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 KYC Application APIs
+```javascript
+// Start KYC application
+POST /api/v1/kyc/applications
+Body: {
+    application_type: "individual", // individual, business, vendor
+    personal_info: {
+        full_name: "John Doe",
+        full_name_bn: "জন ডো",
+        date_of_birth: "1990-01-15",
+        nationality: "Bangladeshi",
+        phone: "+8801712345678",
+        email: "john@example.com"
+    }
+}
+
+// Get KYC application status
+GET /api/v1/kyc/applications/:id
+Response: {
+    id: "uuid",
+    status: "under_review",
+    risk_level: "low",
+    progress: 75,
+    required_documents: ["nid", "photo"],
+    submitted_documents: ["nid"],
+    estimated_completion: "2024-03-20T10:00:00Z"
+}
+
+// Update KYC application
+PUT /api/v1/kyc/applications/:id
+Body: {
+    personal_info: {
+        address: "Updated address"
+    }
+}
+
+// Submit KYC application for review
+POST /api/v1/kyc/applications/:id/submit
+Body: {
+    declaration: true,
+    consent_data_processing: true
+}
+```
+
+### 4.2 Document Management APIs
+```javascript
+// Upload document
+POST /api/v1/kyc/documents
+Body: FormData {
+    kyc_application_id: "uuid",
+    document_type: "nid",
+    file: File
+}
+
+// Get document details
+GET /api/v1/kyc/documents/:id
+Response: {
+    id: "uuid",
+    document_type: "nid",
+    verification_status: "verified",
+    ocr_confidence: 0.95,
+    extracted_data: {
+        nid_number: "1234567890123",
+        full_name: "John Doe",
+        date_of_birth: "1990-01-15"
+    }
+}
+
+// Retry document verification
+POST /api/v1/kyc/documents/:id/retry-verification
+
+// Delete document
+DELETE /api/v1/kyc/documents/:id
+```
+
+### 4.3 Identity Verification APIs
+```javascript
+// Start face verification
+POST /api/v1/kyc/verification/face
+Body: {
+    kyc_application_id: "uuid",
+    selfie_image: "base64_encoded_image"
+}
+
+// Start video call verification
+POST /api/v1/kyc/verification/video-call
+Body: {
+    kyc_application_id: "uuid",
+    preferred_time: "2024-03-20T10:00:00Z",
+    language: "bn" // en, bn
+}
+
+// Get verification status
+GET /api/v1/kyc/verification/:id
+Response: {
+    id: "uuid",
+    verification_method: "face_verification",
+    status: "completed",
+    confidence_score: 0.92,
+    result: "verified"
+}
+```
+
+### 4.4 Business KYC APIs
+```javascript
+// Submit business registration
+POST /api/v1/kyc/business
+Body: {
+    kyc_application_id: "uuid",
+    business_info: {
+        business_name: "ABC Trading Ltd",
+        business_name_bn: "এবিসি ট্রেডিং লিমিটেড",
+        trade_license_number: "TRAD/DHAKA/12345",
+        tin_number: "123456789012",
+        business_type: "private_limited",
+        registration_date: "2020-01-01",
+        business_address: {
+            street: "123 Commerce St",
+            area: "Dhanmondi",
+            city: "Dhaka",
+            postal_code: "1205"
+        },
+        authorized_person: {
+            name: "John Doe",
+            position: "Managing Director",
+            nid: "1234567890123"
+        }
+    }
+}
+
+// Verify trade license
+POST /api/v1/kyc/business/verify-trade-license
+Body: {
+    trade_license_number: "TRAD/DHAKA/12345",
+    business_name: "ABC Trading Ltd"
+}
+
+// Get business verification status
+GET /api/v1/kyc/business/:id
+```
+
+### 4.5 Admin APIs
+```javascript
+// Get pending KYC applications
+GET /api/v1/admin/kyc/pending
+Query: ?page=1&limit=20&risk_level=high
+
+// Review KYC application
+POST /api/v1/admin/kyc/applications/:id/review
+Body: {
+    status: "approved", // approved, rejected, request_more_info
+    review_notes: "All documents verified successfully",
+    risk_level: "low"
+}
+
+// Get KYC statistics
+GET /api/v1/admin/kyc/statistics
+Response: {
+    total_applications: 1250,
+    pending_review: 85,
+    approved_today: 45,
+    rejection_rate: 0.08,
+    average_processing_time: 2.5 // days
+}
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local Document Support
+- **National ID (NID)**: Full NID verification with government database integration
+- **Smart NID**: Support for smart card NID verification
+- **Passport**: Bangladesh passport verification
+- **Trade License**: Business trade license verification
+- **TIN Certificate**: Tax identification number verification
+- **Driving License**: Bangladesh driving license verification
+
+### 5.2 Government Integration
+- **Election Commission API**: NID verification with EC database
+- **RJSC Integration**: Company registration verification
+- **NBR Integration**: TIN number verification
+- **Bangladesh Bank**: Financial institution compliance checks
+
+### 5.3 Local Compliance
+- **Anti-Money Laundering**: AML compliance as per Bangladesh Bank guidelines
+- **Know Your Customer**: KYC requirements for financial services
+- **Foreign Exchange Regulation**: Compliance with FERA requirements
+- **Data Protection**: Compliance with Bangladesh data protection laws
+
+### 5.4 Cultural Considerations
+- **Bangla Language Support**: Full Bengali interface and documentation
+- **Islamic Banking Compliance**: Shariah-compliant verification processes
+- **Rural Area Support**: Special provisions for rural customers
+- **Women's Access**: Female verification officers for conservative customers
+
+## 6. Risk Assessment Framework
+
+### 6.1 Risk Factors
+```javascript
+{
+    document_risk: {
+        authenticity_score: 0.95,
+        quality_score: 0.88,
+        consistency_score: 0.92
+    },
+    identity_risk: {
+        face_match_score: 0.94,
+        liveness_score: 0.91,
+        name_consistency: 0.96
+    },
+    behavioral_risk: {
+        application_speed: 0.75, // suspiciously fast/slow
+        device_consistency: 0.89,
+        location_consistency: 0.93
+    },
+    external_risk: {
+        sanctions_check: "clear",
+        adverse_media: "clear",
+        pep_status: "not_pep"
+    }
+}
+```
+
+### 6.2 Risk Levels
+- **Low Risk (0.0-0.3)**: Auto-approve with periodic monitoring
+- **Medium Risk (0.3-0.6)**: Manual review required
+- **High Risk (0.6-0.8)**: Enhanced due diligence required
+- **Critical Risk (0.8-1.0)**: Immediate escalation and detailed investigation
+
+## 7. Compliance & Security
+
+### 7.1 Data Protection
+- **Encryption**: End-to-end encryption for all KYC data
+- **Data Retention**: Automatic deletion based on regulatory requirements
+- **Access Control**: Role-based access to sensitive KYC information
+- **Audit Trail**: Complete audit log of all KYC activities
+
+### 7.2 Regulatory Compliance
+- **Bangladesh Bank Guidelines**: Full compliance with central bank KYC requirements
+- **FATF Recommendations**: Compliance with international AML/CFT standards
+- **Data Protection Laws**: Compliance with local and international data protection regulations
+- **Financial Intelligence Unit**: Reporting suspicious transactions as required
+
+This comprehensive KYC service ensures robust identity verification, regulatory compliance, and fraud prevention while supporting Bangladesh-specific requirements and cultural considerations.

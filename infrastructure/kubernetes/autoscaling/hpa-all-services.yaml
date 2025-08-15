@@ -1,0 +1,697 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: product-service-hpa
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Product Service - GetIt Bangladesh"
+    target-cpu: "70%"
+    target-memory: "80%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: product-service
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service-hpa
+  namespace: getit-production
+  labels:
+    app: order-service
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Order Service - Critical for Bangladesh Orders"
+    target-cpu: "60%"
+    target-memory: "75%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: order-service
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Pods
+    pods:
+      metric:
+        name: orders_per_minute
+      target:
+        type: AverageValue
+        averageValue: "20"
+  - type: Pods
+    pods:
+      metric:
+        name: checkout_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "50"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 200
+        periodSeconds: 30
+      - type: Pods
+        value: 10
+        periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 5
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vendor-service-hpa
+  namespace: getit-production
+  labels:
+    app: vendor-service
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Vendor Service - GetIt Bangladesh"
+    target-cpu: "65%"
+    target-memory: "75%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vendor-service
+  minReplicas: 4
+  maxReplicas: 25
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 65
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Pods
+    pods:
+      metric:
+        name: vendor_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "30"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: customer-web-hpa
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Customer Web - Bangladesh Festival Traffic Ready"
+    target-cpu: "50%"
+    target-memory: "70%"
+    festival-scaling: "eid-500%, black-friday-1000%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: customer-web
+  minReplicas: 6
+  maxReplicas: 100
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "200"
+  - type: Pods
+    pods:
+      metric:
+        name: concurrent_users
+      target:
+        type: AverageValue
+        averageValue: "500"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 300
+        periodSeconds: 30
+      - type: Pods
+        value: 20
+        periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 5
+        periodSeconds: 120
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: admin-panel-hpa
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Admin Panel - GetIt Bangladesh"
+    target-cpu: "60%"
+    target-memory: "70%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: admin-panel
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Pods
+    pods:
+      metric:
+        name: admin_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "10"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: prometheus-hpa
+  namespace: getit-monitoring
+  labels:
+    app: prometheus
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Prometheus - Monitoring Infrastructure"
+    target-cpu: "75%"
+    target-memory: "85%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: prometheus
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 180
+      - type: Pods
+        value: 1
+        periodSeconds: 180
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 180
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: grafana-hpa
+  namespace: getit-monitoring
+  labels:
+    app: grafana
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Grafana - Dashboard Service"
+    target-cpu: "70%"
+    target-memory: "80%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: grafana
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: logstash-hpa
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Logstash - Log Processing"
+    target-cpu: "75%"
+    target-memory: "80%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: logstash
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: logs_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kibana-hpa
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Auto-scaling for Kibana - Log Dashboard"
+    target-cpu: "65%"
+    target-memory: "75%"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kibana
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 65
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+      selectPolicy: Min
+---
+# Special Bangladesh Festival Scaling Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bangladesh-festival-scaling
+  namespace: getit-production
+  labels:
+    app: festival-scaling
+    component: autoscaling
+    platform: getit-bangladesh
+  annotations:
+    description: "Bangladesh Festival Auto-scaling Configuration"
+data:
+  festival-config.yaml: |
+    festivals:
+      eid-ul-fitr:
+        duration_days: 5
+        traffic_multiplier: 5.0
+        scaling_configs:
+          customer-web:
+            min_replicas: 30
+            max_replicas: 150
+          order-service:
+            min_replicas: 25
+            max_replicas: 100
+          product-service:
+            min_replicas: 15
+            max_replicas: 60
+      
+      eid-ul-adha:
+        duration_days: 4
+        traffic_multiplier: 4.0
+        scaling_configs:
+          customer-web:
+            min_replicas: 24
+            max_replicas: 120
+          order-service:
+            min_replicas: 20
+            max_replicas: 80
+          product-service:
+            min_replicas: 12
+            max_replicas: 48
+      
+      pohela-boishakh:
+        duration_days: 2
+        traffic_multiplier: 3.0
+        scaling_configs:
+          customer-web:
+            min_replicas: 18
+            max_replicas: 90
+          order-service:
+            min_replicas: 15
+            max_replicas: 60
+          product-service:
+            min_replicas: 9
+            max_replicas: 36
+      
+      black-friday:
+        duration_days: 3
+        traffic_multiplier: 10.0
+        scaling_configs:
+          customer-web:
+            min_replicas: 60
+            max_replicas: 200
+          order-service:
+            min_replicas: 50
+            max_replicas: 150
+          product-service:
+            min_replicas: 30
+            max_replicas: 100
+      
+      cyber-monday:
+        duration_days: 1
+        traffic_multiplier: 8.0
+        scaling_configs:
+          customer-web:
+            min_replicas: 48
+            max_replicas: 160
+          order-service:
+            min_replicas: 40
+            max_replicas: 120
+          product-service:
+            min_replicas: 24
+            max_replicas: 80
+    
+    monitoring:
+      scale_up_threshold_seconds: 30
+      scale_down_threshold_seconds: 600
+      cpu_threshold_festival: 40
+      memory_threshold_festival: 60
+      requests_per_second_threshold: 1000
+    
+    alert_channels:
+      - slack: "#festival-alerts"
+      - email: "devops-festival@getit.com.bd"
+      - sms: "+8801700000000"
+---
+# Metrics Server Configuration for Custom Metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-metrics-config
+  namespace: getit-production
+  labels:
+    app: custom-metrics
+    component: autoscaling
+    platform: getit-bangladesh
+data:
+  metrics.yaml: |
+    custom_metrics:
+      - name: http_requests_per_second
+        query: 'rate(http_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: orders_per_minute
+        query: 'rate(orders_created_total[1m]) * 60'
+        target_type: AverageValue
+      
+      - name: checkout_requests_per_second
+        query: 'rate(checkout_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: concurrent_users
+        query: 'active_users_total'
+        target_type: AverageValue
+      
+      - name: vendor_requests_per_second
+        query: 'rate(vendor_api_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: admin_requests_per_second
+        query: 'rate(admin_api_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: logs_per_second
+        query: 'rate(log_entries_total[1m])'
+        target_type: AverageValue
+      
+      # Bangladesh specific metrics
+      - name: mobile_banking_transactions_per_second
+        query: 'rate(bangladesh_mobile_banking_transactions_total[1m])'
+        target_type: AverageValue
+      
+      - name: bkash_requests_per_second
+        query: 'rate(bkash_api_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: nagad_requests_per_second
+        query: 'rate(nagad_api_requests_total[1m])'
+        target_type: AverageValue
+      
+      - name: rocket_requests_per_second
+        query: 'rate(rocket_api_requests_total[1m])'
+        target_type: AverageValue

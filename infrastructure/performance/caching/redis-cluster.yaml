@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-config
+  namespace: getit-production
+  labels:
+    component: performance
+    tier: caching
+data:
+  redis.conf: |
+    # Redis Cluster Configuration for GetIt Platform
+    port 6379
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 5000
+    cluster-announce-ip ${POD_IP}
+    cluster-announce-port 6379
+    cluster-announce-bus-port 16379
+    
+    # Memory Management
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    # Performance Tuning
+    tcp-keepalive 300
+    timeout 0
+    tcp-backlog 511
+    
+    # Security
+    requirepass ${REDIS_PASSWORD}
+    
+    # Logging
+    loglevel notice
+    logfile /var/log/redis/redis.log
+
+  cache-strategy.json: |
+    {
+      "cacheStrategies": {
+        "productCatalog": {
+          "ttl": 3600,
+          "strategy": "write-through",
+          "keys": "product:*",
+          "evictionPolicy": "lru",
+          "replication": "master-slave"
+        },
+        "userSessions": {
+          "ttl": 1800,
+          "strategy": "write-back",
+          "keys": "session:*",
+          "evictionPolicy": "ttl",
+          "replication": "cluster"
+        },
+        "searchResults": {
+          "ttl": 600,
+          "strategy": "cache-aside",
+          "keys": "search:*",
+          "evictionPolicy": "lfu",
+          "replication": "master-slave"
+        },
+        "paymentTokens": {
+          "ttl": 300,
+          "strategy": "write-through",
+          "keys": "payment:token:*",
+          "evictionPolicy": "ttl",
+          "replication": "cluster",
+          "encryption": true
+        },
+        "bangladeshData": {
+          "ttl": 7200,
+          "strategy": "cache-aside",
+          "keys": "bd:*",
+          "evictionPolicy": "lru",
+          "description": "Bangladesh-specific data (districts, areas, etc.)"
+        }
+      },
+      "performance": {
+        "connectionPoolSize": 50,
+        "commandTimeout": 5000,
+        "retryAttempts": 3,
+        "circuitBreaker": {
+          "threshold": 5,
+          "timeout": 60000,
+          "monitor": true
+        }
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: getit-production
+  labels:
+    app: redis-cluster
+    component: performance
+    tier: caching
+spec:
+  serviceName: redis-cluster
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+        component: performance
+        tier: caching
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.0-alpine
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        volumeMounts:
+        - name: config
+          mountPath: /etc/redis
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+      volumes:
+      - name: config
+        configMap:
+          name: redis-cluster-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: getit-production
+  labels:
+    app: redis-cluster
+    component: performance
+    tier: caching
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: client
+  - port: 16379
+    targetPort: 16379
+    name: gossip
+  clusterIP: None
+  selector:
+    app: redis-cluster

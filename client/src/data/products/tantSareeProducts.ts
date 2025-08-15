@@ -1,0 +1,45 @@
+
+export const tantSareeProducts = [
+  {
+    id: 'tant-saree-1',
+    name: 'Bengal Tant Saree - Traditional Red',
+    nameBn: 'বাংলা তাঁত শাড়ি - ঐতিহ্যবাহী লাল',
+    price: 3500,
+    originalPrice: 4500,
+    rating: 4.5,
+    reviews: 234,
+    vendor: 'Bengal Tant House',
+    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&h=400&fit=crop',
+    discount: 22,
+    freeShipping: true,
+    location: 'Chittagong',
+    verified: true,
+    quickDelivery: true,
+    sold: 189,
+    category: 'Tant Saree',
+    stock: { status: 'in_stock', quantity: 34 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  },
+  {
+    id: 'tant-saree-2',
+    name: 'Handloom Tant Saree - Classic Design',
+    nameBn: 'তাঁতের শাড়ি - চিরায়ত নকশা',
+    price: 2800,
+    originalPrice: 3600,
+    rating: 4.3,
+    reviews: 167,
+    vendor: 'Handloom Crafts',
+    image: 'https://images.unsplash.com/photo-1564557287817-3785e38ec1e5?w=400&h=400&fit=crop',
+    discount: 22,
+    freeShipping: true,
+    location: 'Rajshahi',
+    verified: true,
+    quickDelivery: false,
+    sold: 156,
+    category: 'Tant Saree',
+    stock: { status: 'in_stock', quantity: 45 },
+    delivery: { estimatedDays: 3, express: false, cod: true, freeShipping: true },
+    features: { trending: false, festival: true, priceHistory: false, emi: true }
+  }
+];

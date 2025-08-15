@@ -1,0 +1,162 @@
+# Kibana Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Log Visualization and Analytics
+
+# Server configuration
+server.port: 5601
+server.host: "0.0.0.0"
+server.name: getit-kibana
+server.basePath: ""
+server.rewriteBasePath: false
+server.publicBaseUrl: "https://kibana.getit.com.bd"
+
+# Elasticsearch connection
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "REPLACE_WITH_KIBANA_PASSWORD"
+elasticsearch.requestTimeout: 30000
+elasticsearch.shardTimeout: 30000
+elasticsearch.pingTimeout: 1500
+
+# Kibana index configuration
+kibana.index: ".kibana"
+kibana.defaultAppId: "dashboard"
+
+# Logging configuration
+logging.appenders.file.type: file
+logging.appenders.file.fileName: /usr/share/kibana/logs/kibana.log
+logging.appenders.file.layout.type: json
+logging.root.level: info
+logging.root.appenders: [default, file]
+
+# Performance and monitoring
+ops.interval: 5000
+monitoring.enabled: true
+monitoring.ui.enabled: true
+monitoring.kibana.collection.enabled: true
+monitoring.kibana.collection.interval: 10000
+
+# Security (enable in production)
+xpack.security.enabled: false
+xpack.encryptedSavedObjects.encryptionKey: "REPLACE_WITH_32_CHARACTER_KEY"
+xpack.reporting.encryptionKey: "REPLACE_WITH_32_CHARACTER_KEY"
+xpack.security.encryptionKey: "REPLACE_WITH_32_CHARACTER_KEY"
+
+# Bangladesh specific configurations
+i18n.locale: "en"
+map.regionmap.includeElasticMapsService: true
+map.tilemap.url: "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/{z}/{y}/{x}.jpg"
+
+# Default space configuration
+xpack.spaces.enabled: true
+xpack.spaces.maxSpaces: 1000
+
+# Machine Learning
+xpack.ml.enabled: true
+
+# Canvas
+xpack.canvas.enabled: true
+
+# Reporting
+xpack.reporting.enabled: true
+xpack.reporting.capture.browser.chromium.disableSandbox: true
+xpack.reporting.roles.enabled: false
+
+# Dashboard configurations
+dashboard.defaultDarkMode: false
+newsfeed.enabled: true
+telemetry.enabled: false
+telemetry.optIn: false
+
+# Advanced settings for GetIt Bangladesh
+vis_type_vega.enableExternalUrls: true
+data.search.aggs.shardDelay.enabled: true
+data.search.sessions.enabled: true
+
+# Index pattern management
+kibana.autocompleteTimeout: 1000
+kibana.autocompleteTerminateAfter: 100000
+
+# Saved objects and import/export
+savedObjects.maxImportPayloadBytes: 26214400
+savedObjects.maxImportExportSize: 10000
+
+# CSV export settings
+xpack.reporting.csv.maxSizeBytes: 104857600
+xpack.reporting.csv.useByteOrderMarkEncoding: false
+
+# Security settings for production
+server.ssl.enabled: false
+server.ssl.certificate: /usr/share/kibana/config/certs/kibana.crt
+server.ssl.key: /usr/share/kibana/config/certs/kibana.key
+
+# Session and cookie settings
+xpack.security.session.idleTimeout: "8h"
+xpack.security.session.lifespan: "30d"
+xpack.security.cookieName: "sid"
+
+# Content Security Policy
+csp.rules:
+  - "script-src 'unsafe-eval' 'self'"
+  - "worker-src blob: 'self'"
+  - "child-src blob: 'self'"
+
+# Custom index patterns for GetIt Bangladesh
+defaultIndex: "getit-app-*"
+
+# Visualization and dashboard defaults
+visualization.colorMapping: 
+  - "#1f77b4"  # Blue
+  - "#ff7f0e"  # Orange
+  - "#2ca02c"  # Green
+  - "#d62728"  # Red
+  - "#9467bd"  # Purple
+  - "#8c564b"  # Brown
+  - "#e377c2"  # Pink
+  - "#7f7f7f"  # Gray
+  - "#bcbd22"  # Olive
+  - "#17becf"  # Cyan
+
+# Bangladesh business hours (for scheduling reports)
+timezone: "Asia/Dhaka"
+dateFormat: "MMM D, YYYY @ HH:mm:ss.SSS"
+dateFormat:tz: "Asia/Dhaka"
+
+# Custom Kibana plugins and features
+plugin.scanDirs: ["/usr/share/kibana/plugins"]
+
+# Memory and performance optimization
+node.options: "--max-old-space-size=1800"
+server.compression.enabled: true
+server.compression.referrerWhitelist: ["kibana.getit.com.bd"]
+
+# Custom roles and permissions for GetIt Bangladesh teams
+xpack.security.authc.providers:
+  basic.basic1:
+    order: 0
+    enabled: true
+  saml.saml1:
+    order: 1
+    realm: "getit-saml"
+    description: "GetIt Bangladesh SAML"
+
+# Alert and action settings
+xpack.alerting.healthCheck.interval: "60s"
+xpack.actions.enabled: true
+xpack.actions.allowedHosts: ["*"]
+xpack.actions.enabledActionTypes: ["*"]
+
+# Fleet and Elastic Agent
+xpack.fleet.enabled: true
+xpack.fleet.agents.enabled: true
+xpack.fleet.packages:
+  - name: system
+    version: latest
+  - name: nginx
+    version: latest
+  - name: postgresql
+    version: latest
+  - name: redis
+    version: latest
+
+# Custom dashboard for GetIt Bangladesh business metrics
+dashboard.defaultIndex: "getit-business-*"

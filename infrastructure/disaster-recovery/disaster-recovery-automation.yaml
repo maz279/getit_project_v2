@@ -1,0 +1,379 @@
+# Disaster Recovery Automation for GetIt Platform
+# Amazon.com/Shopee.sg Enterprise Disaster Recovery Implementation
+
+# Backup CronJob for Database
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: getit-platform
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            command:
+            - /bin/bash
+            - -c
+            - |
+              export PGPASSWORD=$POSTGRES_PASSWORD
+              pg_dump -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB \
+                --no-owner --no-privileges --clean --if-exists \
+                | gzip > /backup/backup-$(date +%Y%m%d_%H%M%S).sql.gz
+              
+              # Upload to cloud storage
+              aws s3 cp /backup/backup-$(date +%Y%m%d_%H%M%S).sql.gz \
+                s3://getit-backups/database/
+              
+              # Cleanup local files older than 24 hours
+              find /backup -name "backup-*.sql.gz" -mtime +1 -delete
+            env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: host
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: database
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret-access-key
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+
+---
+# Disaster Recovery Orchestration Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: disaster-recovery-orchestrator
+  namespace: getit-platform
+spec:
+  template:
+    spec:
+      containers:
+      - name: dr-orchestrator
+        image: getit/dr-orchestrator:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          
+          # Disaster Recovery Orchestration Script
+          echo "Starting disaster recovery orchestration..."
+          
+          # Check primary region health
+          check_primary_health() {
+            local health_url="https://api.getit.com.bd/health"
+            local timeout=30
+            local max_retries=3
+            
+            for i in $(seq 1 $max_retries); do
+              if curl -s --max-time $timeout "$health_url" | grep -q "healthy"; then
+                echo "Primary region is healthy"
+                return 0
+              fi
+              echo "Health check attempt $i failed, retrying..."
+              sleep 10
+            done
+            
+            echo "Primary region is unhealthy"
+            return 1
+          }
+          
+          # Failover to secondary region
+          failover_to_secondary() {
+            echo "Initiating failover to secondary region..."
+            
+            # Update DNS to point to secondary region
+            aws route53 change-resource-record-sets \
+              --hosted-zone-id $HOSTED_ZONE_ID \
+              --change-batch file:///config/dns-failover.json
+            
+            # Scale up secondary region infrastructure
+            kubectl --kubeconfig=/config/secondary-kubeconfig \
+              scale deployment getit-api-deployment --replicas=10
+            
+            # Update load balancer configuration
+            kubectl --kubeconfig=/config/secondary-kubeconfig \
+              patch service getit-api-service \
+              -p '{"spec":{"type":"LoadBalancer"}}'
+            
+            echo "Failover completed"
+          }
+          
+          # Database failover
+          database_failover() {
+            echo "Initiating database failover..."
+            
+            # Promote read replica to master
+            aws rds promote-read-replica \
+              --db-instance-identifier getit-db-replica-mumbai
+            
+            # Update application configuration
+            kubectl patch secret database-credentials \
+              -p '{"data":{"host":"'$(echo -n $SECONDARY_DB_HOST | base64)'"}}'
+            
+            # Restart application pods to pick up new configuration
+            kubectl rollout restart deployment getit-api-deployment
+            
+            echo "Database failover completed"
+          }
+          
+          # Main execution
+          if ! check_primary_health; then
+            echo "Primary region failure detected, initiating disaster recovery..."
+            
+            # Send alert
+            curl -X POST "$SLACK_WEBHOOK" \
+              -H 'Content-type: application/json' \
+              --data '{"text":"🚨 Disaster recovery initiated for GetIt Platform"}'
+            
+            # Execute failover
+            database_failover
+            failover_to_secondary
+            
+            # Verify recovery
+            sleep 60
+            if check_secondary_health; then
+              echo "Disaster recovery completed successfully"
+              curl -X POST "$SLACK_WEBHOOK" \
+                -H 'Content-type: application/json' \
+                --data '{"text":"✅ Disaster recovery completed successfully"}'
+            else
+              echo "Disaster recovery verification failed"
+              curl -X POST "$SLACK_WEBHOOK" \
+                -H 'Content-type: application/json' \
+                --data '{"text":"❌ Disaster recovery verification failed"}'
+            fi
+          else
+            echo "Primary region is healthy, no action needed"
+          fi
+        env:
+        - name: HOSTED_ZONE_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: hosted-zone-id
+        - name: SECONDARY_DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: secondary-host
+        - name: SLACK_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: notification-credentials
+              key: slack-webhook
+        - name: AWS_DEFAULT_REGION
+          value: "ap-south-1"
+        volumeMounts:
+        - name: dr-config
+          mountPath: /config
+        - name: aws-credentials
+          mountPath: /root/.aws
+      volumes:
+      - name: dr-config
+        configMap:
+          name: disaster-recovery-config
+      - name: aws-credentials
+        secret:
+          secretName: aws-credentials
+      restartPolicy: Never
+
+---
+# Multi-Region Replication Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replication-config
+  namespace: getit-platform
+data:
+  primary-region: "ap-southeast-1"  # Singapore
+  secondary-region: "ap-south-1"    # Mumbai
+  tertiary-region: "us-east-1"      # N. Virginia
+  
+  replication-lag-threshold: "30s"
+  failover-timeout: "300s"
+  recovery-point-objective: "60s"   # RPO: 1 minute
+  recovery-time-objective: "300s"   # RTO: 5 minutes
+
+---
+# Health Check Service for DR
+apiVersion: v1
+kind: Service
+metadata:
+  name: health-check-service
+  namespace: getit-platform
+spec:
+  selector:
+    app: health-checker
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health-checker
+  namespace: getit-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: health-checker
+  template:
+    metadata:
+      labels:
+        app: health-checker
+    spec:
+      containers:
+      - name: health-checker
+        image: getit/health-checker:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CHECK_INTERVAL
+          value: "30s"
+        - name: ENDPOINTS
+          value: "https://api.getit.com.bd/health,https://getit.com.bd/health"
+        - name: ALERT_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: notification-credentials
+              key: alert-webhook
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+# Velero Backup Configuration
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  template:
+    includedNamespaces:
+    - getit-platform
+    - monitoring
+    - istio-system
+    excludedResources:
+    - events
+    - pods
+    - replicasets
+    storageLocation: default
+    volumeSnapshotLocations:
+    - default
+    ttl: 720h  # 30 days
+
+---
+# Cross-Region Database Sync
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-sync
+  namespace: getit-platform
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: db-sync
+            image: postgres:15-alpine
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Sync critical data to secondary region
+              export PGPASSWORD=$PRIMARY_DB_PASSWORD
+              pg_dump -h $PRIMARY_DB_HOST -U $PRIMARY_DB_USER -d $PRIMARY_DB_NAME \
+                --data-only --table=users --table=orders --table=products \
+                | PGPASSWORD=$SECONDARY_DB_PASSWORD \
+                  psql -h $SECONDARY_DB_HOST -U $SECONDARY_DB_USER -d $SECONDARY_DB_NAME
+              
+              echo "Database sync completed at $(date)"
+            env:
+            - name: PRIMARY_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: primary-host
+            - name: SECONDARY_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: secondary-host
+            - name: PRIMARY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: username
+            - name: PRIMARY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: password
+            - name: SECONDARY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: secondary-username
+            - name: SECONDARY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: secondary-password
+            - name: PRIMARY_DB_NAME
+              value: "getit_production"
+            - name: SECONDARY_DB_NAME
+              value: "getit_production"
+          restartPolicy: OnFailure

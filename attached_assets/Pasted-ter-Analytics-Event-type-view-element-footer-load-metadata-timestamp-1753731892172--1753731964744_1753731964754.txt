@@ -1,0 +1,416 @@
+ter Analytics Event: {type: 'view', element: 'footer-load', metadata: {…}, timestamp: 1753731892172}
+hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14290
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+2hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18874
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=0ebebf42:9119
+flushSync @ chunk-RPCDYKBN.js?v=0ebebf42:18959
+finishEventHandler @ chunk-RPCDYKBN.js?v=0ebebf42:3569
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3582
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this error
+3hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18874
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=0ebebf42:9119
+flushSync @ chunk-RPCDYKBN.js?v=0ebebf42:18959
+finishEventHandler @ chunk-RPCDYKBN.js?v=0ebebf42:3569
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3582
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this error
+3hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18874
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=0ebebf42:9119
+flushSync @ chunk-RPCDYKBN.js?v=0ebebf42:18959
+finishEventHandler @ chunk-RPCDYKBN.js?v=0ebebf42:3569
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3582
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this error
+4hook.js:608 Warning: Encountered two children with the same key, `product-iphone 15`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c7 (card.tsx:37:6)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at _c (Card.tsx:84:5)
+    at div (<anonymous>)
+    at AISearchBar.tsx:31:3
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at div (<anonymous>)
+    at Header (Header.tsx:14:3)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=0ebebf42:5455:26)
+    at Routes (react-router-dom.js?v=0ebebf42:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=0ebebf42:6131:13)
+    at BrowserRouter (react-router-dom.js?v=0ebebf42:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=0ebebf42:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=0ebebf42:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=0ebebf42:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=0ebebf42:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ chunk-RPCDYKBN.js?v=0ebebf42:521
+error @ chunk-RPCDYKBN.js?v=0ebebf42:505
+warnOnInvalidKey @ chunk-RPCDYKBN.js?v=0ebebf42:10219
+reconcileChildrenArray @ chunk-RPCDYKBN.js?v=0ebebf42:10235
+reconcileChildFibers2 @ chunk-RPCDYKBN.js?v=0ebebf42:10559
+reconcileChildren @ chunk-RPCDYKBN.js?v=0ebebf42:14292
+updateHostComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14807
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15935
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error

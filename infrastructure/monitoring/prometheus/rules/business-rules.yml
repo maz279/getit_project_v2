@@ -1,0 +1,267 @@
+# Business Metrics Alerting Rules for GetIt Bangladesh
+# Amazon.com/Shopee.sg-Level Business Intelligence
+
+groups:
+- name: business.rules
+  interval: 60s
+  rules:
+  
+  # Revenue and Sales Metrics
+  - record: business:revenue_per_minute
+    expr: increase(total_revenue[1m])
+    labels:
+      metric_type: "business"
+      category: "revenue"
+
+  - record: business:hourly_revenue
+    expr: increase(total_revenue[1h])
+    labels:
+      metric_type: "business"
+      category: "revenue"
+
+  - record: business:daily_revenue
+    expr: increase(total_revenue[24h])
+    labels:
+      metric_type: "business"
+      category: "revenue"
+
+  - record: business:orders_per_minute
+    expr: increase(total_orders[1m])
+    labels:
+      metric_type: "business"
+      category: "orders"
+
+  - record: business:conversion_rate
+    expr: (increase(total_orders[1h]) / increase(total_visitors[1h])) * 100
+    labels:
+      metric_type: "business"
+      category: "conversion"
+
+  - record: business:average_order_value
+    expr: increase(total_revenue[1h]) / increase(total_orders[1h])
+    labels:
+      metric_type: "business"
+      category: "aov"
+
+  # Customer Metrics
+  - record: business:new_customers_rate
+    expr: increase(new_customers[1h])
+    labels:
+      metric_type: "business"
+      category: "customers"
+
+  - record: business:customer_retention_rate
+    expr: (returning_customers / total_customers) * 100
+    labels:
+      metric_type: "business"
+      category: "retention"
+
+  - record: business:cart_abandonment_rate
+    expr: ((carts_created - orders_completed) / carts_created) * 100
+    labels:
+      metric_type: "business"
+      category: "cart_abandonment"
+
+  # Product Performance
+  - record: business:top_selling_products
+    expr: topk(10, increase(product_sales[1h]))
+    labels:
+      metric_type: "business"
+      category: "products"
+
+  - record: business:product_views_to_sales_ratio
+    expr: increase(product_views[1h]) / increase(product_sales[1h])
+    labels:
+      metric_type: "business"
+      category: "product_performance"
+
+  # Payment Metrics
+  - record: business:bkash_transaction_success_rate
+    expr: (bkash_successful_transactions / bkash_total_transactions) * 100
+    labels:
+      metric_type: "business"
+      category: "payment"
+      method: "bkash"
+
+  - record: business:nagad_transaction_success_rate
+    expr: (nagad_successful_transactions / nagad_total_transactions) * 100
+    labels:
+      metric_type: "business"
+      category: "payment"
+      method: "nagad"
+
+  - record: business:mobile_banking_share
+    expr: ((bkash_transactions + nagad_transactions + rocket_transactions) / total_transactions) * 100
+    labels:
+      metric_type: "business"
+      category: "payment"
+      method: "mobile_banking"
+
+  # Geographic Metrics (Bangladesh-specific)
+  - record: business:dhaka_revenue_share
+    expr: (dhaka_revenue / total_revenue) * 100
+    labels:
+      metric_type: "business"
+      category: "geographic"
+      division: "dhaka"
+
+  - record: business:chittagong_revenue_share
+    expr: (chittagong_revenue / total_revenue) * 100
+    labels:
+      metric_type: "business"
+      category: "geographic"
+      division: "chittagong"
+
+  # Vendor Metrics
+  - record: business:vendor_commission_rate
+    expr: (total_commission / total_vendor_sales) * 100
+    labels:
+      metric_type: "business"
+      category: "vendor"
+
+  - record: business:active_vendors_ratio
+    expr: (active_vendors / total_vendors) * 100
+    labels:
+      metric_type: "business"
+      category: "vendor"
+
+  # Marketing Metrics
+  - record: business:email_campaign_effectiveness
+    expr: (email_campaign_conversions / email_campaign_sends) * 100
+    labels:
+      metric_type: "business"
+      category: "marketing"
+      channel: "email"
+
+  - record: business:sms_campaign_effectiveness
+    expr: (sms_campaign_conversions / sms_campaign_sends) * 100
+    labels:
+      metric_type: "business"
+      category: "marketing"
+      channel: "sms"
+
+  # Search and Discovery Metrics
+  - record: business:search_to_purchase_rate
+    expr: (search_resulting_purchases / total_searches) * 100
+    labels:
+      metric_type: "business"
+      category: "search"
+
+  - record: business:ai_recommendation_click_rate
+    expr: (ai_recommendation_clicks / ai_recommendations_shown) * 100
+    labels:
+      metric_type: "business"
+      category: "ai_recommendations"
+
+  # Inventory Metrics
+  - record: business:inventory_turnover_rate
+    expr: cost_of_goods_sold / average_inventory_value
+    labels:
+      metric_type: "business"
+      category: "inventory"
+
+  - record: business:stockout_rate
+    expr: (stockout_events / total_products) * 100
+    labels:
+      metric_type: "business"
+      category: "inventory"
+
+- name: business.alerts
+  rules:
+  
+  # Revenue Alerts
+  - alert: LowHourlyRevenue
+    expr: business:hourly_revenue < 10000
+    for: 15m
+    labels:
+      severity: warning
+      team: business
+    annotations:
+      summary: "Hourly revenue below threshold"
+      description: "Hourly revenue is {{ $value }} BDT, which is below the threshold of 10,000 BDT"
+
+  - alert: RevenueDropSignificant
+    expr: (business:hourly_revenue / business:hourly_revenue offset 24h) < 0.7
+    for: 30m
+    labels:
+      severity: critical
+      team: business
+    annotations:
+      summary: "Significant revenue drop detected"
+      description: "Current hourly revenue is {{ $value }}% of the same hour yesterday"
+
+  # Conversion Alerts
+  - alert: LowConversionRate
+    expr: business:conversion_rate < 2
+    for: 30m
+    labels:
+      severity: warning
+      team: marketing
+    annotations:
+      summary: "Conversion rate below threshold"
+      description: "Conversion rate is {{ $value }}%, which is below the threshold of 2%"
+
+  - alert: HighCartAbandonmentRate
+    expr: business:cart_abandonment_rate > 70
+    for: 15m
+    labels:
+      severity: warning
+      team: product
+    annotations:
+      summary: "High cart abandonment rate"
+      description: "Cart abandonment rate is {{ $value }}%, which exceeds the threshold of 70%"
+
+  # Payment Alerts
+  - alert: MobileBankingFailureRate
+    expr: business:bkash_transaction_success_rate < 95 or business:nagad_transaction_success_rate < 95
+    for: 10m
+    labels:
+      severity: critical
+      team: payments
+    annotations:
+      summary: "Mobile banking failure rate high"
+      description: "Mobile banking success rate dropped below 95%"
+
+  # Customer Alerts
+  - alert: CustomerRetentionDrop
+    expr: business:customer_retention_rate < 60
+    for: 1h
+    labels:
+      severity: warning
+      team: customer_success
+    annotations:
+      summary: "Customer retention rate dropping"
+      description: "Customer retention rate is {{ $value }}%, below the 60% threshold"
+
+  # Inventory Alerts
+  - alert: HighStockoutRate
+    expr: business:stockout_rate > 5
+    for: 30m
+    labels:
+      severity: warning
+      team: inventory
+    annotations:
+      summary: "High product stockout rate"
+      description: "{{ $value }}% of products are out of stock, exceeding 5% threshold"
+
+  # Geographic Alerts
+  - alert: DhakaRevenueShare
+    expr: business:dhaka_revenue_share < 40
+    for: 2h
+    labels:
+      severity: info
+      team: business
+    annotations:
+      summary: "Dhaka revenue share below normal"
+      description: "Dhaka's revenue share is {{ $value }}%, below the expected 40%"
+
+  # AI/ML Performance Alerts
+  - alert: AIRecommendationPerformance
+    expr: business:ai_recommendation_click_rate < 15
+    for: 1h
+    labels:
+      severity: warning
+      team: ai_ml
+    annotations:
+      summary: "AI recommendation performance degraded"
+      description: "AI recommendation click rate is {{ $value }}%, below 15% threshold"

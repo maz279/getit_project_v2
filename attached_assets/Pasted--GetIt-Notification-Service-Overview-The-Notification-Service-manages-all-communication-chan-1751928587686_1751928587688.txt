@@ -1,0 +1,513 @@
+# GetIt Notification Service
+
+## Overview
+The Notification Service manages all communication channels for the GetIt multi-vendor ecommerce platform. It handles multi-channel messaging, template management, notification preferences, delivery tracking, and ensures effective communication between customers, vendors, and the platform across SMS, email, push notifications, and messaging platforms.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: PostgreSQL (primary), Redis (queue/cache)
+- **Message Queue**: Redis Bull Queue for processing
+- **Email Service**: AWS SES, SendGrid for email delivery
+- **SMS Gateway**: SSL Wireless, Robi, Grameenphone, Banglalink
+- **Push Notifications**: Firebase Cloud Messaging (FCM)
+- **Template Engine**: Handlebars.js for dynamic content
+- **Background Jobs**: Node-cron for scheduled notifications
+
+## Core Responsibilities
+
+### 1. Multi-Channel Communication
+- Email notification management
+- SMS delivery through local telecom operators
+- Push notifications for mobile applications
+- WhatsApp Business API integration
+- In-app notification system
+
+### 2. Template & Content Management
+- Dynamic template creation and management
+- Multi-language template support (Bangla, English)
+- Personalized content generation
+- Template versioning and A/B testing
+- Rich media content support
+
+### 3. Notification Preferences
+- User notification preference management
+- Channel-specific opt-in/opt-out controls
+- Notification frequency management
+- Timezone-aware scheduling
+- Do-not-disturb period handling
+
+### 4. Delivery Tracking & Analytics
+- Notification delivery status tracking
+- Open and click rate analytics
+- Bounce and failure handling
+- Engagement metrics and reporting
+- Performance optimization insights
+
+### 5. Event-Driven Messaging
+- Real-time event processing
+- Automated trigger-based notifications
+- Workflow-based message sequences
+- Conditional messaging logic
+- Retry mechanisms for failed deliveries
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **Local SMS Providers**: Integration with all major telecom operators
+- **Bangla Language Support**: Full Unicode support for Bangla content
+- **Cultural Sensitivity**: Festival and religious event awareness
+- **Mobile-First Design**: Optimized for mobile device delivery
+- **Cost Optimization**: Local rate optimization for SMS and calls
+
+### Advanced Messaging Features
+- **Rich Notifications**: Images, buttons, and interactive elements
+- **Dynamic Content**: Personalized based on user behavior
+- **Scheduled Messaging**: Time-based and event-based scheduling
+- **Bulk Messaging**: Efficient mass communication
+- **Message Threading**: Conversation continuity management
+
+### Integration Features
+- **Multi-Platform Support**: Web, mobile apps, and third-party integrations
+- **API-First Design**: Easy integration with external systems
+- **Webhook Support**: Real-time delivery status updates
+- **Template Inheritance**: Reusable template components
+- **Content Localization**: Automatic language detection and switching
+
+## API Endpoints
+
+### Notification Management APIs
+```yaml
+Send Notifications:
+  POST /api/v1/notifications/send
+  POST /api/v1/notifications/send-bulk
+  POST /api/v1/notifications/schedule
+  GET /api/v1/notifications/:id/status
+  POST /api/v1/notifications/:id/retry
+
+Notification Types:
+  POST /api/v1/notifications/email
+  POST /api/v1/notifications/sms
+  POST /api/v1/notifications/push
+  POST /api/v1/notifications/whatsapp
+  POST /api/v1/notifications/in-app
+```
+
+### Template Management APIs
+```yaml
+Templates:
+  GET /api/v1/templates
+  POST /api/v1/templates
+  GET /api/v1/templates/:id
+  PUT /api/v1/templates/:id
+  DELETE /api/v1/templates/:id
+  POST /api/v1/templates/:id/test
+
+Template Versions:
+  GET /api/v1/templates/:id/versions
+  POST /api/v1/templates/:id/versions
+  PUT /api/v1/templates/:id/versions/:versionId
+  POST /api/v1/templates/:id/activate/:versionId
+```
+
+### User Preferences APIs
+```yaml
+Preferences:
+  GET /api/v1/users/:id/notification-preferences
+  PUT /api/v1/users/:id/notification-preferences
+  PATCH /api/v1/users/:id/notification-preferences
+  POST /api/v1/users/:id/unsubscribe
+  POST /api/v1/users/:id/resubscribe
+
+Channel Preferences:
+  GET /api/v1/users/:id/channels
+  PUT /api/v1/users/:id/channels/:channel
+  POST /api/v1/users/:id/channels/:channel/verify
+  DELETE /api/v1/users/:id/channels/:channel
+```
+
+### Analytics & Reporting APIs
+```yaml
+Analytics:
+  GET /api/v1/notifications/analytics
+  GET /api/v1/notifications/delivery-stats
+  GET /api/v1/notifications/engagement-metrics
+  POST /api/v1/notifications/analytics/export
+  GET /api/v1/notifications/performance-report
+
+Campaign Analytics:
+  GET /api/v1/campaigns/:id/analytics
+  GET /api/v1/campaigns/:id/delivery-report
+  GET /api/v1/campaigns/compare
+  POST /api/v1/campaigns/:id/ab-test-results
+```
+
+### Admin APIs
+```yaml
+System Management:
+  GET /api/v1/admin/notifications/dashboard
+  GET /api/v1/admin/notifications/queue-status
+  POST /api/v1/admin/notifications/flush-queue
+  GET /api/v1/admin/notifications/failed
+  POST /api/v1/admin/notifications/retry-failed
+
+Provider Management:
+  GET /api/v1/admin/providers
+  POST /api/v1/admin/providers/configure
+  PUT /api/v1/admin/providers/:id/status
+  GET /api/v1/admin/providers/:id/health
+```
+
+## Database Schema
+
+### Primary Tables
+```sql
+notifications:
+  - id (Primary Key)
+  - notification_id (Unique)
+  - user_id (Foreign Key)
+  - template_id (Foreign Key)
+  - channel (email, sms, push, whatsapp, in_app)
+  - recipient
+  - subject
+  - content
+  - content_type (text, html, rich)
+  - status (queued, sent, delivered, failed, read)
+  - priority (low, normal, high, urgent)
+  - scheduled_at
+  - sent_at
+  - delivered_at
+  - read_at
+  - failed_at
+  - failure_reason
+  - retry_count
+  - metadata
+  - created_at
+  - updated_at
+
+templates:
+  - id (Primary Key)
+  - name
+  - description
+  - type (transactional, marketing, system)
+  - channel (email, sms, push, whatsapp, multi)
+  - language
+  - subject_template
+  - content_template
+  - variables
+  - is_active
+  - version
+  - created_by
+  - created_at
+  - updated_at
+
+user_notification_preferences:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - channel
+  - notification_type
+  - is_enabled
+  - frequency (immediate, daily, weekly, never)
+  - quiet_hours_start
+  - quiet_hours_end
+  - timezone
+  - updated_at
+
+notification_channels:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - channel_type (email, sms, push, whatsapp)
+  - address (email address, phone number, device token)
+  - is_verified
+  - is_primary
+  - verification_token
+  - verified_at
+  - created_at
+  - last_used_at
+
+notification_events:
+  - id (Primary Key)
+  - event_type
+  - event_name
+  - description
+  - default_templates
+  - is_enabled
+  - priority
+  - created_at
+
+delivery_logs:
+  - id (Primary Key)
+  - notification_id (Foreign Key)
+  - provider
+  - provider_id
+  - status
+  - response_data
+  - delivery_time
+  - cost
+  - created_at
+
+campaigns:
+  - id (Primary Key)
+  - name
+  - description
+  - type (promotional, announcement, reminder)
+  - target_audience
+  - template_id (Foreign Key)
+  - schedule_type (immediate, scheduled, recurring)
+  - scheduled_at
+  - status (draft, scheduled, running, completed, cancelled)
+  - total_recipients
+  - sent_count
+  - delivered_count
+  - opened_count
+  - clicked_count
+  - created_by
+  - created_at
+  - completed_at
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **User Service**: User contact information and preferences
+- **Order Service**: Order status updates and confirmations
+- **Payment Service**: Payment confirmations and alerts
+- **Vendor Service**: Vendor notifications and communications
+- **Shipping Service**: Delivery updates and tracking notifications
+- **Analytics Service**: Notification performance metrics
+
+### External Service Integration
+- **SMS Providers**: SSL Wireless, Robi, Grameenphone, Banglalink
+- **Email Services**: AWS SES, SendGrid, Mailgun
+- **Push Notification Services**: Firebase Cloud Messaging (FCM)
+- **WhatsApp Business API**: Meta WhatsApp Business Platform
+- **Voice Call Services**: Local telecom providers for voice alerts
+
+## Notification Types & Templates
+
+### Transactional Notifications
+```yaml
+User Management:
+  - Account registration confirmation
+  - Email/phone verification
+  - Password reset instructions
+  - Login security alerts
+  - Profile update confirmations
+
+Order Management:
+  - Order confirmation
+  - Payment confirmation
+  - Order status updates
+  - Shipping notifications
+  - Delivery confirmations
+  - Return/refund updates
+
+Vendor Management:
+  - New order notifications
+  - Payout confirmations
+  - Product approval status
+  - Performance alerts
+  - Account updates
+```
+
+### Marketing Notifications
+```yaml
+Promotional:
+  - Flash sale announcements
+  - Discount code delivery
+  - Festival season offers
+  - Product recommendations
+  - Abandoned cart reminders
+
+Engagement:
+  - Welcome series for new users
+  - Product review requests
+  - Loyalty program updates
+  - Birthday/anniversary offers
+  - Seasonal greetings
+```
+
+### System Notifications
+```yaml
+System Alerts:
+  - Service maintenance notices
+  - Security updates
+  - Policy changes
+  - Feature announcements
+  - System downtime notifications
+
+Support:
+  - Support ticket updates
+  - Dispute resolution updates
+  - Account verification requirements
+  - Compliance notifications
+  - Help and tutorial offers
+```
+
+## Multi-Channel Delivery Strategy
+
+### Channel Selection Logic
+```yaml
+Priority Order (based on urgency):
+  1. Critical: SMS + Push + Email
+  2. High: Push + SMS
+  3. Normal: Push + Email
+  4. Low: Email only
+
+Channel Preference Rules:
+  - User-defined preferences override default
+  - Fallback to next available channel if primary fails
+  - Respect quiet hours and frequency limits
+  - Consider device/platform availability
+```
+
+### SMS Delivery (Bangladesh)
+```yaml
+Provider Selection:
+  - SSL Wireless: Primary for transactional SMS
+  - Robi: Secondary and promotional SMS
+  - Grameenphone: Backup and rural coverage
+  - Banglalink: Cost-effective bulk messaging
+
+SMS Features:
+  - Unicode support for Bangla text
+  - Delivery status tracking
+  - Cost optimization across providers
+  - Spam compliance and opt-out management
+  - Two-way SMS support for interactions
+```
+
+### Email Delivery
+```yaml
+Email Types:
+  - Transactional: AWS SES for high deliverability
+  - Marketing: SendGrid for bulk campaigns
+  - System: Dedicated IP for critical notifications
+
+Email Features:
+  - Responsive HTML templates
+  - Plain text fallback
+  - Attachment support
+  - Tracking pixels for open rates
+  - Click tracking for engagement
+  - Bounce and complaint handling
+```
+
+### Push Notifications
+```yaml
+Platform Support:
+  - Android: Firebase Cloud Messaging (FCM)
+  - iOS: Apple Push Notification Service (APNs)
+  - Web: Web Push API
+
+Push Features:
+  - Rich notifications with images and actions
+  - Deep linking to specific app screens
+  - Notification grouping and stacking
+  - Silent notifications for background updates
+  - Badge count management
+```
+
+## Localization & Personalization
+
+### Multi-Language Support
+```yaml
+Supported Languages:
+  - Bangla (Bengali): Primary local language
+  - English: International and business communication
+
+Language Detection:
+  - User preference setting
+  - Browser/device language detection
+  - Geographic location-based selection
+  - Automatic fallback to English
+```
+
+### Content Personalization
+```yaml
+Personalization Variables:
+  - User name and profile information
+  - Recent purchase history
+  - Browsing behavior and preferences
+  - Location and timezone
+  - Device and platform information
+
+Dynamic Content:
+  - Product recommendations
+  - Location-specific offers
+  - Seasonal and cultural content
+  - Behavior-triggered messaging
+  - A/B test content variations
+```
+
+## Delivery Optimization
+
+### Queue Management
+```yaml
+Queue Priorities:
+  1. Critical: Security alerts, payment issues
+  2. High: Order confirmations, delivery updates
+  3. Normal: General notifications, promotions
+  4. Low: Newsletters, recommendations
+
+Queue Processing:
+  - Dedicated workers for each priority level
+  - Rate limiting to prevent provider throttling
+  - Retry logic with exponential backoff
+  - Dead letter queue for failed messages
+  - Real-time monitoring and alerting
+```
+
+### Performance Optimization
+- **Batch Processing**: Group similar notifications for efficiency
+- **Template Caching**: Cache rendered templates for faster processing
+- **Connection Pooling**: Optimize provider API connections
+- **Rate Limiting**: Respect provider rate limits
+- **Load Balancing**: Distribute load across multiple providers
+
+## Analytics & Reporting
+
+### Key Performance Metrics
+```yaml
+Delivery Metrics:
+  - Delivery rate: Successfully delivered notifications
+  - Bounce rate: Failed delivery percentage
+  - Response time: Average delivery time
+  - Provider performance: Carrier-wise success rates
+
+Engagement Metrics:
+  - Open rate: Email and push notification opens
+  - Click-through rate: Link clicks in notifications
+  - Conversion rate: Actions taken after notification
+  - Unsubscribe rate: Opt-out frequency
+
+Cost Metrics:
+  - Cost per notification by channel
+  - Provider cost comparison
+  - ROI for marketing campaigns
+  - Budget utilization tracking
+```
+
+### Reporting Features
+- **Real-time Dashboards**: Live notification status monitoring
+- **Campaign Reports**: Detailed campaign performance analysis
+- **User Engagement Reports**: Individual user interaction patterns
+- **Provider Performance Reports**: Delivery success by provider
+- **Cost Analysis Reports**: Notification spending and optimization
+
+## Business Objectives
+
+### Primary Goals
+1. **Reliable Communication**: Ensure message delivery across all channels
+2. **User Engagement**: Increase user interaction and satisfaction
+3. **Operational Efficiency**: Automate routine communications
+4. **Cost Optimization**: Minimize communication costs while maintaining quality
+5. **Compliance**: Meet regulatory requirements for communications
+
+### Bangladesh Market Alignment
+1. **Local Language Support**: Comprehensive Bangla language support
+2. **Mobile-First Approach**: Optimize for mobile device notifications
+3. **Cost-Effective Solutions**: Use local providers for competitive rates
+4. **Cultural Sensitivity**: Respect local customs and traditions
+5. **Rural Accessibility**: Ensure notifications reach all areas of Bangladesh
+
+This Notification Service provides comprehensive, multi-channel communication capabilities that ensure effective engagement with users while respecting preferences, cultural considerations, and cost optimization specific to the Bangladesh market.

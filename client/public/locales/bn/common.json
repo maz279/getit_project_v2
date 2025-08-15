@@ -1,0 +1,173 @@
+{
+  "app": {
+    "name": "গেটইট",
+    "tagline": "বাংলাদেশের সেরা অনলাইন শপিং গন্তব্য",
+    "description": "Amazon.com/Shopee.sg মানের মাল্টি-ভেন্ডর ই-কমার্স প্ল্যাটফর্ম"
+  },
+  "navigation": {
+    "home": "হোম",
+    "categories": "ক্যাটাগরি",
+    "vendors": "বিক্রেতা",
+    "cart": "কার্ট",
+    "profile": "প্রোফাইল",
+    "orders": "অর্ডার",
+    "wishlist": "পছন্দের তালিকা",
+    "help": "সাহায্য",
+    "contact": "যোগাযোগ"
+  },
+  "auth": {
+    "login": "লগইন",
+    "register": "নিবন্ধন",
+    "logout": "লগআউট",
+    "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
+    "resetPassword": "পাসওয়ার্ড রিসেট করুন",
+    "verifyOTP": "ওটিপি যাচাই করুন"
+  },
+  "product": {
+    "search": "পণ্য খুঁজুন",
+    "addToCart": "কার্টে যোগ করুন",
+    "buyNow": "এখনই কিনুন",
+    "addToWishlist": "পছন্দের তালিকায় যোগ করুন",
+    "compare": "তুলনা করুন",
+    "share": "শেয়ার করুন",
+    "viewDetails": "বিস্তারিত দেখুন",
+    "reviews": "রিভিউ",
+    "rating": "রেটিং",
+    "inStock": "স্টকে আছে",
+    "outOfStock": "স্টকে নেই",
+    "freeShipping": "ফ্রি ডেলিভারি"
+  },
+  "cart": {
+    "title": "শপিং কার্ট",
+    "empty": "আপনার কার্ট খালি",
+    "quantity": "পরিমাণ",
+    "subtotal": "সাবটোটাল",
+    "shipping": "ডেলিভারি চার্জ",
+    "tax": "ভ্যাট",
+    "total": "মোট",
+    "checkout": "চেকআউট",
+    "continueShopping": "কেনাকাটা চালিয়ে যান",
+    "removeItem": "আইটেম সরান",
+    "updateQuantity": "পরিমাণ আপডেট করুন",
+    "coupon": "কুপন কোড",
+    "applyCoupon": "কুপন প্রয়োগ করুন"
+  },
+  "checkout": {
+    "title": "চেকআউট",
+    "shippingAddress": "ডেলিভারি ঠিকানা",
+    "billingAddress": "বিলিং ঠিকানা",
+    "paymentMethod": "পেমেন্ট পদ্ধতি",
+    "orderReview": "অর্ডার পর্যালোচনা",
+    "placeOrder": "অর্ডার করুন",
+    "orderConfirmed": "অর্ডার নিশ্চিত হয়েছে"
+  },
+  "payment": {
+    "bkash": "বিকাশ",
+    "nagad": "নগদ",
+    "rocket": "রকেট",
+    "cashOnDelivery": "ক্যাশ অন ডেলিভারি",
+    "cardPayment": "কার্ড পেমেন্ট",
+    "bankTransfer": "ব্যাংক ট্রান্সফার",
+    "paymentFailed": "পেমেন্ট ব্যর্থ",
+    "paymentSuccess": "পেমেন্ট সফল",
+    "processing": "প্রক্রিয়া চলছে"
+  },
+  "address": {
+    "division": "বিভাগ",
+    "district": "জেলা",
+    "upazila": "উপজেলা",
+    "area": "এলাকা",
+    "fullAddress": "সম্পূর্ণ ঠিকানা",
+    "postalCode": "পোস্টাল কোড",
+    "phone": "ফোন",
+    "email": "ইমেইল"
+  },
+  "vendor": {
+    "store": "দোকান",
+    "products": "পণ্য",
+    "rating": "রেটিং",
+    "followers": "ফলোয়ার",
+    "since": "থেকে",
+    "viewStore": "দোকান দেখুন",
+    "followVendor": "ফলো করুন",
+    "chatWithVendor": "চ্যাট করুন"
+  },
+  "order": {
+    "orderHistory": "অর্ডার ইতিহাস",
+    "orderDetails": "অর্ডার বিস্তারিত",
+    "trackOrder": "অর্ডার ট্র্যাক করুন",
+    "cancelOrder": "অর্ডার বাতিল করুন",
+    "returnOrder": "অর্ডার ফেরত",
+    "orderStatus": "অর্ডার স্ট্যাটাস",
+    "pending": "অপেক্ষমাণ",
+    "confirmed": "নিশ্চিত",
+    "shipped": "পাঠানো হয়েছে",
+    "delivered": "ডেলিভার হয়েছে",
+    "cancelled": "বাতিল",
+    "returned": "ফেরত"
+  },
+  "profile": {
+    "personalInfo": "ব্যক্তিগত তথ্য",
+    "security": "নিরাপত্তা",
+    "addresses": "ঠিকানা",
+    "paymentMethods": "পেমেন্ট পদ্ধতি",
+    "notifications": "নোটিফিকেশন",
+    "preferences": "পছন্দসমূহ",
+    "editProfile": "প্রোফাইল সম্পাদনা",
+    "changePassword": "পাসওয়ার্ড পরিবর্তন"
+  },
+  "common": {
+    "loading": "লোড হচ্ছে...",
+    "save": "সেভ করুন",
+    "cancel": "বাতিল",
+    "edit": "সম্পাদনা",
+    "delete": "মুছুন",
+    "confirm": "নিশ্চিত করুন",
+    "yes": "হ্যাঁ",
+    "no": "না",
+    "close": "বন্ধ করুন",
+    "back": "পিছনে",
+    "next": "পরবর্তী",
+    "previous": "পূর্ববর্তী",
+    "submit": "জমা দিন",
+    "reset": "রিসেট",
+    "clear": "পরিষ্কার",
+    "view": "দেখুন",
+    "download": "ডাউনলোড",
+    "upload": "আপলোড",
+    "share": "শেয়ার",
+    "copy": "কপি",
+    "success": "সফল",
+    "error": "ত্রুটি",
+    "warning": "সতর্কতা",
+    "info": "তথ্য"
+  },
+  "cultural": {
+    "eidMubarak": "ঈদ মুবারক",
+    "poheleBoishakh": "পহেলা বৈশাখ",
+    "victoryday": "বিজয় দিবস",
+    "independenceDay": "স্বাধীনতা দিবস",
+    "shaheedDibosh": "শহীদ দিবস",
+    "banglaNewYear": "বাংলা নববর্ষ",
+    "durga": "দুর্গা পূজা",
+    "kali": "কালী পূজা"
+  },
+  "currency": {
+    "bdt": "৳",
+    "symbol": "৳",
+    "name": "টাকা"
+  },
+  "time": {
+    "today": "আজ",
+    "yesterday": "গতকাল",
+    "tomorrow": "আগামীকাল",
+    "now": "এখন",
+    "ago": "আগে",
+    "minutes": "মিনিট",
+    "hours": "ঘন্টা",
+    "days": "দিন",
+    "weeks": "সপ্তাহ",
+    "months": "মাস",
+    "years": "বছর"
+  }
+}

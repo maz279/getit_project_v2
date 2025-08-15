@@ -1,0 +1,148 @@
+Below is a step-by-step blueprint that large multi-vendor marketplaces (Amazon-style) actually follow to ship Google-grade auto-suggest.  Everything is split into two tracks:
+
+- Track A – “cold start” suggestions generated directly from the product catalog (works even when you have zero query logs).  
+- Track B – “warm” suggestions learned from real user queries (kicks in once you have traffic).
+
+Both tracks feed the same low-latency index, so the front-end only sees a single, merged, ranked list.
+
+--------------------------------------------------------------------
+1.  System overview
+--------------------------------------------------------------------
+            ┌----------------┐      ┌------------------┐
+            │  Front-end JS  │◄-----┤  Suggest API     │  50-100 ms
+            └-------┬--------┘      │  (stateless Go   │
+                    │               │   or Node svc)   │
+                    │               └------┬-----------┘
+                    │                      │
+                    │               ┌------┴-----------┐
+                    │               │  Solr / Open-    │
+                    │               │  Search index    │
+                    │               └------┬-----------┘
+                    │                      │
+      ┌-------------┴-------------┐   ┌---┴---------------┐
+      │   Track A – Catalog       │   │ Track B – Query   │
+      │   nightly Spark job       │   │  hourly Flink job │
+      └---------------------------┘   └-------------------┘
+
+--------------------------------------------------------------------
+2.  Track A – Catalog-based suggestions (cold start)
+--------------------------------------------------------------------
+Goal: turn every meaningful product attribute into human-like query phrases.
+
+Step-by-step
+1.  Token explosion  
+    For every SKU explode these fields into shingles of length 1-4:  
+    name, category path, brand, color, size, material, style, occasion, key specs, vendor name.  
+    Example:  
+    “Apple iPhone 15 Pro Max 256 GB Natural Titanium” →  
+    [“iphone 15”, “iphone 15 pro”, “iphone 15 pro max”, “natural titanium iphone”, …]
+
+2.  Clean-up & business rules  
+    - Lower-case, ASCIIFold, de-pluralise.  
+    - Remove stop-words (“and”, “with”).  
+    - Detect gender & occasion tokens (“women”, “summer”) and move them to the end so that “red dress women” becomes “red dress – women”.
+
+3.  Importance score  
+    importance = boost(category) × boost(brand) × boost(seller tier) × seasonal_boost.  
+    Merchandisers can override via a simple CSV upload.
+
+4.  Index schema (Solr example)  
+    <field name="input"      type="text_suggest" indexed="true" stored="true"/>  
+    <field name="source"     type="string"  stored="true"/>  <!-- “catalog” -->  
+    <field name="importance" type="int"    stored="true"/>  
+    <field name="length"     type="int"    stored="true"/>   <!-- word count -->  
+    <field name="vendor_id"  type="long"   stored="true"/>   <!-- to bias per-vendor -->
+
+5.  Edge n-gram  
+    Use EdgeNGramFilterFactory on the “input” field so that “iph” instantly matches “iphone 15 pro max”.
+
+After this nightly job you always have *something* relevant in the dropdown—even on day 0.
+
+--------------------------------------------------------------------
+3.  Track B – Query-log based suggestions (warm start)
+--------------------------------------------------------------------
+Once you have ≥1 M search events / week you can mine real queries.
+
+1.  Deduplicate & normalise  
+    - Case-fold, strip punctuation, convert plural→singular.  
+    - Group semantically identical queries (“prom dress” ≈ “dress for prom”).
+
+2.  Compute frequency rank  
+    rank = Σ(clicks on results) + 2×Σ(add-to-cart) + 5×Σ(purchase).  
+    Store group_rank in the same schema.
+
+3.  Expand with facets  
+    For every high-frequency query, ask the product engine for top facets (category, price bucket, brand, color).  
+    Example: “nike shoes” → create extra suggestions:  
+       “nike shoes under 2000”, “nike shoes white”, “nike running shoes”.
+
+4.  Stream into the same index  
+    Only difference: field source = “query”.  Because we sort by rank, warm suggestions naturally float to the top.
+
+--------------------------------------------------------------------
+4.  Hybrid ranking at query time
+--------------------------------------------------------------------
+API pseudo-code (Go)
+
+    func Suggest(prefix string) []Suggestion {
+        q := fmt.Sprintf(`input:%s* AND (source:catalog OR source:query)`, prefix)
+        resp := solr.Query(q, fl="input,source,importance,group_rank,length",
+                           sort="group_rank desc, importance desc, length asc",
+                           rows=10)
+        return dedupeByInput(resp.docs)
+    }
+
+The sort order ensures:
+- Exact user queries (source=query) appear first.  
+- High-importance catalog phrases fill gaps.
+
+--------------------------------------------------------------------
+5.  Real-time personalisation hooks
+--------------------------------------------------------------------
+- Per-vendor boost: if user is currently on vendor=123, append `AND vendor_id:123^2` to the Solr query.  
+- Geo-boost: append `AND ships_to:IN^2` for Indian IP addresses.  
+- User history: keep last 10 searches in Redis; append as optional `OR input_exact_match^3`.
+
+--------------------------------------------------------------------
+6.  Front-end implementation
+--------------------------------------------------------------------
+HTML skeleton:
+
+    <input id="search" autocomplete="off">
+    <ul id="suggest-box" class="dropdown"></ul>
+
+JS (vanilla fetch, debounced 150 ms):
+
+    const search = document.getElementById('search');
+    search.addEventListener('input', debounce(e => {
+        fetch(`/suggest?q=${encodeURIComponent(e.target.value)}`)
+          .then(r => r.json())
+          .then(render);
+    }, 150));
+
+    function render(list) {
+        const box = document.getElementById('suggest-box');
+        box.innerHTML = list.map(s => `<li>${s.input}</li>`).join('');
+        box.style.display = list.length ? 'block' : 'none';
+    }
+
+Keyboard navigation (↓, ↑, Enter) and click-outside-to-close are trivial additions.
+
+--------------------------------------------------------------------
+7.  Ops checklist
+--------------------------------------------------------------------
+- Index size: 50 M suggestions → Solr cloud shard, 4 × r5.2xlarge, <50 ms p99.  
+- Refresh cadence: catalog job nightly, query job hourly (Flink streaming).  
+- Monitoring: Grafana dashboards on suggestion latency, zero-result rate, CTR.  
+- A/B: ramp new suggest index to 5 % traffic, watch CTR & revenue per session.
+
+--------------------------------------------------------------------
+8.  Stack cheat-sheet
+--------------------------------------------------------------------
+- Search index: OpenSearch 2.x or Solr 9.x  
+- Batch ETL: Spark on EMR / Dataproc  
+- Stream ETL: Flink on Kinesis / Kafka  
+- API: Go or Node micro-service behind ELB  
+- CDN: CloudFront with /suggest path cached 5 min
+
+With the above pipeline you get an autocomplete that behaves like Google’s: lightning-fast, typo-tolerant, and increasingly smarter as real traffic grows .

@@ -1,0 +1,203 @@
+Looking at your large AISearchBar component (~2700+ lines), I can see it's a feature-rich search implementation with multiple responsibilities. Here's a systematic plan to break it down into manageable, maintainable modules:
+
+## Recommended Architecture Structure
+
+```
+src/
+├── features/
+│   └── search/
+│       ├── components/
+│       │   ├── AISearchBar/
+│       │   │   ├── index.tsx                 # Main component (thin wrapper)
+│       │   │   ├── AISearchBar.tsx           # Core search bar UI (~200 lines)
+│       │   │   ├── AISearchBar.types.ts      # All TypeScript interfaces
+│       │   │   └── AISearchBar.styles.ts     # Styled components/CSS
+│       │   ├── SearchInput/
+│       │   │   ├── index.tsx
+│       │   │   └── SearchInput.tsx           # Input field component
+│       │   ├── SearchSuggestions/
+│       │   │   ├── index.tsx
+│       │   │   └── SearchSuggestions.tsx     # Suggestions dropdown
+│       │   ├── SearchActions/
+│       │   │   ├── index.tsx
+│       │   │   ├── VoiceSearchButton.tsx
+│       │   │   ├── ImageSearchButton.tsx
+│       │   │   ├── AISearchButton.tsx
+│       │   │   └── QRSearchButton.tsx
+│       │   └── SearchResults/
+│       │       └── UnifiedSearchResults.tsx
+│       ├── hooks/
+│       │   ├── useSearchState.ts             # Main state management hook
+│       │   ├── useSearchSuggestions.ts       # Suggestions logic
+│       │   ├── useVoiceSearch.ts             # Voice search logic
+│       │   ├── useImageSearch.ts             # Image search logic
+│       │   ├── useSearchAnalytics.ts         # Analytics tracking
+│       │   ├── useSearchKeyboard.ts          # Keyboard navigation
+│       │   └── useSearchAccessibility.ts     # Accessibility features
+│       ├── services/
+│       │   ├── api/
+│       │   │   ├── searchApi.ts              # API endpoints & calls
+│       │   │   └── searchApi.types.ts        # API types
+│       │   ├── validation/
+│       │   │   ├── InputValidator.ts         # Input validation logic
+│       │   │   └── AdvancedInputValidator.ts
+│       │   ├── cache/
+│       │   │   └── SmartCacheManager.ts      # Caching logic
+│       │   └── request/
+│       │       ├── RequestManager.ts         # Request management
+│       │       └── EnhancedRequestManager.ts
+│       ├── state/
+│       │   ├── searchReducer.ts              # Reducer logic
+│       │   ├── searchActions.ts              # Action creators
+│       │   └── searchSelectors.ts            # State selectors
+│       ├── utils/
+│       │   ├── searchHelpers.ts              # Utility functions
+│       │   ├── analyticsHelpers.ts           # Analytics utilities
+│       │   └── businessIntelligence.ts       # BI calculations
+│       ├── constants/
+│       │   ├── searchConstants.ts            # Constants & config
+│       │   └── searchPatterns.ts             # Regex patterns
+│       └── context/
+│           └── SearchContext.tsx             # Context provider (optional)
+```
+
+## Breaking Down Strategy
+
+### 1. **Types and Interfaces** (~200 lines)
+**File**: `AISearchBar.types.ts`
+```typescript
+// All interfaces and types
+export interface SearchSuggestion { ... }
+export interface SearchResult { ... }
+export interface AISearchBarProps { ... }
+export interface SearchState { ... }
+export type SearchAction = ...
+export type SearchType = ...
+// etc.
+```
+
+### 2. **Utility Classes** (~400 lines)
+Break into separate service files:
+
+**File**: `services/validation/InputValidator.ts`
+```typescript
+export class InputValidator {
+  // Basic validation logic
+}
+
+export class AdvancedInputValidator {
+  // Advanced validation with severity levels
+}
+```
+
+**File**: `services/cache/SmartCacheManager.ts`
+```typescript
+export class SmartCacheManager<T> {
+  // All caching logic
+}
+```
+
+### 3. **Custom Hooks** (~800 lines)
+Split into focused hooks:
+
+**File**: `hooks/useSearchState.ts`
+```typescript
+export const useSearchState = () => {
+  const [state, dispatch] = useReducer(searchReducer, initialState);
+  // Core state management
+  return { state, dispatch };
+};
+```
+
+**File**: `hooks/useVoiceSearch.ts`
+```typescript
+export const useVoiceSearch = (language: string, onSearch: Function) => {
+  // All voice search logic
+  return { 
+    isListening, 
+    startVoiceSearch, 
+    stopVoiceSearch 
+  };
+};
+```
+
+### 4. **API Layer** (~300 lines)
+**File**: `services/api/searchApi.ts`
+```typescript
+export const searchApi = {
+  getSuggestions: async (query: string, language: string) => { ... },
+  performSearch: async (params: SearchParams) => { ... },
+  uploadImage: async (file: File) => { ... },
+  // etc.
+};
+```
+
+### 5. **Component Breakdown** (~400 lines)
+Split the main component into smaller, focused components:
+
+**File**: `components/AISearchBar/AISearchBar.tsx`
+```typescript
+export const AISearchBar: FC<AISearchBarProps> = (props) => {
+  const { state, dispatch } = useSearchState();
+  const { startVoiceSearch } = useVoiceSearch(props.language, handleSearch);
+  const { suggestions } = useSearchSuggestions(state.query);
+  
+  return (
+    <div className="search-container">
+      <SearchInput 
+        value={state.query}
+        onChange={handleInputChange}
+        onSubmit={handleSubmit}
+      />
+      <SearchActions 
+        onVoiceSearch={startVoiceSearch}
+        onImageSearch={handleImageSearch}
+        // etc.
+      />
+      <SearchSuggestions 
+        suggestions={suggestions}
+        onSelect={handleSuggestionSelect}
+      />
+    </div>
+  );
+};
+```
+
+### 6. **Analytics & Monitoring** (~500 lines)
+**File**: `hooks/useSearchAnalytics.ts`
+```typescript
+export const useSearchAnalytics = () => {
+  const trackEvent = useCallback((event: string, data: any) => { ... });
+  const getMetrics = useCallback(() => { ... });
+  // All analytics logic
+  return { trackEvent, getMetrics };
+};
+```
+
+## Implementation Priority
+
+1. **Phase 1**: Extract types, interfaces, and constants
+2. **Phase 2**: Extract utility classes (validators, cache, request managers)
+3. **Phase 3**: Create custom hooks for major features
+4. **Phase 4**: Break down UI components
+5. **Phase 5**: Implement service layer for API calls
+6. **Phase 6**: Add comprehensive tests for each module
+
+## Benefits of This Approach
+
+1. **Maintainability**: Each file has a single responsibility
+2. **Testability**: Smaller units are easier to test
+3. **Reusability**: Hooks and utilities can be used elsewhere
+4. **Performance**: Better code splitting and lazy loading
+5. **Team Collaboration**: Multiple developers can work on different parts
+6. **Debugging**: Easier to locate and fix issues
+
+## Migration Strategy
+
+1. Start with a feature flag to toggle between old and new implementations
+2. Extract one module at a time, ensuring tests pass
+3. Use the Strangler Fig pattern - gradually replace old code
+4. Keep the old component working while building the new structure
+5. Once complete, remove the old monolithic component
+
+Would you like me to help you start with any specific module extraction?

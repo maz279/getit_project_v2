@@ -1,0 +1,45 @@
+
+export const jamdaniSareeProducts = [
+  {
+    id: 'jamdani-saree-1',
+    name: 'Dhakai Jamdani Saree - Pure Cotton',
+    nameBn: 'ঢাকাই জামদানি শাড়ি - খাঁটি সুতি',
+    price: 8500,
+    originalPrice: 12000,
+    rating: 4.8,
+    reviews: 289,
+    vendor: 'Dhakai Jamdani House',
+    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&h=400&fit=crop',
+    discount: 29,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 178,
+    category: 'Jamdani Saree',
+    stock: { status: 'in_stock', quantity: 15 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  },
+  {
+    id: 'jamdani-saree-2',
+    name: 'Traditional Jamdani - Handwoven Motifs',
+    nameBn: 'ঐতিহ্যবাহী জামদানি - হস্তবোনা মোটিফ',
+    price: 6500,
+    originalPrice: 9000,
+    rating: 4.6,
+    reviews: 234,
+    vendor: 'Traditional Weaves',
+    image: 'https://images.unsplash.com/photo-1594736797933-d0e501ba2fe6?w=400&h=400&fit=crop',
+    discount: 28,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 145,
+    category: 'Jamdani Saree',
+    stock: { status: 'in_stock', quantity: 22 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: false, priceHistory: true, emi: true }
+  }
+];

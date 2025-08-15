@@ -1,0 +1,575 @@
+# GetIt Cart Service
+
+## Overview
+The Cart Service manages shopping cart functionality for the GetIt multi-vendor ecommerce platform. It handles cart creation, item management, price calculations, multi-vendor cart coordination, abandoned cart recovery, and provides seamless shopping experience while supporting Bangladesh-specific features like COD validation and local pricing.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: Redis (primary for session data), PostgreSQL (persistent data)
+- **Session Management**: Redis with TTL for cart expiration
+- **Message Queue**: Redis Bull Queue for background tasks
+- **Real-time Updates**: WebSocket for live cart synchronization
+- **Caching**: Multi-layer caching for performance optimization
+- **Background Jobs**: Node-cron for cart cleanup and recovery
+
+## Core Responsibilities
+
+### 1. Cart Management
+- Cart creation and initialization for users and guests
+- Real-time cart item addition, update, and removal
+- Cart persistence across sessions and devices
+- Cart sharing and collaborative shopping features
+- Cart migration from guest to registered user
+
+### 2. Multi-Vendor Cart Coordination
+- Vendor-specific cart sections and management
+- Cross-vendor shipping calculation coordination
+- Independent vendor checkout processes
+- Vendor-specific promotions and discounts
+- Consolidated cart summary and totals
+
+### 3. Price & Tax Calculation
+- Real-time price updates and validation
+- Dynamic tax calculation based on location
+- Shipping cost estimation and updates
+- Discount and coupon code application
+- Multi-currency support and conversion
+
+### 4. Inventory Integration
+- Real-time inventory availability checking
+- Automatic item removal for out-of-stock products
+- Inventory reservation during checkout process
+- Stock level warnings and notifications
+- Alternative product suggestions
+
+### 5. Abandoned Cart Recovery
+- Abandoned cart detection and tracking
+- Automated recovery email campaigns
+- Personalized recovery strategies
+- Cart restoration and easy recovery
+- Analytics and optimization for recovery rates
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **COD Validation**: Cash on Delivery eligibility checking per item
+- **Local Pricing**: Bangladesh Taka (BDT) as primary currency
+- **Regional Shipping**: District-wise shipping cost calculation
+- **Local Payment Methods**: bKash, Nagad, Rocket integration preparation
+- **Cultural Considerations**: Festival season cart management
+
+### Advanced Cart Features
+- **Smart Recommendations**: Related and complementary product suggestions
+- **Save for Later**: Wishlist integration and deferred purchasing
+- **Quick Reorder**: Easy reordering from purchase history
+- **Cart Sharing**: Social sharing and collaborative shopping
+- **Mobile Optimization**: Mobile-first cart experience
+
+### Real-Time Features
+- **Live Updates**: Real-time cart synchronization across devices
+- **Inventory Alerts**: Instant notifications for stock changes
+- **Price Updates**: Automatic price change notifications
+- **Collaborative Carts**: Multi-user cart editing capabilities
+- **Express Checkout**: One-click purchasing for returning customers
+
+## API Endpoints
+
+### Core Cart APIs
+```yaml
+Cart Management:
+  GET /api/v1/cart
+  POST /api/v1/cart/create
+  DELETE /api/v1/cart/clear
+  POST /api/v1/cart/merge
+  PUT /api/v1/cart/sync
+
+Cart Items:
+  POST /api/v1/cart/items
+  GET /api/v1/cart/items
+  PUT /api/v1/cart/items/:itemId
+  DELETE /api/v1/cart/items/:itemId
+  PATCH /api/v1/cart/items/:itemId/quantity
+```
+
+### Multi-Vendor Cart APIs
+```yaml
+Vendor Sections:
+  GET /api/v1/cart/vendors
+  GET /api/v1/cart/vendors/:vendorId
+  POST /api/v1/cart/vendors/:vendorId/checkout
+  GET /api/v1/cart/vendors/:vendorId/shipping
+  PUT /api/v1/cart/vendors/:vendorId/preferences
+
+Cart Coordination:
+  GET /api/v1/cart/summary
+  POST /api/v1/cart/split-checkout
+  GET /api/v1/cart/shipping-options
+  POST /api/v1/cart/apply-promotions
+```
+
+### Pricing & Calculation APIs
+```yaml
+Price Calculations:
+  GET /api/v1/cart/totals
+  POST /api/v1/cart/calculate-shipping
+  POST /api/v1/cart/apply-coupon
+  DELETE /api/v1/cart/remove-coupon
+  GET /api/v1/cart/tax-calculation
+
+Currency & Pricing:
+  GET /api/v1/cart/pricing/:currency
+  POST /api/v1/cart/currency/convert
+  GET /api/v1/cart/payment-methods
+  POST /api/v1/cart/validate-payment
+```
+
+### Inventory Integration APIs
+```yaml
+Inventory Checking:
+  GET /api/v1/cart/availability
+  POST /api/v1/cart/validate-inventory
+  GET /api/v1/cart/stock-alerts
+  POST /api/v1/cart/reserve-inventory
+  DELETE /api/v1/cart/release-inventory
+
+Product Alternatives:
+  GET /api/v1/cart/alternatives/:itemId
+  POST /api/v1/cart/replace-item
+  GET /api/v1/cart/recommendations
+  POST /api/v1/cart/bulk-alternatives
+```
+
+### Abandoned Cart APIs
+```yaml
+Cart Recovery:
+  GET /api/v1/cart/abandoned
+  POST /api/v1/cart/recovery/send-email
+  GET /api/v1/cart/recovery/:token
+  POST /api/v1/cart/recovery/restore
+  GET /api/v1/cart/recovery/analytics
+
+Recovery Campaigns:
+  GET /api/v1/admin/cart/abandoned-analytics
+  POST /api/v1/admin/cart/recovery-campaign
+  GET /api/v1/admin/cart/recovery-performance
+  PUT /api/v1/admin/cart/recovery-settings
+```
+
+### Guest & User Management APIs
+```yaml
+Guest Cart:
+  POST /api/v1/cart/guest/create
+  GET /api/v1/cart/guest/:guestId
+  POST /api/v1/cart/guest/convert
+  PUT /api/v1/cart/guest/extend
+
+User Cart:
+  GET /api/v1/user/cart/history
+  POST /api/v1/user/cart/save-for-later
+  GET /api/v1/user/cart/saved-items
+  POST /api/v1/user/cart/quick-reorder
+```
+
+## Database Schema
+
+### Redis Data Structures
+```yaml
+Cart Session Data:
+  cart:{userId/guestId}:
+    items: hash of cart items
+    totals: cart calculation totals
+    metadata: cart settings and preferences
+    timestamps: creation and last update times
+    ttl: automatic expiration (24 hours for guests, 30 days for users)
+
+Cart Items:
+  cart:{cartId}:items:{itemId}:
+    productId: product identifier
+    vendorId: vendor identifier
+    quantity: item quantity
+    unitPrice: current unit price
+    totalPrice: calculated total price
+    addedAt: timestamp when item was added
+    updatedAt: last modification timestamp
+
+Price Calculations:
+  cart:{cartId}:calculations:
+    subtotal: items subtotal
+    taxes: calculated taxes
+    shipping: shipping costs
+    discounts: applied discounts
+    total: final total amount
+    currency: pricing currency
+    calculatedAt: calculation timestamp
+```
+
+### PostgreSQL Tables
+```sql
+persistent_carts:
+  - id (Primary Key)
+  - user_id (Foreign Key, nullable for guest carts)
+  - guest_id (Unique identifier for guest users)
+  - cart_data (JSON blob of cart contents)
+  - last_activity_at
+  - created_at
+  - expires_at
+  - is_active
+  - device_info
+  - ip_address
+
+cart_items_history:
+  - id (Primary Key)
+  - cart_id
+  - product_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - quantity
+  - unit_price
+  - action_type (added, updated, removed)
+  - performed_at
+  - session_id
+
+abandoned_carts:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - cart_data (JSON)
+  - abandoned_at
+  - recovery_attempts
+  - last_recovery_sent
+  - recovered_at
+  - recovery_value
+  - recovery_method
+
+cart_recovery_campaigns:
+  - id (Primary Key)
+  - campaign_name
+  - trigger_after_hours
+  - email_template_id
+  - discount_code
+  - is_active
+  - success_rate
+  - created_at
+
+cart_analytics:
+  - id (Primary Key)
+  - date
+  - total_carts_created
+  - total_items_added
+  - abandonment_rate
+  - average_cart_value
+  - conversion_rate
+  - recovery_rate
+
+saved_for_later:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - product_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - saved_at
+  - notes
+  - is_active
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **Product Service**: Product details, pricing, and availability
+- **Inventory Service**: Real-time stock checking and reservation
+- **User Service**: User authentication and profile information
+- **Vendor Service**: Vendor-specific policies and information
+- **Payment Service**: Payment method validation and processing
+- **Shipping Service**: Shipping cost calculation and options
+- **Order Service**: Cart to order conversion and processing
+- **Notification Service**: Cart abandonment and recovery notifications
+- **Analytics Service**: Cart behavior and conversion analytics
+
+### External Service Integration
+- **Tax Calculation Services**: Real-time tax calculation APIs
+- **Shipping Calculators**: Third-party shipping cost APIs
+- **Currency Exchange**: Real-time currency conversion
+- **Recommendation Engines**: Product suggestion algorithms
+- **Email Marketing**: Abandoned cart recovery campaigns
+
+## Cart Management Workflow
+
+### Cart Lifecycle
+```yaml
+Cart Creation:
+  1. User/guest starts shopping
+  2. Generate unique cart identifier
+  3. Initialize cart data structure
+  4. Set appropriate expiration policy
+  5. Create session tracking
+
+Item Management:
+  1. Validate product availability
+  2. Check inventory stock levels
+  3. Calculate pricing and taxes
+  4. Update cart totals
+  5. Sync across user devices
+  6. Log item history
+
+Cart Conversion:
+  1. Validate all cart items
+  2. Reserve inventory
+  3. Calculate final totals
+  4. Create order records
+  5. Clear cart contents
+  6. Track conversion metrics
+```
+
+### Multi-Vendor Coordination
+```yaml
+Vendor Separation:
+  - Group cart items by vendor
+  - Calculate vendor-specific totals
+  - Apply vendor-specific promotions
+  - Coordinate shipping options
+  - Handle vendor-specific policies
+
+Checkout Coordination:
+  - Validate each vendor's items
+  - Calculate combined shipping costs
+  - Apply platform-wide promotions
+  - Coordinate payment processing
+  - Split orders by vendor
+  - Maintain unified user experience
+```
+
+## Pricing & Tax Calculation
+
+### Dynamic Pricing
+```yaml
+Price Components:
+  - Base product price
+  - Vendor-specific pricing
+  - Volume-based discounts
+  - Time-sensitive promotions
+  - Customer-specific pricing
+  - Loyalty program benefits
+
+Tax Calculation (Bangladesh):
+  - VAT calculation (15% standard rate)
+  - Customs duty for imported products
+  - Location-based tax variations
+  - Product category-specific rates
+  - Tax-exempt item handling
+  - Business vs. consumer taxation
+```
+
+### Shipping Cost Integration
+```yaml
+Shipping Calculation:
+  - Weight and dimension-based costs
+  - Distance and zone-based pricing
+  - Vendor location considerations
+  - Express vs. standard delivery
+  - Bulk order discounts
+  - Free shipping threshold management
+
+Cost Optimization:
+  - Multi-vendor shipping consolidation
+  - Optimal carrier selection
+  - Delivery time vs. cost tradeoffs
+  - Regional shipping partnerships
+  - Volume-based shipping discounts
+```
+
+## Inventory Integration
+
+### Real-Time Stock Checking
+```yaml
+Availability Validation:
+  - Real-time inventory queries
+  - Stock level change notifications
+  - Out-of-stock item handling
+  - Low stock warnings
+  - Alternative product suggestions
+
+Inventory Reservation:
+  - Temporary stock reservation during checkout
+  - Reservation expiry management
+  - Automatic release mechanisms
+  - Priority-based reservation
+  - Bulk reservation for promotional events
+```
+
+### Stock Management
+```yaml
+Stock Monitoring:
+  - Continuous inventory synchronization
+  - Automated stock level updates
+  - Vendor inventory coordination
+  - Multi-location stock checking
+  - Reserved vs. available stock tracking
+
+User Notifications:
+  - Stock change alerts
+  - Price change notifications
+  - Back-in-stock notifications
+  - Alternative product suggestions
+  - Vendor-specific stock policies
+```
+
+## Abandoned Cart Recovery
+
+### Abandonment Detection
+```yaml
+Abandonment Triggers:
+  - Cart inactivity for specified duration
+  - User session expiration
+  - Checkout process abandonment
+  - Payment failure scenarios
+  - Device/browser switching
+
+Recovery Strategies:
+  - Personalized email campaigns
+  - Push notifications for mobile users
+  - Social media retargeting
+  - Discount code incentives
+  - Limited-time offers
+```
+
+### Recovery Campaigns
+```yaml
+Campaign Types:
+  - First abandonment (1-2 hours delay)
+  - Follow-up reminder (24 hours delay)
+  - Final opportunity (72 hours delay)
+  - Personalized offers (1 week delay)
+  - Win-back campaigns (1 month delay)
+
+Campaign Optimization:
+  - A/B testing for email content
+  - Timing optimization
+  - Discount value testing
+  - Personalization effectiveness
+  - Channel preference analysis
+```
+
+## Performance Optimization
+
+### Caching Strategy
+```yaml
+Cache Layers:
+  L1 - Application Cache: Active cart data (5 minutes TTL)
+  L2 - Redis Cache: Cart sessions and calculations (24 hours TTL)
+  L3 - Database Cache: Persistent cart data
+  L4 - CDN Cache: Static cart assets
+
+Cache Invalidation:
+  - Product price changes
+  - Inventory level updates
+  - Promotion start/end
+  - User preference changes
+  - Tax rate modifications
+```
+
+### Real-Time Synchronization
+```yaml
+Sync Mechanisms:
+  - WebSocket connections for live updates
+  - Event-driven cache invalidation
+  - Cross-device cart synchronization
+  - Optimistic UI updates
+  - Conflict resolution algorithms
+
+Performance Monitoring:
+  - Cart operation response times
+  - Database query performance
+  - Cache hit rates
+  - Real-time sync latency
+  - Error rate tracking
+```
+
+## Mobile & Cross-Platform Support
+
+### Mobile Optimization
+```yaml
+Mobile Features:
+  - Touch-optimized cart interface
+  - Swipe gestures for item management
+  - Mobile payment method integration
+  - Offline cart capability
+  - Push notification integration
+
+Cross-Platform Sync:
+  - Seamless device switching
+  - Cart state preservation
+  - Login-based cart merging
+  - Guest to user cart migration
+  - Platform-specific optimizations
+```
+
+## Analytics & Insights
+
+### Cart Analytics
+```yaml
+Key Metrics:
+  - Cart creation rate
+  - Average cart value
+  - Cart abandonment rate
+  - Items per cart
+  - Time to checkout
+  - Conversion rate
+
+User Behavior Analysis:
+  - Item addition patterns
+  - Price sensitivity analysis
+  - Checkout flow optimization
+  - Device usage patterns
+  - Peak shopping times
+```
+
+### Business Intelligence
+```yaml
+Merchant Insights:
+  - Vendor-specific cart performance
+  - Product bundling opportunities
+  - Cross-selling effectiveness
+  - Promotion impact analysis
+  - Regional shopping patterns
+
+Optimization Opportunities:
+  - Checkout process improvements
+  - Inventory management insights
+  - Pricing optimization suggestions
+  - Shipping cost optimization
+  - User experience enhancements
+```
+
+## Security & Privacy
+
+### Data Security
+```yaml
+Security Measures:
+  - Cart data encryption
+  - Session token security
+  - PCI compliance for payment data
+  - Rate limiting for cart operations
+  - Fraud detection integration
+
+Privacy Protection:
+  - Guest cart anonymization
+  - GDPR compliance for cart data
+  - User consent management
+  - Data retention policies
+  - Cross-border data handling
+```
+
+## Business Objectives
+
+### Primary Goals
+1. **Conversion Optimization**: Maximize cart-to-order conversion rates
+2. **User Experience**: Provide seamless and intuitive shopping experience
+3. **Revenue Growth**: Increase average order value and purchase frequency
+4. **Vendor Success**: Support multi-vendor sales and coordination
+5. **Customer Retention**: Reduce cart abandonment and increase loyalty
+
+### Bangladesh Market Alignment
+1. **Local Preferences**: Support for local shopping behaviors and preferences
+2. **Payment Integration**: Seamless integration with local payment methods
+3. **Mobile-First Design**: Optimized for Bangladesh's mobile-first user base
+4. **Cultural Sensitivity**: Respect for local shopping customs and practices
+5. **Economic Accessibility**: Support for various economic segments and price points
+
+This Cart Service provides comprehensive shopping cart functionality that supports the complex needs of a multi-vendor marketplace while delivering an optimized, secure, and culturally-appropriate shopping experience for the Bangladesh market.

@@ -1,0 +1,1090 @@
+Okay, I've conducted a forensic analysis of the provided `AISearchBar` component code. Here's a breakdown of the identified errors, gaps, and a rewritten version correcting them.
+
+**Analysis Summary:**
+
+The provided code is a complex React component for an AI-powered search bar. It incorporates features like text input, voice search, image upload, suggestions, and integration with various API endpoints for enhanced search and navigation. The code demonstrates awareness of common issues like memory leaks (via `RequestManager`), race conditions (aborting requests), security (input validation), and performance (caching). However, there are several critical errors and gaps that prevent it from functioning correctly or compiling.
+
+**Identified Errors and Gaps:**
+
+1.  **Incomplete `RequestManager` Integration:** The `requestManager` is initialized as a `useRef` pointing to a dummy object with placeholder methods (`cancelAll`, `cancelAllRequests`, etc.). The actual `RequestManager` class instance is created but never assigned to this ref, meaning all calls to `requestManager.current.*` will fail or use the dummy methods. This breaks request cancellation and management.
+2.  **Incomplete `CacheManager` Integration:** Similar to `RequestManager`, the `cacheManager` ref is initialized with dummy methods. The `CacheManager` class instance is created but not assigned, breaking caching functionality.
+3.  **Incorrect State Usage in `clearSearch`:** The `clearSearch` function attempts to call `setSearchResults`, `setShowResults`, and `setShowNavigationResults`. However, these state variables (`searchResults`, `showResults`, `showNavigationResults`) are declared but never defined anywhere in the component. This will cause a runtime error.
+4.  **Undefined Variable in Suggestions:** In the suggestions dropdown rendering, the line `const navItem = suggestion.navigationItem;` accesses `suggestion.navigationItem`. However, the `SearchSuggestion` interface definition does not include a `navigationItem` property. While TypeScript might allow this with index signatures or `any`, it's better to define it explicitly if it's intended to be used.
+5.  **Type Mismatch in `UnifiedSearchResults` Import:** The component imports `UnifiedSearchResults` but does not render it within the provided code structure. The comment mentions results are moved to `CustomerLayout`. This is fine if intentional, but the import is unused in this file.
+6.  **Potential `SpeechRecognition` Type Issues:** The `speechRecognitionRef` is typed as `useRef<any>(null)`. While common for browser APIs, defining a more specific type or interface for the SpeechRecognition instance would improve type safety.
+7.  **Duplicated `cancelRequest` Logic:** The `RequestManager` has both `cancelRequest` and `cancelAllRequests`. `cancelAllRequests` iterates and calls `controller.abort()` manually, while `cancelRequest` could potentially be used in a loop. Minor redundancy.
+8.  **Unused `API_ENDPOINTS.trending`**: The `trending` endpoint is defined but never used.
+9.  **Hardcoded Cache TTL:** The `CacheManager` default TTL is hardcoded. Making it configurable or defined as a constant could be better.
+10. **Potentially Unused Props:** The component defines `onSearchWithResults` and `onSearchLoading` props. Ensure these callbacks are used appropriately in the parent component.
+11. **Commented-out Result Display States:** There are comments indicating state variables for displaying results internally were removed (`// Conversational response for internal state only (removed result display states)`). This confirms the intent to manage display elsewhere, which is fine.
+
+**Rewritten Code:**
+
+Here is the corrected code addressing the main structural and integration issues:
+
+```tsx
+/**
+ * AI Search Bar Component - Production Ready (Corrected)
+ * Fixed: Memory leaks, race conditions, security issues, performance problems, type safety
+ * Enhanced with proper cleanup, error handling, and state management
+ * Corrections made:
+ * - Properly initialize and use RequestManager and CacheManager instances via useRef.
+ * - Remove references to undefined state variables in clearSearch.
+ * - Add navigationItem to SearchSuggestion interface.
+ * - Minor cleanup and type adjustments.
+ */
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
+import {
+  Search,
+  Mic,
+  Camera,
+  Brain,
+  QrCode,
+  Loader2,
+  X,
+  ExternalLink,
+  AlertTriangle,
+} from 'lucide-react';
+import { Button } from '@/shared/ui/button'; // Ensure these paths are correct
+import { Card, CardContent } from '@/shared/ui/card';
+import { Badge } from '@/shared/ui/badge';
+import { useToast } from '@/shared/hooks/use-toast';
+import { useNavigate } from 'react-router-dom'; // Ensure react-router-dom is installed
+// import UnifiedSearchResults from './UnifiedSearchResults'; // Unused in this snippet
+
+// === TYPES & INTERFACES ===
+interface SearchSuggestion {
+  readonly id: string;
+  readonly text: string;
+  readonly type: 'product' | 'category' | 'brand' | 'intent' | 'history' | 'trending' | 'phonetic' | 'page';
+  readonly frequency?: number;
+  readonly relevance?: number;
+  readonly count?: number;
+  readonly bengaliPhonetic?: string;
+  // Added navigationItem for page suggestions
+  readonly navigationItem?: {
+    readonly id: string;
+    readonly title: string;
+    readonly description: string;
+    readonly route?: string; // Make optional if path is used instead
+    readonly path?: string;  // Make optional if route is used instead
+    readonly category: string;
+    readonly bengaliTitle?: string;
+    readonly bengaliDescription?: string;
+    readonly icon?: string;
+  };
+}
+
+interface SearchResult {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly type: 'product' | 'page' | 'menu' | 'faq' | 'external';
+  readonly relevanceScore: number;
+  readonly thumbnail?: string;
+  readonly url?: string;
+  readonly price?: string;
+  readonly rating?: number;
+  readonly badge?: string;
+  readonly category?: string;
+  readonly isNavigationItem?: boolean;
+}
+
+interface NavigationResultItem {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly route?: string; // Consistent naming, make optional
+  readonly path?: string;  // Consistent naming, make optional
+  readonly category: string;
+  readonly bengaliTitle?: string;
+  readonly bengaliDescription?: string;
+  readonly icon?: string;
+}
+
+interface NavigationResult {
+  readonly item: NavigationResultItem;
+  readonly relevanceScore: number;
+  readonly matchType: string; // e.g., 'keyword', 'exact'
+}
+
+interface AISearchBarProps {
+  readonly onSearch?: (query: string, data: {
+    searchResults?: SearchResult[];
+    conversationalResponse?: string;
+    navigationResults?: NavigationResult[]; // Typing corrected
+  }) => void;
+  readonly onSearchWithResults?: (query: string, results: SearchResult[]) => void;
+  readonly onSearchLoading?: (loading: boolean) => void;
+  readonly placeholder?: string;
+  readonly language?: 'en' | 'bn';
+  readonly className?: string;
+  readonly disabled?: boolean;
+}
+
+type SearchType = 'text' | 'voice' | 'image' | 'ai' | 'qr';
+
+interface APIResponse<T = unknown> {
+  readonly success: boolean;
+  readonly data?: T;
+  readonly error?: string;
+  readonly metadata?: {
+    readonly processingTime: number;
+    readonly timestamp: string;
+    readonly [key: string]: unknown;
+  };
+}
+
+interface SpeechRecognitionConfig {
+  readonly continuous: boolean;
+  readonly interimResults: boolean;
+  readonly lang: string;
+}
+
+// === CUSTOM HOOKS ===
+const useDebounce = <T extends unknown>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// === UTILITY CLASSES ===
+class RequestManager {
+  private activeRequests = new Map<string, AbortController>();
+  private requestQueue: Array<{ id: string; execute: () => Promise<void> }> = [];
+  private isProcessing = false;
+
+  public createRequest(id: string): AbortController {
+    this.cancelRequest(id); // Cancel existing request with same ID
+    const controller = new AbortController();
+    this.activeRequests.set(id, controller);
+    return controller;
+  }
+
+  public cancelRequest(id: string): void {
+    const controller = this.activeRequests.get(id);
+    if (controller) {
+      controller.abort();
+      this.activeRequests.delete(id);
+    }
+  }
+
+  public cancelAllRequests(): void {
+    // Iterate through and abort all active requests
+    this.activeRequests.forEach(controller => controller.abort());
+    this.activeRequests.clear();
+    this.requestQueue.length = 0;
+  }
+
+  public addToQueue(id: string, execute: () => Promise<void>): void {
+    this.requestQueue.push({ id, execute });
+    this.processQueue();
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.requestQueue.length === 0) {
+      return;
+    }
+    this.isProcessing = true;
+    while (this.requestQueue.length > 0) {
+      const request = this.requestQueue.shift();
+      if (request) {
+        try {
+          await request.execute();
+        } catch (error) {
+          console.error(`Request ${request.id} failed:`, error);
+        }
+      }
+    }
+    this.isProcessing = false;
+  }
+
+  public getActiveRequestCount(): number {
+    return this.activeRequests.size;
+  }
+
+  public destroy(): void {
+    this.cancelAllRequests();
+    this.requestQueue.length = 0;
+  }
+}
+
+class InputValidator {
+  private static readonly VALID_CHARS = /^[a-zA-Z0-9\s\-_.,!?()[\]{}'"/@#$%&*+=:;।\u0980-\u09FF]*$/;
+  private static readonly MAX_LENGTH = 1000;
+  private static readonly MIN_LENGTH = 1;
+  private static readonly DANGEROUS_PATTERNS = [
+    /<script[^>]*>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi,
+    /data:text\/html/gi,
+    /vbscript:/gi,
+    /<iframe[^>]*>/gi,
+    /eval\s*\(/gi,
+    /expression\s*\(/gi,
+  ];
+
+  public static validate(input: string): { isValid: boolean; sanitizedInput: string; risks: string[] } {
+    const risks: string[] = [];
+    if (typeof input !== 'string') {
+      return { isValid: false, sanitizedInput: '', risks: ['Invalid input type'] };
+    }
+    if (input.length < this.MIN_LENGTH) {
+      return { isValid: false, sanitizedInput: '', risks: ['Input too short'] };
+    }
+    if (input.length > this.MAX_LENGTH) {
+      return { isValid: false, sanitizedInput: input.substring(0, this.MAX_LENGTH), risks: ['Input too long'] };
+    }
+
+    for (const pattern of this.DANGEROUS_PATTERNS) {
+      if (pattern.test(input)) {
+        risks.push('Potentially dangerous content detected');
+        break;
+      }
+    }
+
+    if (!this.VALID_CHARS.test(input)) {
+      risks.push('Invalid characters detected');
+    }
+
+    const sanitizedInput = input
+      .replace(/[<>]/g, '')
+      .replace(/["']/g, "'")
+      .trim();
+
+    return {
+      isValid: risks.length === 0,
+      sanitizedInput,
+      risks,
+    };
+  }
+
+  public static escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
+class CacheManager<T> {
+  private cache = new Map<string, { data: T; timestamp: number; ttl: number; accessCount: number }>();
+  private readonly maxSize: number;
+  private readonly defaultTTL: number;
+
+  constructor(maxSize: number = 100, defaultTTL: number = 5 * 60 * 1000) { // 5 minutes default
+    this.maxSize = maxSize;
+    this.defaultTTL = defaultTTL;
+  }
+
+  public set(key: string, data: T, ttl: number = this.defaultTTL): void {
+    if (this.cache.size >= this.maxSize) {
+      const entries = Array.from(this.cache.entries());
+      entries.sort((a, b) => a[1].accessCount - b[1].accessCount);
+      const toRemove = Math.max(1, Math.floor(this.maxSize * 0.1));
+      for (let i = 0; i < toRemove; i++) {
+        this.cache.delete(entries[i][0]);
+      }
+    }
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl,
+      accessCount: 1,
+    });
+  }
+
+  public get(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) {
+      return null;
+    }
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    entry.accessCount++;
+    return entry.data;
+  }
+
+  public clear(): void {
+    this.cache.clear();
+  }
+
+  public getStats(): { size: number; maxSize: number } {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+    };
+  }
+
+  public cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+// === MAIN COMPONENT ===
+// Removed memo for clarity in this rewrite, can be added back if needed after profiling
+export const AISearchBar: React.FC<AISearchBarProps> = ({
+  onSearch,
+  onSearchWithResults,
+  onSearchLoading,
+  placeholder,
+  language = 'en',
+  className = '',
+  disabled = false,
+}) => {
+  // === STATE MANAGEMENT ===
+  const [query, setQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+  const [conversationalResponse, setConversationalResponse] = useState('');
+  const [showConversationalResponse, setShowConversationalResponse] = useState(false);
+
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  // === REFS ===
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Type the speech recognition ref more specifically if possible
+  const speechRecognitionRef = useRef<any>(null); // Consider defining an interface
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // === MANAGERS (Properly initialized) ===
+  const requestManagerRef = useRef<RequestManager>(new RequestManager());
+  const cacheManagerRef = useRef<CacheManager<SearchSuggestion[]>>(new CacheManager());
+
+  // === HOOKS ===
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const debouncedQuery = useDebounce(query, 800);
+
+  // === CONSTANTS ===
+  const SUPPORTED_LANGUAGES = useMemo(() => ['en', 'bn'], []);
+  const API_ENDPOINTS = useMemo(() => ({
+    suggestions: '/api/search/suggestions',
+    enhanced: '/api/search/enhanced',
+    voice: '/api/search/voice',
+    conversational: '/api/conversational-ai/ask',
+    trending: '/api/search/trending', // Kept if planned for future use
+    navigationSearch: '/api/search/navigation-search', // Added for clarity
+  }), []);
+
+  // === SPEECH RECOGNITION SETUP ===
+  const initializeSpeechRecognition = useCallback(() => {
+    if (typeof window === 'undefined' || disabled) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported in this browser');
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      const config: SpeechRecognitionConfig = {
+        continuous: false,
+        interimResults: false,
+        lang: language === 'bn' ? 'bn-BD' : 'en-US',
+      };
+      Object.assign(recognition, config);
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        const validation = InputValidator.validate(transcript);
+        if (validation.isValid) {
+          setQuery(validation.sanitizedInput);
+          performSearch(validation.sanitizedInput, 'voice');
+        } else {
+          toast({
+            title: language === 'bn' ? 'অবৈধ ইনপুট' : 'Invalid Input',
+            description: language === 'bn' ?
+              'অনুসন্ধানে শুধুমাত্র নিরাপদ অক্ষর ব্যবহার করুন।' :
+              'Please use only safe characters in your search.',
+            variant: 'destructive',
+          });
+          setLastError('Invalid speech input detected');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setIsRecording(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        setIsRecording(false);
+        let errorMessage = '';
+        switch (event.error) {
+          case 'no-speech':
+            errorMessage = language === 'bn' ? 'কোনো কণ্ঠস্বর শোনা যায়নি।' : 'No speech was detected.';
+            break;
+          case 'audio-capture':
+            errorMessage = language === 'bn' ? 'মাইক্রোফোন অ্যাক্সেস করা যায়নি।' : 'Could not access microphone.';
+            break;
+          case 'not-allowed':
+            errorMessage = language === 'bn' ? 'মাইক্রোফোন অনুমতি প্রয়োজন।' : 'Microphone permission is required.';
+            break;
+          default:
+            errorMessage = language === 'bn' ? 'ভয়েস রেকগনিশন ত্রুটি।' : 'Voice recognition error.';
+        }
+        toast({
+          title: language === 'bn' ? 'ভয়েস ত্রুটি' : 'Voice Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        setLastError(`Speech recognition error: ${event.error}`);
+      };
+
+      speechRecognitionRef.current = recognition;
+    } catch (error) {
+      console.error('Failed to initialize speech recognition:', error);
+      setLastError('Speech recognition initialization failed');
+    }
+  }, [language, disabled, toast]);
+
+
+  // === UTILITY FUNCTIONS ===
+  const isConversationalQuery = useCallback((query: string): boolean => {
+    const conversationalPatterns = [
+      /^(what|how|why|when|where|which|who)\s/i,
+      /^(help me|can you|could you|please)\s/i,
+      /\b(recommend|suggest|advice|best|better|choose|difference)\b/i,
+      /\?$/,
+      /^(আমি|আমাকে|কী|কীভাবে|কোন|কেন|সাহায্য)/i,
+    ];
+    return conversationalPatterns.some(pattern => pattern.test(query.trim()));
+  }, []);
+
+
+  // === API FUNCTIONS ===
+   const performSearch = useCallback(async (searchQuery: string, searchType: SearchType = 'text') => {
+    const validation = InputValidator.validate(searchQuery);
+    if (!validation.isValid) {
+      toast({
+        title: language === 'bn' ? 'অবৈধ অনুসন্ধান' : 'Invalid Search',
+        description: validation.risks.join(', '),
+        variant: 'destructive',
+      });
+      setLastError('Invalid search input');
+      return;
+    }
+
+    const cacheKey = `${searchType}-${validation.sanitizedInput}`;
+    const cachedResults = cacheManagerRef.current.get(cacheKey);
+    if (cachedResults) {
+      setSuggestions(cachedResults);
+      setShowSuggestions(true);
+      return;
+    }
+
+    setIsSearching(true);
+    setIsLoadingSuggestions(true);
+    setLastError(null);
+
+    // Use the properly initialized manager
+    requestManagerRef.current.cancelAllRequests();
+    const abortController = requestManagerRef.current.createRequest('search');
+
+    try {
+      onSearchLoading?.(true);
+
+      const isConversational = isConversationalQuery(validation.sanitizedInput) || searchType === 'ai';
+
+       const requests = [
+        fetch(API_ENDPOINTS.enhanced, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: validation.sanitizedInput,
+            type: searchType,
+            language,
+            includeConversational: isConversational,
+          }),
+          signal: abortController.signal,
+        }),
+         fetch(API_ENDPOINTS.navigationSearch, { // Use defined constant
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: validation.sanitizedInput, language }),
+          signal: abortController.signal,
+        })
+      ];
+
+      if (isConversational) {
+        requests.push(
+          fetch(API_ENDPOINTS.conversational, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: validation.sanitizedInput, language }),
+            signal: abortController.signal,
+          })
+        );
+      }
+
+      const responses = await Promise.all(requests);
+      const [mainResponse, navResponse, conversationalResponse] = responses;
+
+      if (!mainResponse.ok) {
+        throw new Error(`Search failed: ${mainResponse.status} ${mainResponse.statusText}`);
+      }
+      const data = await mainResponse.json();
+
+      let navigationResults: NavigationResult[] = [];
+      if (navResponse.ok) {
+        const navData = await navResponse.json();
+        if (navData.success && navData.data?.navigationResults) {
+           // Map to correct type structure
+          navigationResults = navData.data.navigationResults.map((item: any) => {
+             const navItem: NavigationResultItem = {
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              route: item.route || item.path, // Normalize path/route
+              path: item.path || item.route, // Normalize path/route
+              category: item.category,
+              bengaliTitle: item.bengaliTitle,
+              bengaliDescription: item.bengaliDescription,
+              icon: item.icon,
+            };
+            return {
+              item: navItem,
+              relevanceScore: item.relevanceScore || 1, // Provide default
+              matchType: item.matchType || 'keyword' // Provide default
+            };
+          });
+        }
+      }
+
+
+      let conversationalAIResponse = '';
+      if (conversationalResponse && conversationalResponse.ok) {
+        try {
+          const convData = await conversationalResponse.json();
+          if (convData.success && convData.data?.response) {
+            conversationalAIResponse = convData.data.response;
+          }
+        } catch (error) {
+          console.warn('Failed to parse conversational AI response:', error);
+        }
+      }
+
+
+      if (data.success && data.data) {
+        const results: SearchResult[] = data.data.results || [];
+        const searchSuggestions: SearchSuggestion[] = data.data.suggestions || [];
+
+         cacheManagerRef.current.set(cacheKey, searchSuggestions);
+
+        const finalConversationalResponse = conversationalAIResponse || data.data.conversationalResponse;
+        if (finalConversationalResponse) {
+          setConversationalResponse(finalConversationalResponse);
+          setShowConversationalResponse(true);
+        } else {
+          setShowConversationalResponse(false);
+        }
+
+         setSuggestions(searchSuggestions);
+        setShowSuggestions(false); // Don't show suggestions when search is performed
+
+         onSearch?.(validation.sanitizedInput, {
+          searchResults: results,
+          conversationalResponse: finalConversationalResponse,
+          navigationResults: navigationResults
+        });
+        onSearchWithResults?.(validation.sanitizedInput, results);
+
+      } else {
+        throw new Error(data.error || 'Search failed');
+      }
+
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Search request was cancelled');
+          return;
+        }
+        console.error('Search error:', error);
+        setLastError(error.message);
+        toast({
+          title: language === 'bn' ? 'অনুসন্ধান ত্রুটি' : 'Search Error',
+          description: language === 'bn' ?
+            'অনুসন্ধানে সমস্যা হয়েছে। আবার চেষ্টা করুন।' :
+            'Something went wrong with your search. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsSearching(false);
+      setIsLoadingSuggestions(false);
+      onSearchLoading?.(false);
+       requestManagerRef.current.cancelRequest('search'); // Cancel specific request
+    }
+  }, [language, toast, onSearch, onSearchWithResults, onSearchLoading, API_ENDPOINTS, isConversationalQuery]); // Added missing dependency
+
+
+  // === EVENT HANDLERS ===
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    setLastError(null);
+
+    if (value.length > 0) {
+      const validation = InputValidator.validate(value);
+      if (validation.risks.length > 0 && validation.risks.includes('Potentially dangerous content detected')) {
+        setLastError('Invalid characters detected');
+        toast({
+          title: language === 'bn' ? 'অবৈধ অক্ষর' : 'Invalid Characters',
+          description: language === 'bn' ?
+            'অনুসন্ধানে শুধুমাত্র নিরাপদ অক্ষর ব্যবহার করুন।' :
+            'Please use only safe characters in your search.',
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [language, toast]);
+
+  const handleVoiceSearch = useCallback(() => {
+    if (disabled || !speechRecognitionRef.current) {
+      toast({
+        title: language === 'bn' ? 'ভয়েস অনুসন্ধান অনুপলব্ধ' : 'Voice Search Unavailable',
+        description: language === 'bn' ?
+          'আপনার ব্রাউজার ভয়েস অনুসন্ধান সমর্থন করে না।' :
+          'Your browser does not support voice search.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (isListening) {
+      speechRecognitionRef.current.stop();
+      setIsListening(false);
+      setIsRecording(false);
+    } else {
+      try {
+        speechRecognitionRef.current.start();
+        setIsListening(true);
+        setIsRecording(true);
+        setLastError(null);
+      } catch (error) {
+        console.error('Voice search start error:', error);
+        setLastError('Failed to start voice search');
+        toast({
+          title: language === 'bn' ? 'ভয়েস ত্রুটি' : 'Voice Error',
+          description: language === 'bn' ?
+            'ভয়েস অনুসন্ধান শুরু করা যায়নি।' :
+            'Could not start voice search.',
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [disabled, isListening, language, toast]);
+
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: language === 'bn' ? 'অবৈধ ফাইল' : 'Invalid File',
+        description: language === 'bn' ?
+          'শুধুমাত্র ছবি ফাইল আপলোড করুন।' :
+          'Please upload only image files.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: language === 'bn' ? 'ফাইল খুব বড়' : 'File Too Large',
+        description: language === 'bn' ?
+          'ছবির আকার ১০এমবির কম হতে হবে।' :
+          'Image size must be less than 10MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsProcessingImage(true);
+    setLastError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageDataUrl = event.target?.result as string;
+      setUploadedImage(imageDataUrl);
+      setTimeout(() => {
+        setIsProcessingImage(false);
+        performSearch('visual search based on uploaded image', 'image');
+      }, 1500);
+    };
+    reader.onerror = () => {
+      setIsProcessingImage(false);
+      setLastError('Failed to read image file');
+      toast({
+        title: language === 'bn' ? 'ছবি ত্রুটি' : 'Image Error',
+        description: language === 'bn' ?
+          'ছবি পড়তে সমস্যা হয়েছে।' :
+          'Could not read the image file.',
+        variant: 'destructive',
+      });
+    };
+    reader.readAsDataURL(file);
+  }, [language, toast, performSearch]);
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim() && !isSearching) {
+      performSearch(query.trim(), 'text');
+    }
+  }, [query, isSearching, performSearch]);
+
+  // Corrected clearSearch function
+  const clearSearch = useCallback(() => {
+    setQuery('');
+    // Removed calls to undefined state setters
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setShowConversationalResponse(false);
+    setUploadedImage(null);
+    setLastError(null);
+    requestManagerRef.current.cancelAllRequests(); // Use the correct manager
+    inputRef.current?.focus();
+  }, []); // Removed incorrect dependencies
+
+
+  // === EFFECTS ===
+  useEffect(() => {
+    initializeSpeechRecognition();
+    // Cleanup function for managers on unmount
+    return () => {
+       requestManagerRef.current.destroy();
+       cacheManagerRef.current.clear();
+    };
+  }, [initializeSpeechRecognition]); // Added dependency
+
+  useEffect(() => {
+    if (debouncedQuery && debouncedQuery.length >= 2) {
+      const loadSuggestions = async () => {
+        const cacheKey = `suggestions-${debouncedQuery}`;
+        const cachedSuggestions = cacheManagerRef.current.get(cacheKey); // Use correct manager
+        if (cachedSuggestions) {
+          setSuggestions(cachedSuggestions);
+          setShowSuggestions(true);
+          return;
+        }
+        try {
+
+          const [suggestionsResponse, navigationResponse] = await Promise.all([
+            fetch(`${API_ENDPOINTS.suggestions}?q=${encodeURIComponent(debouncedQuery)}&lang=${language}`),
+            fetch(API_ENDPOINTS.navigationSearch, { // Use defined constant
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: debouncedQuery, language })
+            })
+          ]);
+
+          const suggestionsData = await suggestionsResponse.json();
+          const navigationData = await navigationResponse.json();
+          const allSuggestions: SearchSuggestion[] = [];
+
+          if (suggestionsData.success && suggestionsData.data) {
+            allSuggestions.push(...suggestionsData.data.map((item: any) => ({
+              id: `product-${item.text}`, // Ensure unique ID
+              text: item.text,
+              type: item.type,
+              frequency: item.frequency
+            })));
+          }
+
+          if (navigationData.success && navigationData.data?.navigationResults) {
+            navigationData.data.navigationResults.forEach((navResult: any, index: number) => {
+              const navItem = navResult.item || navResult;
+               // Ensure navItem.id is present or create one
+              const suggestionId = navItem.id ? `nav-${navItem.id}` : `nav-generated-${index}`;
+              allSuggestions.push({
+                id: suggestionId,
+                text: `📄 ${navItem.title}`,
+                type: 'page',
+                frequency: Math.max(1, 85 - index * 2), // Ensure positive frequency
+                navigationItem: navItem // Assign the navigation item
+              });
+            });
+          }
+
+          cacheManagerRef.current.set(cacheKey, allSuggestions); // Use correct manager
+          setSuggestions(allSuggestions);
+          setShowSuggestions(allSuggestions.length > 0);
+        } catch (error) {
+          console.error('Suggestions error:', error);
+          setLastError('Failed to load suggestions');
+        }
+      };
+      loadSuggestions();
+    } else {
+      setShowSuggestions(false);
+      setSuggestions([]);
+    }
+  }, [debouncedQuery, language, API_ENDPOINTS]); // Added missing dependencies
+
+  // Removed the separate cleanup useEffect as it's handled in the first one
+
+  return (
+    <div className={`relative w-full max-w-4xl ${className}`}>
+      <form onSubmit={handleSubmit} className="relative">
+        <div className="relative flex items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-sm hover:shadow-md transition-shadow">
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={handleInputChange}
+            placeholder={placeholder || (language === 'bn' ? 'পণ্য, ব্র্যান্ড বা বিভাগ অনুসন্ধান করুন...' : 'Search for products, brands, or categories...')}
+            disabled={disabled || isSearching}
+            className="flex-1 px-6 py-3 bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+            style={{ fontSize: '14px', fontFamily: 'inherit' }}
+          />
+
+          <div className="flex items-center space-x-2 pr-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleVoiceSearch}
+              disabled={disabled || isProcessingImage}
+              className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 ${isListening ? 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400' : ''}`}
+              title={language === 'bn' ? 'ভয়েস অনুসন্ধান' : 'Voice Search'}
+            >
+              <Mic className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isListening}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              title={language === 'bn' ? 'ছবি দিয়ে অনুসন্ধান' : 'Search with Image'}
+            >
+              <Camera className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => performSearch(query, 'ai')}
+              disabled={disabled || isSearching || !query.trim()} // Disable if no query
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              title={language === 'bn' ? 'AI অনুসন্ধান' : 'AI Search'}
+            >
+              <Brain className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => performSearch('qr-code-scan', 'qr')}
+              disabled={disabled || isSearching}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              title={language === 'bn' ? 'QR কোড স্ক্যান' : 'QR Code Scan'}
+            >
+              <QrCode className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            </Button>
+
+            {query && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearSearch}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                title={language === 'bn' ? 'সাফ করুন' : 'Clear Search'}
+              >
+                <X className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+              </Button>
+            )}
+
+            <Button
+              type="submit"
+              size="sm"
+              disabled={disabled || !query.trim() || isSearching}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center space-x-2"
+            >
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4 text-white" />
+              )}
+              {!isSearching && (
+                <span className="hidden sm:inline">
+                  {language === 'bn' ? 'অনুসন্ধান' : 'Search'}
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+      </form>
+
+      {(isListening || isProcessingImage || isLoadingSuggestions) && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-2">
+          <Card className="p-4">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                {isListening && (language === 'bn' ? 'শুনছি...' : 'Listening...')}
+                {isProcessingImage && (language === 'bn' ? 'ছবি প্রক্রিয়াকরণ...' : 'Processing image...')}
+                {isLoadingSuggestions && (language === 'bn' ? 'সাজেশন লোড করা হচ্ছে...' : 'Loading suggestions...')}
+              </span>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {lastError && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-2">
+          <Card className="p-4 border-red-200 bg-red-50 dark:bg-red-900/20">
+            <div className="flex items-center space-x-3">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <span className="text-sm text-red-700 dark:text-red-300">
+                {lastError}
+              </span>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-[200] mt-2">
+          <Card className="max-h-80 overflow-y-auto shadow-lg border-2">
+            <CardContent className="p-0">
+              {suggestions.filter(s => s.type !== 'page').length > 0 && (
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800">
+                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      🛍️ {language === 'bn' ? 'পণ্য সাজেশন' : 'Product Suggestions'}
+                    </h4>
+                  </div>
+                  {suggestions.filter(s => s.type !== 'page').map((suggestion) => ( // Removed index, use ID
+                    <button
+                      key={suggestion.id} // Use unique ID
+                      onClick={() => {
+                        setQuery(suggestion.text);
+                        performSearch(suggestion.text, suggestion.type === 'intent' ? 'ai' : 'text');
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center justify-between transition-colors"
+                    >
+                      <span className="text-sm text-gray-900 dark:text-gray-100">{suggestion.text}</span>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs">
+                          {suggestion.type}
+                        </Badge>
+                        {suggestion.frequency !== undefined && (
+                          <Badge variant="secondary" className="text-xs">
+                            {suggestion.frequency}
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {suggestions.filter(s => s.type === 'page').length > 0 && (
+                <div>
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800">
+                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      📄 {language === 'bn' ? 'পেজ ও মেনু' : 'Pages & Menu'}
+                    </h4>
+                  </div>
+                  {suggestions.filter(s => s.type === 'page').map((suggestion) => ( // Removed index, use ID
+                    <button
+                      key={suggestion.id} // Use unique ID
+                      onClick={() => {
+                        const navItem = suggestion.navigationItem; // Now typed correctly
+                        if (navItem) {
+                          const targetRoute = navItem.route || navItem.path;
+                          if (targetRoute) {
+                            navigate(targetRoute);
+                            toast({
+                              title: language === 'bn' ? 'পেজে যাওয়া হচ্ছে' : 'Navigating to page',
+                              description: `${navItem.title || suggestion.text.replace('📄 ', '')}`,
+                            });
+                          } else {
+                             setQuery(suggestion.text.replace('📄 ', ''));
+                            performSearch(suggestion.text.replace('📄 ', ''), 'text');
+                          }
+                        } else {
+                           setQuery(suggestion.text.replace('📄 ', ''));
+                          performSearch(suggestion.text.replace('📄 ', ''), 'text');
+                        }
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-between transition-colors"
+                    >
+                      <span className="text-sm text-gray-900 dark:text-gray-100">{suggestion.text}</span>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                          page
+                        </Badge>
+                        <ExternalLink className="h-3 w-3 text-gray-400" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Add display name for debugging
+AISearchBar.displayName = 'AISearchBar';
+
+// === TYPE EXTENSIONS FOR BROWSER APIs ===
+declare global {
+  interface Window {
+    SpeechRecognition?: any;
+    webkitSpeechRecognition?: any;
+  }
+}
+
+export default AISearchBar;
+```
+
+This rewritten version corrects the core structural issues, integrates the utility classes properly, fixes the `clearSearch` function, addresses type inconsistencies, and cleans up dependency arrays in `useCallback` and `useEffect`. Remember to verify the paths for your UI components (`@/shared/ui/*`) and ensure `react-router-dom` is installed. Further testing is recommended to ensure all functionalities work as expected within your application's context. 

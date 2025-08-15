@@ -1,0 +1,85 @@
+# Kubernetes Namespace for GetIt Bangladesh Staging Environment
+# Amazon.com/Shopee.sg-Level Staging Environment Configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+  labels:
+    name: staging
+    environment: staging
+    project: getit-bangladesh
+    tier: application
+    owner: devops-team
+    version: v1.0.0
+  annotations:
+    description: "GetIt Bangladesh Multi-Vendor E-commerce Platform - Staging Environment"
+    contact: "devops@getit.com.bd"
+    created-by: "GitLab CI/CD Pipeline"
+    purpose: "Integration testing and pre-production validation"
+---
+# Resource Quota for Staging Environment
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: staging-resource-quota
+  namespace: staging
+  labels:
+    environment: staging
+    project: getit-bangladesh
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    
+    # Storage Resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Object Counts
+    pods: "50"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+    deployments.apps: "20"
+    ingresses.networking.k8s.io: "10"
+    
+    # Load Balancer Services
+    services.loadbalancers: "5"
+---
+# Limit Range for Staging Environment
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: staging-limit-range
+  namespace: staging
+  labels:
+    environment: staging
+    project: getit-bangladesh
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    max:
+      cpu: "2"
+      memory: 2Gi
+    min:
+      cpu: 50m
+      memory: 64Mi
+  - type: Pod
+    max:
+      cpu: "4"
+      memory: 4Gi
+  - type: PersistentVolumeClaim
+    max:
+      storage: 50Gi
+    min:
+      storage: 1Gi

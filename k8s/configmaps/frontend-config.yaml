@@ -1,0 +1,253 @@
+# Frontend ConfigMap for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Frontend Configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+    config-type: application
+data:
+  # API Configuration
+  api-url: "https://api.getit.com.bd"
+  websocket-url: "wss://api.getit.com.bd"
+  cdn-url: "https://cdn.getit.com.bd"
+  
+  # Feature Flags
+  enable-social-login: "true"
+  enable-mobile-payments: "true"
+  enable-voice-search: "true"
+  enable-ar-features: "false"
+  enable-live-chat: "true"
+  enable-notifications: "true"
+  enable-analytics: "true"
+  
+  # Regional Settings
+  default-language: "en"
+  supported-languages: "en,bn"
+  default-currency: "BDT"
+  supported-currencies: "BDT,USD"
+  timezone: "Asia/Dhaka"
+  country-code: "BD"
+  
+  # Performance Settings
+  enable-lazy-loading: "true"
+  enable-service-worker: "true"
+  enable-offline-mode: "true"
+  cache-strategy: "stale-while-revalidate"
+  image-optimization: "true"
+  enable-compression: "true"
+  
+  # Security Settings
+  enable-csp: "true"
+  enable-hsts: "true"
+  enable-xss-protection: "true"
+  enable-frame-options: "true"
+  enable-content-type-options: "true"
+  
+  # Bangladesh Specific Settings
+  enable-bangla-keyboard: "true"
+  enable-prayer-times: "true"
+  enable-festival-banners: "true"
+  enable-mobile-banking: "true"
+  supported-mobile-wallets: "bkash,nagad,rocket"
+  
+  # Social Commerce Settings
+  enable-group-buying: "true"
+  enable-social-sharing: "true"
+  enable-influencer-features: "true"
+  enable-live-streaming: "true"
+  
+  # PWA Settings
+  app-name: "GetIt Bangladesh"
+  app-short-name: "GetIt"
+  app-description: "Bangladesh's Leading Multi-Vendor E-commerce Platform"
+  theme-color: "#6366f1"
+  background-color: "#ffffff"
+  start-url: "/"
+  display: "standalone"
+  orientation: "portrait"
+  
+  # Monitoring and Analytics
+  enable-error-reporting: "true"
+  enable-performance-monitoring: "true"
+  log-level: "info"
+  
+  # Third-party Integrations
+  google-maps-enabled: "true"
+  facebook-pixel-enabled: "true"
+  google-analytics-enabled: "true"
+  hotjar-enabled: "false"
+  intercom-enabled: "true"
+---
+# Nginx Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+    config-type: nginx
+data:
+  default.conf: |
+    # GetIt Bangladesh Frontend Nginx Configuration
+    # Optimized for Amazon.com/Shopee.sg-Level Performance
+    
+    upstream backend {
+        server backend-service:3000;
+        keepalive 32;
+    }
+    
+    # Rate Limiting
+    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+    limit_req_zone $binary_remote_addr zone=api:10m rate=100r/m;
+    limit_req_zone $binary_remote_addr zone=static:10m rate=200r/m;
+    
+    # GeoIP Configuration for Bangladesh
+    geoip_country /etc/nginx/geoip/GeoIP.dat;
+    map $geoip_country_code $allowed_country {
+        default yes;
+        CN no;
+        RU no;
+    }
+    
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        
+        # Security Headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        
+        # Content Security Policy
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google-analytics.com https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.getit.com.bd wss://api.getit.com.bd; frame-src https://www.youtube.com https://www.facebook.com;" always;
+        
+        # Gzip Compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Brotli Compression
+        brotli on;
+        brotli_comp_level 6;
+        brotli_types
+            text/plain
+            text/css
+            application/json
+            application/javascript
+            text/xml
+            application/xml
+            application/xml+rss
+            text/javascript;
+        
+        # Static Assets Caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header X-Content-Type-Options nosniff;
+            limit_req zone=static burst=50 nodelay;
+        }
+        
+        # API Proxy
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+        
+        # Login Rate Limiting
+        location /login {
+            limit_req zone=login burst=5 nodelay;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # Health Check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Metrics Endpoint
+        location /metrics {
+            access_log off;
+            stub_status on;
+            allow 10.0.0.0/8;
+            allow 172.16.0.0/12;
+            allow 192.168.0.0/16;
+            deny all;
+        }
+        
+        # Main Application
+        location / {
+            try_files $uri $uri/ /index.html;
+            
+            # Country Blocking
+            if ($allowed_country = no) {
+                return 403;
+            }
+            
+            # Bangladesh Optimization
+            if ($geoip_country_code = BD) {
+                add_header X-Country-Optimized "Bangladesh" always;
+            }
+        }
+        
+        # Favicon
+        location = /favicon.ico {
+            log_not_found off;
+            access_log off;
+        }
+        
+        # Robots.txt
+        location = /robots.txt {
+            allow all;
+            log_not_found off;
+            access_log off;
+        }
+        
+        # Service Worker
+        location = /sw.js {
+            add_header Cache-Control "no-cache";
+            proxy_cache_bypass $http_pragma;
+            proxy_cache_revalidate on;
+        }
+        
+        # Web App Manifest
+        location = /manifest.json {
+            add_header Cache-Control "public, max-age=86400";
+        }
+    }

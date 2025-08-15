@@ -1,0 +1,400 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: getit-production
+  labels:
+    app: redis
+    component: cache-database
+    platform: getit-bangladesh
+    tier: infrastructure
+  annotations:
+    description: "Redis Cluster for Caching and Session Management - GetIt Bangladesh"
+    contact: "database-team@getit.com.bd"
+spec:
+  serviceName: redis-cluster-headless
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cache-database
+        platform: getit-bangladesh
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: redis
+        image: redis:7.2.3-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        - containerPort: 16379
+          name: cluster-bus
+          protocol: TCP
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cache-secrets
+              key: redis-password
+        - name: REDIS_CLUSTER_ANNOUNCE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: REDIS_CLUSTER_ANNOUNCE_PORT
+          value: "6379"
+        - name: REDIS_CLUSTER_ANNOUNCE_BUS_PORT
+          value: "16379"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Redis cluster configuration
+          redis-server \
+            --cluster-enabled yes \
+            --cluster-config-file /data/nodes.conf \
+            --cluster-node-timeout 5000 \
+            --cluster-announce-ip $REDIS_CLUSTER_ANNOUNCE_IP \
+            --cluster-announce-port $REDIS_CLUSTER_ANNOUNCE_PORT \
+            --cluster-announce-bus-port $REDIS_CLUSTER_ANNOUNCE_BUS_PORT \
+            --appendonly yes \
+            --appendfsync everysec \
+            --save 300 10 \
+            --save 60 1000 \
+            --save 10 10000 \
+            --maxmemory 2gb \
+            --maxmemory-policy allkeys-lru \
+            --maxclients 20000 \
+            --tcp-keepalive 300 \
+            --timeout 300 \
+            --requirepass $REDIS_PASSWORD \
+            --masterauth $REDIS_PASSWORD \
+            --protected-mode no \
+            --bind 0.0.0.0 \
+            --port 6379 \
+            --dir /data \
+            --logfile /var/log/redis/redis.log \
+            --loglevel notice
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-logs
+          mountPath: /var/log/redis
+        - name: redis-config
+          mountPath: /usr/local/etc/redis/redis.conf
+          subPath: redis.conf
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          exec:
+            command:
+            - redis-cli
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.55.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9121
+          name: metrics
+          protocol: TCP
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cache-secrets
+              key: redis-password
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9121
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9121
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+      - name: redis-logs
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+      labels:
+        app: redis
+        component: cache-database
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: cache-storage
+      resources:
+        requests:
+          storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: getit-production
+  labels:
+    app: redis
+    component: cache-database
+    platform: getit-bangladesh
+  annotations:
+    description: "Redis Cluster Service for GetIt Bangladesh"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9121"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  - port: 9121
+    targetPort: 9121
+    protocol: TCP
+    name: metrics
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster-headless
+  namespace: getit-production
+  labels:
+    app: redis
+    component: cache-database
+    platform: getit-bangladesh
+  annotations:
+    description: "Redis Cluster Headless Service for StatefulSet"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  - port: 16379
+    targetPort: 16379
+    protocol: TCP
+    name: cluster-bus
+  selector:
+    app: redis
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+  namespace: getit-production
+  labels:
+    app: redis
+    component: cluster-init
+    platform: getit-bangladesh
+  annotations:
+    description: "Redis Cluster Initialization Job"
+spec:
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cluster-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: redis-cluster-init
+        image: redis:7.2.3-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for all Redis nodes to be ready
+          echo "Waiting for Redis nodes to be ready..."
+          sleep 30
+          
+          # Create Redis cluster
+          redis-cli --cluster create \
+            redis-cluster-0.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            redis-cluster-1.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            redis-cluster-2.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            redis-cluster-3.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            redis-cluster-4.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            redis-cluster-5.redis-cluster-headless.getit-production.svc.cluster.local:6379 \
+            --cluster-replicas 1 \
+            --cluster-yes \
+            -a $REDIS_PASSWORD
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cache-secrets
+              key: redis-password
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: getit-production
+  labels:
+    app: redis
+    component: cache-database
+    platform: getit-bangladesh
+data:
+  redis.conf: |
+    # Redis Configuration for GetIt Bangladesh Production Cluster
+    
+    # Network
+    bind 0.0.0.0
+    port 6379
+    tcp-keepalive 300
+    timeout 300
+    tcp-backlog 511
+    
+    # General
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile /var/log/redis/redis.log
+    syslog-enabled no
+    databases 16
+    
+    # Cluster
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 5000
+    cluster-announce-port 6379
+    cluster-announce-bus-port 16379
+    cluster-require-full-coverage yes
+    
+    # Persistence
+    save 300 10
+    save 60 1000
+    save 10 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+    
+    # AOF
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+    aof-use-rdb-preamble yes
+    
+    # Memory Management
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # Lazy Freeing
+    lazyfree-lazy-eviction no
+    lazyfree-lazy-expire no
+    lazyfree-lazy-server-del no
+    replica-lazy-flush no
+    
+    # Threaded I/O
+    io-threads 4
+    io-threads-do-reads yes
+    
+    # Security
+    protected-mode no
+    
+    # Clients
+    maxclients 20000
+    
+    # Slow Log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+    
+    # Latency Monitor
+    latency-monitor-threshold 100
+    
+    # Notifications
+    notify-keyspace-events Ex
+    
+    # Hash
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    
+    # List
+    list-max-ziplist-size -2
+    list-compress-depth 0
+    
+    # Set
+    set-max-intset-entries 512
+    
+    # Sorted Set
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    
+    # HyperLogLog
+    hll-sparse-max-bytes 3000
+    
+    # Streams
+    stream-node-max-bytes 4096
+    stream-node-max-entries 100

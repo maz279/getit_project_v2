@@ -1,0 +1,45 @@
+
+export const designerSareeProducts = [
+  {
+    id: 'designer-saree-1',
+    name: 'Contemporary Designer Saree - Modern Art',
+    nameBn: 'সমসাময়িক ডিজাইনার শাড়ি - আধুনিক শিল্প',
+    price: 8500,
+    originalPrice: 12000,
+    rating: 4.7,
+    reviews: 267,
+    vendor: 'Designer Collections BD',
+    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&h=400&fit=crop',
+    discount: 29,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 145,
+    category: 'Designer Saree',
+    stock: { status: 'in_stock', quantity: 22 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: false, priceHistory: true, emi: true }
+  },
+  {
+    id: 'designer-saree-2',
+    name: 'Luxury Designer Saree - Exclusive Print',
+    nameBn: 'বিলাসবহুল ডিজাইনার শাড়ি - এক্সক্লুসিভ প্রিন্ট',
+    price: 11500,
+    originalPrice: 15000,
+    rating: 4.8,
+    reviews: 189,
+    vendor: 'Luxury Designs',
+    image: 'https://images.unsplash.com/photo-1594736797933-d0e501ba2fe6?w=400&h=400&fit=crop',
+    discount: 23,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 98,
+    category: 'Designer Saree',
+    stock: { status: 'limited', quantity: 12 },
+    delivery: { estimatedDays: 1, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  }
+];

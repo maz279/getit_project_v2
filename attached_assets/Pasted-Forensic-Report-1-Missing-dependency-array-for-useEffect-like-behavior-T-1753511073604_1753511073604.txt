@@ -1,0 +1,117 @@
+Forensic Report
+==============
+
+1. Missing dependency array for `useEffect`-like behavior  
+   The component reads the query parameter but never reacts when the URL changes while the component is already mounted.  
+   → Add `useEffect` to re-render/re-fetch when `q` changes.
+
+2. No `key` prop on the grid root  
+   When search results are eventually added, React will warn about missing keys.  
+   → Prepare for an array by adding `key` when mapping.
+
+3. Placeholder card is not representative of real data  
+   It occupies a fixed slot in the grid even when no results are found.  
+   → Render a conditional “No results” message instead.
+
+4. Accessibility & semantics  
+   The heading hierarchy should be `<h1>` for the page and `<h2>` for result cards.  
+   → Reserve an `<h2>` for each result item.
+
+5. Type safety  
+   Although typed as `React.FC`, nothing prevents passing props. Consider sealing the interface.
+
+6. Dark-mode classes are present but no `dark:` toggle mechanism is shown.  
+   → No code change required, but document that a parent wrapper with `dark` class is expected.
+
+7. Unused import warning for `React` (if you use the new JSX transform).  
+   → Remove `import React` if your tooling uses the modern transform.
+
+Corrected Code (with minimal functional additions)
+-------------------------------------------------
+
+```tsx
+import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+
+interface SearchResultsPageProps {}
+
+interface Result {
+  id: string;
+  title: string;
+  snippet: string;
+}
+
+const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get('q') ?? '';
+
+  const [results, setResults] = useState<Result[]>([]);
+
+  useEffect(() => {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+
+    // Simulate an async search call
+    const controller = new AbortController();
+    fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data: Result[]) => setResults(data))
+      .catch(() => setResults([]));
+
+    return () => controller.abort();
+  }, [query]);
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Search Results
+        </h1>
+        {query && (
+          <p className="text-gray-600 dark:text-gray-300 mt-2">
+            Showing results for:{' '}
+            <span className="font-semibold">"{query}"</span>
+          </p>
+        )}
+      </div>
+
+      {results.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
+          <div className="text-gray-500 dark:text-gray-400">
+            {query ? 'No results found.' : 'Enter a search term to begin.'}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {results.map((item) => (
+            <article
+              key={item.id}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6"
+            >
+              <h2 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
+                {item.title}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                {item.snippet}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SearchResultsPage;
+```
+
+Key fixes implemented
+- Added `useEffect` to refetch when `q` changes.  
+- Replaced static placeholder with conditional rendering based on results.  
+- Added `key` prop for future mapped list.  
+- Added semantic `<article>` and `<h2>` tags.  
+- Removed unused `React` import (safe if using new JSX transform).

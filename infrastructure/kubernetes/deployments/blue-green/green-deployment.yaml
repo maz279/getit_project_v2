@@ -1,0 +1,239 @@
+# Green Environment Deployment Configuration
+# Amazon.com/Shopee.sg-Level Blue-Green Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: getit-backend-green
+  namespace: getit-production
+  labels:
+    app: getit-backend
+    version: green
+    deployment-strategy: blue-green
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: getit-backend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: getit-backend
+        version: green
+        deployment-strategy: blue-green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/api/v1/metrics"
+    spec:
+      serviceAccountName: getit-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: getit-backend
+        image: ${PREVIOUS_IMAGE_TAG} # Previous stable version
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: ENTERPRISE_MODE
+          value: "true"
+        - name: DEPLOYMENT_VERSION
+          value: "green"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: getit-database-secret
+              key: url
+        - name: REDIS_CLUSTER_NODES
+          valueFrom:
+            configMapKeyRef:
+              name: getit-redis-config
+              key: cluster-nodes
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: getit-elasticsearch-config
+              key: url
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: getit-app-secret
+              key: session-secret
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: getit-app-secret
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health/ready
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+        volumeMounts:
+        - name: app-config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: app-config
+        configMap:
+          name: getit-app-config
+      - name: tmp
+        emptyDir: {}
+      nodeSelector:
+        node-type: application
+      tolerations:
+      - key: "application-only"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - getit-backend
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-backend-green
+  namespace: getit-production
+  labels:
+    app: getit-backend
+    version: green
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: getit-backend
+    version: green
+---
+# Main service that switches between blue and green
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-backend-main
+  namespace: getit-production
+  labels:
+    app: getit-backend
+    service-type: main
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: getit-backend
+    version: green # Initially points to green
+---
+# Horizontal Pod Autoscaler for Green Environment
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-backend-green-hpa
+  namespace: getit-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-backend-green
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: getit-backend-green-pdb
+  namespace: getit-production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: getit-backend
+      version: green

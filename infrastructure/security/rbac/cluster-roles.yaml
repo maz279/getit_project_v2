@@ -1,0 +1,111 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: getit-platform-admin
+  labels:
+    component: security
+    tier: admin
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["security.istio.io"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: getit-platform-developer
+  labels:
+    component: security
+    tier: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods/log", "pods/status"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: getit-payment-service-role
+  labels:
+    component: security
+    tier: service
+    service: payment
+    bangladesh: enabled
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+  resourceNames: ["bangladesh-payment-secret", "auth-secret"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: getit-platform-admin
+  namespace: getit-development
+  labels:
+    component: security
+    tier: admin
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: getit-payment-service
+  namespace: getit-development
+  labels:
+    component: security
+    tier: service
+    service: payment
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: getit-platform-admin-binding
+  labels:
+    component: security
+    tier: admin
+subjects:
+- kind: ServiceAccount
+  name: getit-platform-admin
+  namespace: getit-development
+roleRef:
+  kind: ClusterRole
+  name: getit-platform-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: getit-payment-service-binding
+  labels:
+    component: security
+    tier: service
+    service: payment
+subjects:
+- kind: ServiceAccount
+  name: getit-payment-service
+  namespace: getit-development
+roleRef:
+  kind: ClusterRole
+  name: getit-payment-service-role
+  apiGroup: rbac.authorization.k8s.io

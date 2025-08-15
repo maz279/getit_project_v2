@@ -1,0 +1,153 @@
+# GetIt API Gateway Kubernetes Deployment
+# High-availability deployment with Bangladesh optimizations
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: getit-api-gateway
+  namespace: getit-production
+  labels:
+    app: getit-api-gateway
+    component: api-gateway
+    environment: production
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: getit-api-gateway
+  template:
+    metadata:
+      labels:
+        app: getit-api-gateway
+        component: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: api-gateway
+        image: registry.getit.com.bd/getit-api-gateway:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8443
+          name: https
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: API_GATEWAY_PORT
+          value: "8080"
+        - name: SERVICE_DISCOVERY_ENABLED
+          value: "true"
+        - name: BANGLADESH_OPTIMIZATIONS
+          value: "true"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: JWT_SECRET
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: DATABASE_URL
+        - name: REDIS_HOST
+          value: "redis-master"
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - getit-api-gateway
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-api-gateway-service
+  namespace: getit-production
+  labels:
+    app: getit-api-gateway
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 8443
+    targetPort: 8443
+    protocol: TCP
+    name: https
+  selector:
+    app: getit-api-gateway
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-api-gateway-hpa
+  namespace: getit-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-api-gateway
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

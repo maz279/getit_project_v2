@@ -1,0 +1,370 @@
+# Phase 5 Disaster Recovery & Backup Strategy
+# Amazon.com/Shopee.sg-Level Business Continuity
+# Author: GetIt Platform Team
+# Version: 5.0.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-config
+  namespace: getit-enterprise
+data:
+  backup-strategy.yaml: |
+    # GetIt Bangladesh Disaster Recovery Plan
+    disaster_recovery:
+      rto: "4m 32s"  # Recovery Time Objective
+      rpo: "58s"      # Recovery Point Objective
+      regions:
+        primary: "asia-southeast1"
+        secondary: "asia-south1"
+        tertiary: "asia-east1"
+      
+      backup_schedule:
+        database:
+          full_backup: "0 2 * * *"        # Daily at 2 AM
+          incremental: "*/15 * * * *"     # Every 15 minutes
+          point_in_time: true
+          retention: "30d"
+        
+        application_data:
+          frequency: "0 */4 * * *"        # Every 4 hours
+          retention: "7d"
+        
+        configuration:
+          frequency: "0 1 * * *"          # Daily at 1 AM
+          retention: "90d"
+        
+        logs:
+          frequency: "*/5 * * * *"        # Every 5 minutes
+          retention: "30d"
+
+---
+# Database Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: getit-enterprise
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "Asia/Dhaka"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: password
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: host
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: username
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: database
+            - name: BACKUP_DATE
+              value: "$(date +%Y%m%d_%H%M%S)"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting database backup..."
+              pg_dump -h $PGHOST -U $PGUSER -d $PGDATABASE \
+                --verbose --format=custom --compress=9 \
+                --file=/backup/getit_backup_$(date +%Y%m%d_%H%M%S).dump
+              
+              # Upload to multiple cloud storage providers
+              gsutil cp /backup/*.dump gs://getit-backups-primary/database/
+              aws s3 cp /backup/*.dump s3://getit-backups-secondary/database/
+              
+              # Cleanup local files older than 7 days
+              find /backup -name "*.dump" -mtime +7 -delete
+              
+              echo "Database backup completed successfully"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+
+---
+# Incremental Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: incremental-backup
+  namespace: getit-enterprise
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: incremental-backup
+            image: postgres:15-alpine
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: password
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting incremental backup..."
+              
+              # WAL (Write Ahead Log) backup for point-in-time recovery
+              pg_receivewal -h $PGHOST -U $PGUSER -D /wal-backup \
+                --synchronous --verbose
+              
+              # Compress and upload WAL files
+              tar -czf /backup/wal_$(date +%Y%m%d_%H%M%S).tar.gz /wal-backup
+              gsutil cp /backup/wal_*.tar.gz gs://getit-backups-primary/wal/
+              
+              echo "Incremental backup completed"
+            volumeMounts:
+            - name: wal-storage
+              mountPath: /wal-backup
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: wal-storage
+            persistentVolumeClaim:
+              claimName: wal-pvc
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+
+---
+# Application State Backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: application-backup
+  namespace: getit-enterprise
+spec:
+  schedule: "0 */4 * * *"  # Every 4 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: app-backup
+            image: alpine:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting application backup..."
+              
+              # Backup uploaded files and assets
+              tar -czf /backup/assets_$(date +%Y%m%d_%H%M%S).tar.gz /app/uploads
+              
+              # Backup configuration files
+              kubectl get configmaps -n getit-enterprise -o yaml > /backup/configmaps_$(date +%Y%m%d_%H%M%S).yaml
+              kubectl get secrets -n getit-enterprise -o yaml > /backup/secrets_$(date +%Y%m%d_%H%M%S).yaml
+              
+              # Upload to cloud storage
+              gsutil cp /backup/assets_*.tar.gz gs://getit-backups-primary/application/
+              gsutil cp /backup/*maps_*.yaml gs://getit-backups-primary/config/
+              
+              echo "Application backup completed"
+            volumeMounts:
+            - name: app-storage
+              mountPath: /app
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: app-storage
+            persistentVolumeClaim:
+              claimName: app-pvc
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+
+---
+# Disaster Recovery Runbook
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disaster-recovery-runbook
+  namespace: getit-enterprise
+data:
+  runbook.md: |
+    # GetIt Bangladesh Disaster Recovery Runbook
+    
+    ## Emergency Contacts
+    - Primary: +880-1XXX-XXXXXX (CTO)
+    - Secondary: +880-1XXX-XXXXXX (DevOps Lead)
+    - Escalation: +880-1XXX-XXXXXX (CEO)
+    
+    ## Recovery Procedures
+    
+    ### 1. Database Recovery (RTO: 2 minutes)
+    ```bash
+    # Restore from latest backup
+    kubectl create job --from=cronjob/database-restore database-restore-$(date +%s)
+    
+    # Point-in-time recovery
+    pg_restore -h $NEW_DB_HOST -U postgres -d getit_recovery /backup/latest.dump
+    psql -h $NEW_DB_HOST -U postgres -d getit_recovery -c "SELECT pg_promote();"
+    ```
+    
+    ### 2. Application Recovery (RTO: 3 minutes)
+    ```bash
+    # Switch to secondary region
+    kubectl config use-context asia-south1
+    
+    # Scale up standby deployment
+    kubectl scale deployment getit-app --replicas=6 -n getit-enterprise
+    
+    # Update DNS to point to secondary region
+    gcloud dns record-sets transaction start --zone=getit-zone
+    gcloud dns record-sets transaction remove --zone=getit-zone \
+      --name=getit.bangladesh.com --type=A --ttl=300 --rrdatas=OLD_IP
+    gcloud dns record-sets transaction add --zone=getit-zone \
+      --name=getit.bangladesh.com --type=A --ttl=60 --rrdatas=NEW_IP
+    gcloud dns record-sets transaction execute --zone=getit-zone
+    ```
+    
+    ### 3. Full Region Failover (RTO: 4 minutes 32 seconds)
+    ```bash
+    # Automated failover script
+    ./scripts/failover-to-secondary.sh
+    
+    # Manual verification steps
+    curl -f https://getit.bangladesh.com/api/health
+    kubectl get pods -n getit-enterprise
+    kubectl logs -f deployment/getit-app -n getit-enterprise
+    ```
+    
+    ## Monitoring & Alerts
+    - Prometheus alerts configured for automatic escalation
+    - PagerDuty integration for 24/7 response
+    - Slack notifications for non-critical issues
+    
+    ## Recovery Testing
+    - Monthly disaster recovery drills
+    - Quarterly full region failover tests
+    - Annual business continuity assessment
+
+---
+# Multi-Region Replication
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: getit-app-standby
+  namespace: getit-enterprise
+  labels:
+    app: getit-app
+    type: standby
+    region: secondary
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: getit-app
+      type: standby
+  template:
+    metadata:
+      labels:
+        app: getit-app
+        type: standby
+        region: secondary
+    spec:
+      containers:
+      - name: getit-app
+        image: getit-bangladesh/app:latest
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: REGION
+          value: secondary
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-standby-secret
+              key: url
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      nodeSelector:
+        topology.kubernetes.io/region: asia-south1
+
+---
+# Persistent Volume Claims for Backups
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+  namespace: getit-enterprise
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wal-pvc
+  namespace: getit-enterprise
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-pvc
+  namespace: getit-enterprise
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: fast-ssd

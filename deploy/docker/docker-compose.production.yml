@@ -1,0 +1,339 @@
+# GetIt Bangladesh Production Infrastructure
+# Complete microservices deployment with Bangladesh optimization
+
+version: '3.8'
+
+networks:
+  getit-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  getit-backend:
+    driver: bridge
+    internal: true
+
+  getit-monitoring:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  # ======================
+  # API GATEWAY
+  # ======================
+  api-gateway:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.api-gateway
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      - NODE_ENV=production
+      - API_GATEWAY_PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis-master
+      - CONSUL_HOST=consul
+      - DATABASE_URL=${DATABASE_URL}
+      - SERVICE_DISCOVERY_ENABLED=true
+      - RATE_LIMIT_ENABLED=true
+      - BANGLADESH_OPTIMIZATIONS=true
+    networks:
+      - getit-network
+      - getit-backend
+    depends_on:
+      - consul
+      - redis-master
+      - postgres-master
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # ======================
+  # MICROSERVICES
+  # ======================
+  user-service:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.microservice
+    environment:
+      - NODE_ENV=production
+      - SERVICE_NAME=user-service
+      - SERVICE_PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_HOST=redis-master
+      - JWT_SECRET=${JWT_SECRET}
+      - BANGLADESH_KYC_ENABLED=true
+    networks:
+      - getit-backend
+    depends_on:
+      - postgres-master
+      - redis-master
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  payment-service:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.microservice
+    environment:
+      - NODE_ENV=production
+      - SERVICE_NAME=payment-service
+      - SERVICE_PORT=3004
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_HOST=redis-master
+      - BKASH_USERNAME=${BKASH_USERNAME}
+      - BKASH_PASSWORD=${BKASH_PASSWORD}
+      - BKASH_APP_KEY=${BKASH_APP_KEY}
+      - BKASH_APP_SECRET=${BKASH_APP_SECRET}
+      - NAGAD_MERCHANT_ID=${NAGAD_MERCHANT_ID}
+      - NAGAD_MERCHANT_PRIVATE_KEY=${NAGAD_MERCHANT_PRIVATE_KEY}
+      - ROCKET_MERCHANT_ID=${ROCKET_MERCHANT_ID}
+      - ROCKET_MERCHANT_SECRET=${ROCKET_MERCHANT_SECRET}
+      - SSLCOMMERZ_STORE_ID=${SSLCOMMERZ_STORE_ID}
+      - SSLCOMMERZ_STORE_PASSWORD=${SSLCOMMERZ_STORE_PASSWORD}
+      - BANGLADESH_CURRENCY=BDT
+    networks:
+      - getit-backend
+    depends_on:
+      - postgres-master
+      - redis-master
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+
+  shipping-service:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.microservice
+    environment:
+      - NODE_ENV=production
+      - SERVICE_NAME=shipping-service
+      - SERVICE_PORT=3008
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_HOST=redis-master
+      - PATHAO_CLIENT_ID=${PATHAO_CLIENT_ID}
+      - PATHAO_CLIENT_SECRET=${PATHAO_CLIENT_SECRET}
+      - PAPERFLY_USERNAME=${PAPERFLY_USERNAME}
+      - PAPERFLY_PASSWORD=${PAPERFLY_PASSWORD}
+      - REDX_CLIENT_ID=${REDX_CLIENT_ID}
+      - REDX_CLIENT_SECRET=${REDX_CLIENT_SECRET}
+      - ECOURIER_API_KEY=${ECOURIER_API_KEY}
+      - ECOURIER_USER_ID=${ECOURIER_USER_ID}
+      - SUNDARBAN_API_KEY=${SUNDARBAN_API_KEY}
+      - BANGLADESH_DIVISIONS=8
+      - COURIER_INTEGRATION_COUNT=5
+    networks:
+      - getit-backend
+    depends_on:
+      - postgres-master
+      - redis-master
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  # ======================
+  # DATABASES
+  # ======================
+  postgres-master:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-getit_production}
+      - POSTGRES_USER=${POSTGRES_USER:-getit_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../config/databases/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf
+    networks:
+      - getit-backend
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-getit_admin} -d ${POSTGRES_DB:-getit_production}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+  redis-master:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 2gb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - getit-backend
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  # ======================
+  # MONITORING STACK
+  # ======================
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ../../config/monitoring-observability/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    networks:
+      - getit-monitoring
+      - getit-backend
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-worldmap-panel
+      - GF_FEATURE_TOGGLES_ENABLE=ngalert
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../config/monitoring-observability/grafana:/etc/grafana/provisioning
+    networks:
+      - getit-monitoring
+      - getit-network
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # ======================
+  # NGINX LOAD BALANCER
+  # ======================
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ../../config/nginx/production.conf:/etc/nginx/nginx.conf
+      - ../../config/nginx/ssl:/etc/nginx/ssl
+    networks:
+      - getit-network
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  # ======================
+  # FRONTEND APPLICATION
+  # ======================
+  frontend:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.frontend
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=https://api.getit.com.bd
+      - VITE_BANGLADESH_LOCALE=bn-BD
+    networks:
+      - getit-network
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G

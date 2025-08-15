@@ -1,0 +1,59 @@
+# GetIt API Gateway Production Container
+# Multi-stage build for optimized production deployment
+
+# Stage 1: Build stage
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Production stage
+FROM node:18-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and install production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nextjs:nodejs /app/config ./config
+
+# Copy additional required files
+COPY --chown=nextjs:nodejs server ./server
+COPY --chown=nextjs:nodejs shared ./shared
+
+# Install additional production dependencies
+RUN npm install --production --silent
+
+# Create directories for logs and temp files
+RUN mkdir -p /app/logs /app/temp && chown nextjs:nodejs /app/logs /app/temp
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# Start the application
+CMD ["node", "dist/server/index.js"]

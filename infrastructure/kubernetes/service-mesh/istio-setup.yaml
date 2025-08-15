@@ -1,0 +1,344 @@
+# Istio Service Mesh Configuration for GetIt Enterprise
+# Amazon.com/Shopee.sg-Level Service Mesh Implementation
+---
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: getit-control-plane
+  namespace: istio-system
+spec:
+  revision: 1-20-0
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        env:
+          PILOT_TRACE_SAMPLING: 1.0
+          PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: true
+    
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: true
+        k8s:
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          service:
+            type: LoadBalancer
+            ports:
+              - port: 15021
+                targetPort: 15021
+                name: status-port
+              - port: 80
+                targetPort: 8080
+                name: http2
+              - port: 443
+                targetPort: 8443
+                name: https
+              - port: 31400
+                targetPort: 31400
+                name: tcp
+    
+    egressGateways:
+      - name: istio-egressgateway
+        enabled: true
+        k8s:
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
+
+  meshConfig:
+    defaultConfig:
+      proxyStatsMatcher:
+        inclusionRegexps:
+          - ".*circuit_breakers.*"
+          - ".*upstream_rq_retry.*"
+          - ".*upstream_rq_pending.*"
+          - ".*_cx_.*"
+      gatewayTopology:
+        numTrustedProxies: 2
+    extensionProviders:
+      - name: otel
+        envoyOtelAls:
+          service: opentelemetry-collector.istio-system.svc.cluster.local
+          port: 4317
+    accessLogFile: /dev/stdout
+    defaultProviders:
+      metrics:
+        - prometheus
+      tracing:
+        - otel
+      accessLogging:
+        - otel
+
+  values:
+    global:
+      meshID: getit-mesh
+      network: getit-network
+      proxy:
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+    pilot:
+      traceSampling: 1.0
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
+---
+# Istio Gateway for GetIt Bangladesh
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: getit-gateway
+  namespace: getit-production
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - getit.com.bd
+        - "*.getit.com.bd"
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: getit-tls-secret
+      hosts:
+        - getit.com.bd
+        - "*.getit.com.bd"
+---
+# Virtual Service for Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: getit-virtualservice
+  namespace: getit-production
+spec:
+  hosts:
+    - getit.com.bd
+    - "*.getit.com.bd"
+  gateways:
+    - getit-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/api/v1/user"
+      route:
+        - destination:
+            host: user-service.getit-production.svc.cluster.local
+            port:
+              number: 8080
+      fault:
+        delay:
+          percentage:
+            value: 0.1
+          fixedDelay: 5s
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+    
+    - match:
+        - uri:
+            prefix: "/api/v1/product"
+      route:
+        - destination:
+            host: product-service.getit-production.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+    
+    - match:
+        - uri:
+            prefix: "/api/v1/order"
+      route:
+        - destination:
+            host: order-service.getit-production.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 60s
+      retries:
+        attempts: 5
+        perTryTimeout: 15s
+    
+    - match:
+        - uri:
+            prefix: "/api/v1/payment"
+      route:
+        - destination:
+            host: payment-service.getit-production.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+    
+    - match:
+        - uri:
+            prefix: "/api/v1/"
+      route:
+        - destination:
+            host: api-gateway.getit-production.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 30s
+    
+    - match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: frontend-web.getit-production.svc.cluster.local
+            port:
+              number: 80
+---
+# Destination Rules for Traffic Policies
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: getit-destination-rules
+  namespace: getit-production
+spec:
+  host: "*.getit-production.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: v2
+      labels:
+        version: v2
+    - name: canary
+      labels:
+        version: canary
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 50
+---
+# Service Entry for External Dependencies
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: getit-external-services
+  namespace: getit-production
+spec:
+  hosts:
+    - api.bkash.com
+    - api.nagad.com
+    - api.rocket.com.bd
+    - api.ssl.com.bd
+    - maps.googleapis.com
+    - api.twilio.com
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+# Sidecar Configuration for Optimized Networking
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: default
+  namespace: getit-production
+spec:
+  workloadSelector:
+    labels:
+      app: getit
+  egress:
+    - hosts:
+        - "./*"
+        - "istio-system/*"
+        - "getit-monitoring/*"
+  ingress:
+    - port:
+        number: 8080
+        protocol: HTTP
+        name: http
+      defaultEndpoint: 127.0.0.1:8080
+---
+# EnvoyFilter for Custom Headers
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: getit-headers
+  namespace: getit-production
+spec:
+  workloadSelector:
+    labels:
+      app: getit
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.wasm
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+            config:
+              configuration:
+                "@type": type.googleapis.com/google.protobuf.StringValue
+                value: |
+                  {
+                    "headers": {
+                      "X-Powered-By": "GetIt Bangladesh",
+                      "X-Service-Mesh": "Istio",
+                      "X-Response-Time": "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+                    }
+                  }

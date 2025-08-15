@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-07-15T19:57:50.248Z",
+  "analysis": {
+    "components": {
+      "missingCount": 0,
+      "existingCount": 18,
+      "total": 18
+    },
+    "brokenImports": 16,
+    "services": {
+      "serviceGaps": 0,
+      "existingServices": 14,
+      "total": 14
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "title": "Fix Broken Imports",
+      "description": "16 broken imports need fixing",
+      "imports": [
+        "client/src/domains/customer/pages/orders/BulkOrders.tsx -> @/shared/components/layouts/Header/Header",
+        "client/src/domains/customer/pages/orders/BulkOrders.tsx -> @/shared/components/layouts/Footer/Footer",
+        "client/src/domains/customer/pages/orders/BulkOrders.tsx -> @/shared/hooks/useSEO",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/card",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/button",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/input",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/badge",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/tabs",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/select",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/avatar",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/progress",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/scroll-area",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/ui/separator",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/layouts/Header/Header",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/components/layouts/Footer/Footer",
+        "client/src/domains/vendor/pages/Dashboard.tsx -> @/shared/hooks/useSEO"
+      ]
+    }
+  ]
+}

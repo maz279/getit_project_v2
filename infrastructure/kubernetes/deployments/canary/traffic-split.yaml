@@ -1,0 +1,183 @@
+# Istio Traffic Split Configuration for Canary Deployment
+# Amazon.com/Shopee.sg-Level Progressive Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: getit-backend-canary-vs
+  namespace: getit-production
+spec:
+  hosts:
+  - getit-backend-main
+  - getit.com.bd
+  - "*.getit.com.bd"
+  gateways:
+  - getit-gateway
+  - mesh
+  http:
+  - match:
+    - headers:
+        canary:
+          exact: "true"
+    route:
+    - destination:
+        host: getit-backend-canary
+        port:
+          number: 80
+      weight: 100
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+  - match:
+    - uri:
+        prefix: "/api/v1/"
+    route:
+    - destination:
+        host: getit-backend-stable
+        port:
+          number: 80
+      weight: 90  # 90% stable traffic
+    - destination:
+        host: getit-backend-canary
+        port:
+          number: 80
+      weight: 10  # 10% canary traffic
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+---
+# Destination Rules for Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: getit-backend-canary-dr
+  namespace: getit-production
+spec:
+  host: getit-backend-main
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+  - name: canary
+    labels:
+      version: canary
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 20  # Limited connections for canary
+      circuitBreaker:
+        consecutiveGatewayErrors: 3  # More sensitive for canary
+        interval: 15s
+        baseEjectionTime: 15s
+        maxEjectionPercent: 30
+---
+# Service Entry for External Monitoring
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: canary-monitoring-external
+  namespace: getit-production
+spec:
+  hosts:
+  - prometheus.monitoring.svc.cluster.local
+  - grafana.monitoring.svc.cluster.local
+  ports:
+  - number: 9090
+    name: prometheus
+    protocol: HTTP
+  - number: 3000
+    name: grafana
+    protocol: HTTP
+  location: MESH_EXTERNAL
+  resolution: DNS
+---
+# Envoy Filter for Canary Header Injection
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: canary-header-injection
+  namespace: getit-production
+spec:
+  workloadSelector:
+    labels:
+      app: getit-backend
+      version: canary
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.wasm
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+          config:
+            configuration:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: |
+                {
+                  "headers": {
+                    "X-Canary-Version": "true",
+                    "X-Deployment-Time": "$START_TIME",
+                    "X-Canary-Traffic": "10%"
+                  }
+                }
+---
+# Authorization Policy for Canary Testing
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: canary-access-control
+  namespace: getit-production
+spec:
+  selector:
+    matchLabels:
+      app: getit-backend
+      version: canary
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/getit-production/sa/getit-service-account"]
+    - source:
+        namespaces: ["getit-monitoring"]
+  - to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "PATCH"]
+    when:
+    - key: request.headers[x-canary-test]
+      values: ["true"]
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/api/v1/health*", "/api/v1/metrics"]

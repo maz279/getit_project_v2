@@ -1,0 +1,58 @@
+# GetIt Microservices Production Container
+# Optimized container for individual microservices
+
+# Stage 1: Build stage
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Production stage
+FROM node:18-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S getit
+RUN adduser -S microservice -u 1001 -G getit
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+WORKDIR /app
+
+# Copy package.json and install production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application
+COPY --from=builder --chown=microservice:getit /app/dist ./dist
+COPY --from=builder --chown=microservice:getit /app/server ./server
+COPY --from=builder --chown=microservice:getit /app/shared ./shared
+COPY --from=builder --chown=microservice:getit /app/config ./config
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/temp && chown microservice:getit /app/logs /app/temp
+
+# Switch to non-root user
+USER microservice
+
+# Expose port (will be overridden by environment variable)
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:${SERVICE_PORT:-3000}/health || exit 1
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the specific microservice
+CMD ["node", "dist/server/microservices/index.js"]

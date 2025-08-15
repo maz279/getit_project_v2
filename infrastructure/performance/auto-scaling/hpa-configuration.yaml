@@ -1,0 +1,300 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: getit-production
+  labels:
+    component: performance
+    tier: auto-scaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service-hpa
+  namespace: getit-production
+  labels:
+    component: performance
+    tier: auto-scaling
+    service: payment
+    bangladesh: enabled
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-service
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Object
+    object:
+      metric:
+        name: payment_queue_length
+      target:
+        type: Value
+        value: "10"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 200
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 5
+        periodSeconds: 60
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scaling-policies
+  namespace: getit-production
+  labels:
+    component: performance
+    tier: auto-scaling
+data:
+  scaling-config.json: |
+    {
+      "services": {
+        "api-gateway": {
+          "minReplicas": 3,
+          "maxReplicas": 50,
+          "targetCPU": 70,
+          "targetMemory": 80,
+          "scaleUpPolicy": {
+            "stabilizationWindow": 60,
+            "maxIncrease": "100%"
+          },
+          "scaleDownPolicy": {
+            "stabilizationWindow": 300,
+            "maxDecrease": "10%"
+          }
+        },
+        "payment-service": {
+          "minReplicas": 2,
+          "maxReplicas": 20,
+          "targetCPU": 60,
+          "targetMemory": 75,
+          "customMetrics": ["payment_queue_length"],
+          "bangladesh": {
+            "enabled": true,
+            "peakHours": ["10:00-14:00", "18:00-22:00"],
+            "scalingFactor": 1.5
+          }
+        },
+        "product-service": {
+          "minReplicas": 2,
+          "maxReplicas": 15,
+          "targetCPU": 65,
+          "targetMemory": 70,
+          "customMetrics": ["search_requests_per_second"]
+        },
+        "order-service": {
+          "minReplicas": 2,
+          "maxReplicas": 25,
+          "targetCPU": 70,
+          "targetMemory": 80,
+          "customMetrics": ["order_processing_time"]
+        },
+        "shipping-service": {
+          "minReplicas": 1,
+          "maxReplicas": 10,
+          "targetCPU": 60,
+          "targetMemory": 70,
+          "bangladesh": {
+            "enabled": true,
+            "courierPartners": ["pathao", "paperfly", "sundarban"]
+          }
+        }
+      },
+      "alerting": {
+        "scaleUpThreshold": 80,
+        "scaleDownThreshold": 20,
+        "notificationChannels": ["slack", "email", "webhook"]
+      },
+      "monitoring": {
+        "metricsInterval": 30,
+        "evaluationPeriods": 3,
+        "alertCooldown": 300
+      }
+    }
+
+  cluster-autoscaler.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cluster-autoscaler
+      namespace: kube-system
+      labels:
+        app: cluster-autoscaler
+        component: performance
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cluster-autoscaler
+      template:
+        metadata:
+          labels:
+            app: cluster-autoscaler
+        spec:
+          serviceAccountName: cluster-autoscaler
+          containers:
+          - image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.21.0
+            name: cluster-autoscaler
+            resources:
+              limits:
+                cpu: 100m
+                memory: 300Mi
+              requests:
+                cpu: 100m
+                memory: 300Mi
+            command:
+            - ./cluster-autoscaler
+            - --v=4
+            - --stderrthreshold=info
+            - --cloud-provider=aws
+            - --skip-nodes-with-local-storage=false
+            - --expander=least-waste
+            - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/getit-cluster
+            - --balance-similar-node-groups
+            - --skip-nodes-with-system-pods=false
+            env:
+            - name: AWS_REGION
+              value: ap-southeast-1
+            volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              readOnly: true
+          volumes:
+          - name: ssl-certs
+            hostPath:
+              path: "/etc/ssl/certs/ca-certificates.crt"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vertical-scaling-config
+  namespace: getit-production
+  labels:
+    component: performance
+    tier: auto-scaling
+data:
+  vpa-config.yaml: |
+    apiVersion: autoscaling.k8s.io/v1
+    kind: VerticalPodAutoscaler
+    metadata:
+      name: payment-service-vpa
+      namespace: getit-production
+    spec:
+      targetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: payment-service
+      updatePolicy:
+        updateMode: "Auto"
+      resourcePolicy:
+        containerPolicies:
+        - containerName: payment-service
+          minAllowed:
+            cpu: 100m
+            memory: 128Mi
+          maxAllowed:
+            cpu: 2
+            memory: 4Gi
+          controlledResources: ["cpu", "memory"]
+          controlledValues: RequestsAndLimits
+
+  predictive-scaling.json: |
+    {
+      "predictiveScaling": {
+        "enabled": true,
+        "algorithm": "machine-learning",
+        "models": {
+          "traffic": {
+            "type": "seasonal-arima",
+            "lookback": "7d",
+            "prediction": "2h"
+          },
+          "resource": {
+            "type": "linear-regression",
+            "features": ["cpu", "memory", "requests"]
+          }
+        },
+        "bangladesh": {
+          "patterns": {
+            "eid": "200% increase",
+            "pohela_boishakh": "150% increase",
+            "black_friday": "300% increase",
+            "flash_sales": "250% increase"
+          },
+          "timezones": ["Asia/Dhaka"],
+          "businessHours": "09:00-23:00"
+        },
+        "triggers": {
+          "scale_ahead": "15m",
+          "confidence_threshold": 0.8,
+          "max_preemptive_scale": "50%"
+        }
+      }
+    }

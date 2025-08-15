@@ -1,0 +1,70 @@
+client/src/shared/components/ai-search/AISearchBar.tsx (1091 lines)
+Main AI-powered search bar with voice, image, AI, and QR code search
+Features: Real-time suggestions, Bengali support, performance tracking
+Status: ✅ Production ready with comprehensive functionality
+Supporting Frontend Files
+client/src/shared/components/ai-search/types/search.types.ts
+TypeScript interfaces for search functionality
+client/src/shared/components/ai-search/hooks/useSearchCleanup.ts
+Custom hook for memory management and cleanup
+client/src/shared/components/ai-search/utils/searchSecurity.ts
+Security utilities for input validation and sanitization
+Integration Files
+client/src/shared/layouts/components/Header/Header.tsx
+Header component integrating the AISearchBar across all pages
+🚀 Backend API Routes & Controllers
+Core Search Routes
+server/routes-minimal.ts
+Primary search endpoints: /api/search/*
+server/routes/enhancedRoutes.ts
+Enhanced search capabilities with AI/ML processing
+server/routes/enhanced-search.ts
+Advanced search with cultural intelligence and personalization
+server/routes/enhanced-search-production.ts
+Production-ready enhanced search with caching and performance optimization
+Specialized Search Services
+server/routes/phase2-visual-search.ts
+Visual/image search capabilities
+server/routes/phase2-visual-search-production.ts
+Production visual search with micro-rewards system
+🤖 AI & ML Services
+Search Optimization
+server/microservices/ml-service/src/controllers/SearchOptimizationController.ts
+ML-powered search optimization and ranking algorithms
+server/microservices/search-service/SearchService.ts
+Comprehensive search service with AI capabilities
+server/services/ai/EnhancedDeepSeekService.ts
+DeepSeek AI integration for intelligent search processing
+Content & Analytics
+server/microservices/content-service/ContentService.ts
+Content search and filtering capabilities
+server/microservices/analytics-service/AnalyticsService.ts
+Search analytics and performance tracking
+🔧 Client-Side Services
+Core Services
+client/src/shared/services/vision/VisualSearchService.ts
+Visual search and image processing
+client/src/shared/services/communication/ServiceCommunicationPatterns.ts
+Service communication for search functionality
+client/src/domains/customer/services/CustomerApiService.js
+Customer-facing search API integration
+Advanced Features
+client/src/shared/services/ai/AIOrchestrator.ts
+AI orchestration for search intelligence
+client/src/shared/services/ml/RecommendationEngine.ts
+ML-powered search recommendations
+🔐 Security & Performance
+Phase 2 Enhancements
+client/src/shared/security/ContentSanitizer.ts
+Multi-context content sanitization for search queries
+client/src/shared/security/RateLimiter.ts
+Advanced rate limiting for search operations
+client/src/shared/performance/CodeSplittingOptimizer.tsx
+Lazy loading optimization for search components
+client/src/shared/performance/ReactMemoOptimizations.tsx
+Performance optimization with React.memo patterns
+Infrastructure
+client/src/shared/services/cache/UnifiedCacheStrategy.ts
+Caching strategies for search results
+client/src/shared/services/monitoring/ServiceHealthMonitoring.ts
+Health monitoring for search services

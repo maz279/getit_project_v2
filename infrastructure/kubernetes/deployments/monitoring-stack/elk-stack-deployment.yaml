@@ -1,0 +1,836 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: logging
+    platform: getit-bangladesh
+    tier: infrastructure
+  annotations:
+    description: "Logstash Log Processing for GetIt Bangladesh"
+    contact: "devops-team@getit.com.bd"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+        component: logging
+        platform: getit-bangladesh
+        version: v8.11.3
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.11.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5044
+          name: beats
+          protocol: TCP
+        - containerPort: 9600
+          name: http
+          protocol: TCP
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xmx2g -Xms2g"
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        - name: ELASTICSEARCH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-username
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-password
+        volumeMounts:
+        - name: logstash-config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+        - name: logstash-pipeline
+          mountPath: /usr/share/logstash/pipeline
+        - name: logstash-data
+          mountPath: /usr/share/logstash/data
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      
+      volumes:
+      - name: logstash-config
+        configMap:
+          name: logstash-config
+      - name: logstash-pipeline
+        configMap:
+          name: logstash-pipeline
+      - name: logstash-data
+        persistentVolumeClaim:
+          claimName: logstash-data-pvc
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: monitoring
+      
+      tolerations:
+      - key: "monitoring-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: logging
+    platform: getit-bangladesh
+    tier: infrastructure
+  annotations:
+    description: "Kibana Dashboard for GetIt Bangladesh"
+    contact: "devops-team@getit.com.bd"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+        component: logging
+        platform: getit-bangladesh
+        version: v8.11.3
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.11.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5601
+          name: http
+          protocol: TCP
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        - name: ELASTICSEARCH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-username
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-password
+        - name: SERVER_NAME
+          value: "kibana.getit.com.bd"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        - name: SERVER_BASEPATH
+          value: ""
+        - name: SERVER_PUBLICBASEURL
+          value: "https://kibana.getit.com.bd"
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        - name: kibana-data
+          mountPath: /usr/share/kibana/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "3Gi"
+            cpu: "1.5"
+        livenessProbe:
+          httpGet:
+            path: /app/kibana
+            port: 5601
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /app/kibana
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config
+      - name: kibana-data
+        persistentVolumeClaim:
+          claimName: kibana-data-pvc
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: monitoring
+      
+      tolerations:
+      - key: "monitoring-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: logging
+    platform: getit-bangladesh
+  annotations:
+    description: "Logstash Service for GetIt Bangladesh"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5044
+    targetPort: 5044
+    protocol: TCP
+    name: beats
+  - port: 9600
+    targetPort: 9600
+    protocol: TCP
+    name: http
+  selector:
+    app: logstash
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: logging
+    platform: getit-bangladesh
+  annotations:
+    description: "Kibana Service for GetIt Bangladesh"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5601
+    targetPort: 5601
+    protocol: TCP
+    name: http
+  selector:
+    app: kibana
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logstash-data-pvc
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: logs-storage
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kibana-data-pvc
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard-storage
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: logging
+    platform: getit-bangladesh
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    path.data: /usr/share/logstash/data
+    pipeline.workers: 4
+    pipeline.batch.size: 125
+    pipeline.batch.delay: 50
+    config.reload.automatic: true
+    config.reload.interval: 3s
+    log.level: info
+    log.format: json
+    queue.type: persisted
+    queue.max_bytes: 1gb
+    queue.checkpoint.writes: 1024
+    dead_letter_queue.enable: true
+    dead_letter_queue.max_bytes: 1gb
+    monitoring.enabled: true
+    monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+    monitoring.elasticsearch.username: ${ELASTICSEARCH_USERNAME}
+    monitoring.elasticsearch.password: ${ELASTICSEARCH_PASSWORD}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-pipeline
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: logging
+    platform: getit-bangladesh
+data:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+      
+      http {
+        port => 8080
+        codec => json
+      }
+      
+      # Kubernetes logs
+      tcp {
+        port => 5000
+        codec => json_lines
+      }
+    }
+    
+    filter {
+      # Parse timestamp
+      if [@timestamp] {
+        date {
+          match => [ "@timestamp", "ISO8601" ]
+        }
+      }
+      
+      # Add Bangladesh timezone
+      mutate {
+        add_field => { "timezone" => "Asia/Dhaka" }
+      }
+      
+      # GetIt service logs parsing
+      if [kubernetes][labels][platform] == "getit-bangladesh" {
+        mutate {
+          add_tag => [ "getit-service" ]
+          add_field => { "service_type" => "%{[kubernetes][labels][component]}" }
+          add_field => { "service_name" => "%{[kubernetes][labels][app]}" }
+        }
+        
+        # Parse JSON logs
+        if [message] =~ /^\{.*\}$/ {
+          json {
+            source => "message"
+          }
+        }
+        
+        # Extract log level
+        grok {
+          match => { "message" => "%{LOGLEVEL:log_level}" }
+        }
+        
+        # Parse order logs specifically
+        if [service_name] == "order-service" {
+          grok {
+            match => { 
+              "message" => "Order %{DATA:order_id} %{WORD:order_action} by user %{DATA:user_id}"
+            }
+          }
+          
+          if [order_action] {
+            mutate {
+              add_tag => [ "order-event" ]
+              add_field => { "event_type" => "order" }
+            }
+          }
+        }
+        
+        # Parse payment logs
+        if [service_name] == "payment-service" {
+          grok {
+            match => {
+              "message" => "Payment %{DATA:payment_id} %{WORD:payment_status} via %{WORD:payment_method}"
+            }
+          }
+          
+          if [payment_method] in ["bkash", "nagad", "rocket"] {
+            mutate {
+              add_tag => [ "bangladesh-payment" ]
+              add_field => { "payment_type" => "mobile_banking" }
+            }
+          }
+        }
+        
+        # Parse error logs
+        if [log_level] == "ERROR" or [log_level] == "error" {
+          mutate {
+            add_tag => [ "error" ]
+          }
+          
+          # Extract stack traces
+          if [message] =~ /Exception|Error|Stack/ {
+            mutate {
+              add_tag => [ "exception" ]
+            }
+          }
+        }
+      }
+      
+      # Database logs
+      if [service_name] in ["postgresql", "mongodb", "redis", "elasticsearch"] {
+        mutate {
+          add_tag => [ "database" ]
+        }
+        
+        # Parse slow query logs
+        if [message] =~ /slow/ {
+          mutate {
+            add_tag => [ "slow-query" ]
+          }
+        }
+      }
+      
+      # Frontend logs
+      if [service_name] in ["customer-web", "admin-panel", "vendor-dashboard"] {
+        mutate {
+          add_tag => [ "frontend" ]
+        }
+        
+        # Parse JavaScript errors
+        if [message] =~ /TypeError|ReferenceError|SyntaxError/ {
+          mutate {
+            add_tag => [ "javascript-error" ]
+          }
+        }
+      }
+      
+      # Bangladesh specific patterns
+      if [message] =~ /bkash|nagad|rocket|dhaka|bangladesh/i {
+        mutate {
+          add_tag => [ "bangladesh-specific" ]
+        }
+      }
+      
+      # Performance monitoring
+      if [message] =~ /response_time|latency|duration/ {
+        mutate {
+          add_tag => [ "performance" ]
+        }
+        
+        # Extract response times
+        grok {
+          match => {
+            "message" => "response_time: %{NUMBER:response_time_ms:float}ms"
+          }
+        }
+      }
+      
+      # Security events
+      if [message] =~ /authentication|authorization|login|failed|blocked/ {
+        mutate {
+          add_tag => [ "security" ]
+        }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["http://elasticsearch:9200"]
+        user => "${ELASTICSEARCH_USERNAME}"
+        password => "${ELASTICSEARCH_PASSWORD}"
+        
+        # Index by service and date
+        index => "getit-logs-%{service_name}-%{+YYYY.MM.dd}"
+        
+        # Template for Bangladesh timezone
+        template_name => "getit-logs"
+        template => {
+          "index_patterns" => ["getit-logs-*"]
+          "settings" => {
+            "number_of_shards" => 3
+            "number_of_replicas" => 1
+          }
+          "mappings" => {
+            "properties" => {
+              "@timestamp" => {
+                "type" => "date"
+                "format" => "strict_date_optional_time||epoch_millis"
+              }
+              "service_name" => { "type" => "keyword" }
+              "service_type" => { "type" => "keyword" }
+              "log_level" => { "type" => "keyword" }
+              "order_id" => { "type" => "keyword" }
+              "user_id" => { "type" => "keyword" }
+              "payment_id" => { "type" => "keyword" }
+              "payment_method" => { "type" => "keyword" }
+              "response_time_ms" => { "type" => "float" }
+              "timezone" => { "type" => "keyword" }
+            }
+          }
+        }
+        template_overwrite => true
+      }
+      
+      # Debug output (disabled in production)
+      # stdout { codec => rubydebug }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: logging
+    platform: getit-bangladesh
+data:
+  kibana.yml: |
+    server.name: kibana.getit.com.bd
+    server.host: "0.0.0.0"
+    server.basePath: ""
+    server.publicBaseUrl: "https://kibana.getit.com.bd"
+    
+    elasticsearch.hosts: ["http://elasticsearch:9200"]
+    elasticsearch.username: ${ELASTICSEARCH_USERNAME}
+    elasticsearch.password: ${ELASTICSEARCH_PASSWORD}
+    
+    monitoring.ui.container.elasticsearch.enabled: true
+    monitoring.ui.container.logstash.enabled: true
+    
+    # Bangladesh timezone
+    dateFormat:tz: "Asia/Dhaka"
+    
+    # Security
+    server.ssl.enabled: false
+    elasticsearch.ssl.verificationMode: none
+    
+    # Performance
+    elasticsearch.requestTimeout: 90000
+    elasticsearch.shardTimeout: 30000
+    
+    # Logging
+    logging.appenders:
+      file:
+        type: file
+        fileName: /usr/share/kibana/data/kibana.log
+        layout:
+          type: json
+    logging.root:
+      appenders:
+        - default
+        - file
+      level: info
+    
+    # UI Configuration
+    newsfeed.enabled: false
+    telemetry.enabled: false
+    telemetry.optIn: false
+    
+    # GetIt Bangladesh specific settings
+    map.includeElasticMapsService: false
+    xpack.reporting.enabled: true
+    xpack.canvas.enabled: true
+    xpack.infra.enabled: true
+    xpack.logs.enabled: true
+    xpack.apm.enabled: false
+    
+    # Dashboard settings for Bangladesh market
+    dashboard.defaultDarkMode: false
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: getit-monitoring
+  labels:
+    app: filebeat
+    component: logging
+    platform: getit-bangladesh
+  annotations:
+    description: "Filebeat Log Shipper for GetIt Bangladesh"
+    contact: "devops-team@getit.com.bd"
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+        component: logging
+        platform: getit-bangladesh
+    spec:
+      serviceAccountName: filebeat
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.11.3
+        args: [
+          "-c", "/etc/filebeat.yml",
+          "-e",
+        ]
+        env:
+        - name: ELASTICSEARCH_HOST
+          value: elasticsearch
+        - name: ELASTICSEARCH_PORT
+          value: "9200"
+        - name: ELASTICSEARCH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-username
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-password
+        - name: LOGSTASH_HOST
+          value: logstash
+        - name: LOGSTASH_PORT
+          value: "5044"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          runAsUser: 0
+        resources:
+          limits:
+            memory: 200Mi
+            cpu: 100m
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/filebeat.yml
+          readOnly: true
+          subPath: filebeat.yml
+        - name: data
+          mountPath: /usr/share/filebeat/data
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varpodlogs
+          mountPath: /var/log/pods
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 0640
+          name: filebeat-config
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varpodlogs
+        hostPath:
+          path: /var/log/pods
+      - name: data
+        hostPath:
+          path: /var/lib/filebeat-data
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: getit-monitoring
+  labels:
+    app: filebeat
+    component: logging
+    platform: getit-bangladesh
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: container
+      paths:
+        - /var/log/containers/*.log
+      processors:
+        - add_kubernetes_metadata:
+            host: ${NODE_NAME}
+            matchers:
+            - logs_path:
+                logs_path: "/var/log/containers/"
+    
+    # Add Bangladesh specific fields
+    processors:
+    - add_fields:
+        target: getit
+        fields:
+          country: bangladesh
+          timezone: asia_dhaka
+          deployment: production
+    
+    output.logstash:
+      hosts: ["${LOGSTASH_HOST}:${LOGSTASH_PORT}"]
+    
+    logging.level: info
+    logging.to_files: true
+    logging.files:
+      path: /usr/share/filebeat/logs
+      name: filebeat
+      keepfiles: 7
+      permissions: 0644
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: getit-monitoring
+  labels:
+    app: filebeat
+    component: logging
+    platform: getit-bangladesh
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+  labels:
+    app: filebeat
+    component: logging
+    platform: getit-bangladesh
+rules:
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - pods
+  - nodes
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups: ["apps"]
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+  labels:
+    app: filebeat
+    component: logging
+    platform: getit-bangladesh
+subjects:
+- kind: ServiceAccount
+  name: filebeat
+  namespace: getit-monitoring
+roleRef:
+  kind: ClusterRole
+  name: filebeat
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: logstash-pdb
+  namespace: getit-monitoring
+  labels:
+    app: logstash
+    component: logging
+    platform: getit-bangladesh
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: logstash
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kibana-pdb
+  namespace: getit-monitoring
+  labels:
+    app: kibana
+    component: logging
+    platform: getit-bangladesh
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: kibana

@@ -1,0 +1,268 @@
+# Elasticsearch Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Log Aggregation and Search
+
+cluster.name: getit-bangladesh-logs
+node.name: ${HOSTNAME}
+node.roles: [ data, ingest, master ]
+
+# Network configuration
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery configuration for single node (production should use cluster)
+discovery.type: single-node
+discovery.seed_hosts: ["elasticsearch"]
+cluster.initial_master_nodes: ["${HOSTNAME}"]
+
+# Path configuration
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+path.repo: ["/usr/share/elasticsearch/backup"]
+
+# Memory settings
+bootstrap.memory_lock: true
+indices.memory.index_buffer_size: 20%
+indices.memory.min_index_buffer_size: 96mb
+
+# Index management
+indices.lifecycle.poll_interval: 10m
+action.destructive_requires_name: true
+action.auto_create_index: "+logstash-*,+filebeat-*,+metricbeat-*,+getit-*,-*"
+
+# Security (disable for development, enable in production)
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+xpack.license.self_generated.type: basic
+
+# Monitoring
+xpack.monitoring.enabled: true
+xpack.monitoring.collection.enabled: true
+
+# Machine Learning
+xpack.ml.enabled: true
+
+# Index templates for GetIt Bangladesh logs
+index.number_of_shards: 1
+index.number_of_replicas: 0
+index.refresh_interval: 30s
+
+# Custom index patterns for GetIt Bangladesh
+index.mapping.total_fields.limit: 2000
+index.mapping.depth.limit: 20
+index.mapping.nested_fields.limit: 100
+
+# Performance optimization
+indices.queries.cache.size: 20%
+indices.fielddata.cache.size: 20%
+indices.requests.cache.size: 2%
+
+# Thread pool configuration
+thread_pool.write.queue_size: 1000
+thread_pool.search.queue_size: 1000
+thread_pool.get.queue_size: 1000
+
+# Cluster settings
+cluster.routing.allocation.disk.threshold_enabled: true
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+
+# Index lifecycle management policies
+ilm.policy.getit-logs:
+  policy:
+    phases:
+      hot:
+        actions:
+          rollover:
+            max_size: 1GB
+            max_age: 1d
+          set_priority:
+            priority: 100
+      warm:
+        min_age: 7d
+        actions:
+          allocate:
+            number_of_replicas: 0
+          shrink:
+            number_of_shards: 1
+          set_priority:
+            priority: 50
+      cold:
+        min_age: 30d
+        actions:
+          allocate:
+            number_of_replicas: 0
+          set_priority:
+            priority: 0
+      delete:
+        min_age: 90d
+
+# Bangladesh specific configurations
+timezone: Asia/Dhaka
+locale: en_US.UTF-8
+
+# Logging configuration
+logger.org.elasticsearch.deprecation: warn
+logger.org.elasticsearch.transport: info
+logger.org.elasticsearch.discovery: info
+
+# Custom processors for Bangladesh content
+ingest.geoip.database_path: /usr/share/elasticsearch/config/ingest-geoip/GeoLite2-City.mmdb
+
+# Index templates
+index_templates:
+  getit-application-logs:
+    index_patterns: ["getit-app-*"]
+    template:
+      settings:
+        number_of_shards: 1
+        number_of_replicas: 0
+        refresh_interval: 30s
+        index:
+          lifecycle:
+            name: getit-logs
+      mappings:
+        properties:
+          timestamp:
+            type: date
+          level:
+            type: keyword
+          service:
+            type: keyword
+          message:
+            type: text
+            analyzer: standard
+          user_id:
+            type: keyword
+          session_id:
+            type: keyword
+          request_id:
+            type: keyword
+          ip_address:
+            type: ip
+          user_agent:
+            type: text
+          country:
+            type: keyword
+          city:
+            type: keyword
+          payment_method:
+            type: keyword
+          order_id:
+            type: keyword
+          product_id:
+            type: keyword
+          vendor_id:
+            type: keyword
+          amount:
+            type: scaled_float
+            scaling_factor: 100
+          currency:
+            type: keyword
+          response_time_ms:
+            type: integer
+          status_code:
+            type: integer
+          error_type:
+            type: keyword
+          stack_trace:
+            type: text
+            index: false
+
+  getit-business-logs:
+    index_patterns: ["getit-business-*"]
+    template:
+      settings:
+        number_of_shards: 1
+        number_of_replicas: 0
+      mappings:
+        properties:
+          timestamp:
+            type: date
+          event_type:
+            type: keyword
+          user_id:
+            type: keyword
+          session_id:
+            type: keyword
+          product_id:
+            type: keyword
+          category:
+            type: keyword
+          vendor_id:
+            type: keyword
+          order_value:
+            type: scaled_float
+            scaling_factor: 100
+          currency:
+            type: keyword
+          payment_method:
+            type: keyword
+          shipping_method:
+            type: keyword
+          conversion_funnel_step:
+            type: keyword
+          device_type:
+            type: keyword
+          browser:
+            type: keyword
+          location:
+            type: geo_point
+          referrer:
+            type: keyword
+          campaign_id:
+            type: keyword
+          is_mobile_banking:
+            type: boolean
+          is_bangladesh_user:
+            type: boolean
+          language:
+            type: keyword
+
+  getit-security-logs:
+    index_patterns: ["getit-security-*"]
+    template:
+      settings:
+        number_of_shards: 1
+        number_of_replicas: 1
+      mappings:
+        properties:
+          timestamp:
+            type: date
+          event_type:
+            type: keyword
+          severity:
+            type: keyword
+          source_ip:
+            type: ip
+          destination_ip:
+            type: ip
+          user_id:
+            type: keyword
+          session_id:
+            type: keyword
+          user_agent:
+            type: text
+          request_path:
+            type: keyword
+          request_method:
+            type: keyword
+          response_status:
+            type: integer
+          threat_type:
+            type: keyword
+          blocked:
+            type: boolean
+          geo_location:
+            type: geo_point
+          country:
+            type: keyword
+          asn:
+            type: keyword
+          fingerprint:
+            type: keyword
+          rule_id:
+            type: keyword
+          signature:
+            type: keyword

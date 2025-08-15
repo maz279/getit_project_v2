@@ -1,0 +1,75 @@
+2chunk-RPCDYKBN.js?v=859ee451:11678 Uncaught Error: Rendered more hooks than during the previous render.
+    at updateWorkInProgressHook (chunk-RPCDYKBN.js?v=859ee451:11678:21)
+    at updateCallback (chunk-RPCDYKBN.js?v=859ee451:12177:22)
+    at Object.useCallback (chunk-RPCDYKBN.js?v=859ee451:12693:22)
+    at useCallback (chunk-QCHXOAYK.js?v=859ee451:1090:29)
+    at UnifiedSearchResultsContent (UnifiedSearchResults.tsx:397:30)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=859ee451:11548:26)
+    at updateFunctionComponent (chunk-RPCDYKBN.js?v=859ee451:14582:28)
+    at beginWork (chunk-RPCDYKBN.js?v=859ee451:15924:22)
+    at HTMLUnknownElement.callCallback2 (chunk-RPCDYKBN.js?v=859ee451:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-RPCDYKBN.js?v=859ee451:3699:24)Understand this error
+hook.js:608 The above error occurred in the <UnifiedSearchResultsContent> component:
+
+    at UnifiedSearchResultsContent (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/UnifiedSearchResults.tsx:57:3)
+    at ComponentErrorBoundary (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/UnifiedSearchResults.tsx:25:5)
+    at UnifiedSearchResults (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/UnifiedSearchResults.tsx:1256:221)
+    at div
+    at main
+    at div
+    at CustomerLayout (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/layouts/CustomerLayout.tsx:24:27)
+    at RenderedRoute (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=859ee451:5455:26)
+    at Routes (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=859ee451:6188:3)
+    at Suspense
+    at AuthProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/domains/customer/auth/components/AuthProvider.tsx:29:32)
+    at Router (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=859ee451:6131:13)
+    at BrowserRouter (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=859ee451:9149:3)
+    at Provider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=859ee451:38:15)
+    at TooltipProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=859ee451:951:5)
+    at ThemeProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/ThemeContext.tsx:218:33)
+    at QueryClientProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=859ee451:2805:3)
+    at SimpleLanguageProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/SimpleLanguageContext.tsx:30:42)
+    at _a (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-helmet-async.js?v=859ee451:624:5)
+    at App
+    at CartProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/CartContext.tsx?v=EbY2hHAoznbs24hWnMI_x:170:32)
+    at AuthProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/domains/customer/auth/components/AuthProvider.tsx?v=EbY2hHAoznbs24hWnMI_x:29:32)
+    at ThemeProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/ThemeContext.tsx?v=EbY2hHAoznbs24hWnMI_x:218:33)
+    at QueryClientProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=859ee451:2805:3)
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ComponentErrorBoundary.
+overrideMethod @ hook.js:608Understand this error
+hook.js:608 UnifiedSearchResults Error: Error: Rendered more hooks than during the previous render.
+    at updateWorkInProgressHook (chunk-RPCDYKBN.js?v=859ee451:11678:21)
+    at updateCallback (chunk-RPCDYKBN.js?v=859ee451:12177:22)
+    at Object.useCallback (chunk-RPCDYKBN.js?v=859ee451:12693:22)
+    at useCallback (chunk-QCHXOAYK.js?v=859ee451:1090:29)
+    at UnifiedSearchResultsContent (UnifiedSearchResults.tsx:397:30)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=859ee451:11548:26)
+    at updateFunctionComponent (chunk-RPCDYKBN.js?v=859ee451:14582:28)
+    at beginWork (chunk-RPCDYKBN.js?v=859ee451:15924:22)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=859ee451:19753:22)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=859ee451:19198:20) Object Error Component Stack
+    at ComponentErrorBoundary (UnifiedSearchResults.tsx:139:5)
+    at UnifiedSearchResults (UnifiedSearchResults.tsx:888:45)
+    at div (<anonymous>)
+    at main (<anonymous>)
+    at div (<anonymous>)
+    at CustomerLayout (CustomerLayout.tsx:12:58)
+    at RenderedRoute (react-router-dom.js?v=859ee451:5455:26)
+    at Routes (react-router-dom.js?v=859ee451:6188:3)
+    at Suspense (<anonymous>)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at Router (react-router-dom.js?v=859ee451:6131:13)
+    at BrowserRouter (react-router-dom.js?v=859ee451:9149:3)
+    at Provider (chunk-OXZDJRWN.js?v=859ee451:38:15)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=859ee451:951:5)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=859ee451:2805:3)
+    at SimpleLanguageProvider (SimpleLanguageContext.tsx:21:42)
+    at _a (react-helmet-async.js?v=859ee451:624:5)
+    at App (<anonymous>)
+    at CartProvider (CartContext.tsx:199:32)
+    at AuthProvider (AuthProvider.tsx:38:61)
+    at ThemeProvider (ThemeContext.tsx:254:33)
+    at QueryClientProvider (@tanstack_react-query.js?v=859ee451:2805:3)
+overrideMethod @ hook.js:608Understand this error

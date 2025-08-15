@@ -1,0 +1,841 @@
+# Subscription Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Subscription Service manages recurring product deliveries, subscription-based services, membership programs, and automated billing for the GetIt platform, enabling vendors to offer subscription products and customers to manage recurring purchases with flexible scheduling and payment options.
+
+### 1.2 Core Responsibilities
+- **Subscription Management**: Create, modify, pause, and cancel subscriptions
+- **Recurring Billing**: Automated billing cycles and payment processing
+- **Delivery Scheduling**: Manage recurring delivery schedules
+- **Plan Management**: Subscription plans with different tiers and features
+- **Inventory Coordination**: Coordinate with inventory for subscription fulfillment
+- **Customer Portal**: Self-service subscription management for customers
+
+### 1.3 Technology Stack
+```yaml
+Service: subscription-service
+Technology: Node.js + Express.js
+Database: PostgreSQL + Redis
+Scheduler: Node-cron + Bull Queue
+Payment: Stripe + Local payment gateways
+Notifications: Email + SMS + Push
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- Subscription plans table
+CREATE TABLE subscription_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    plan_name VARCHAR(255) NOT NULL,
+    plan_name_bn VARCHAR(255), -- Bangla plan name
+    description TEXT,
+    description_bn TEXT, -- Bangla description
+    plan_type plan_type NOT NULL,
+    billing_interval billing_interval NOT NULL,
+    billing_interval_count INTEGER DEFAULT 1,
+    trial_period_days INTEGER DEFAULT 0,
+    setup_fee DECIMAL(10,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    max_subscribers INTEGER,
+    current_subscriber_count INTEGER DEFAULT 0,
+    tags JSONB,
+    features JSONB,
+    restrictions JSONB,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription plan items table
+CREATE TABLE subscription_plan_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2) NOT NULL,
+    is_optional BOOLEAN DEFAULT false,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Customer subscriptions table
+CREATE TABLE customer_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES users(id),
+    subscription_plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+    subscription_number VARCHAR(50) UNIQUE NOT NULL,
+    status subscription_status DEFAULT 'active',
+    billing_interval billing_interval NOT NULL,
+    billing_interval_count INTEGER DEFAULT 1,
+    current_period_start TIMESTAMP NOT NULL,
+    current_period_end TIMESTAMP NOT NULL,
+    trial_start TIMESTAMP,
+    trial_end TIMESTAMP,
+    next_billing_date TIMESTAMP NOT NULL,
+    billing_cycle_anchor TIMESTAMP,
+    quantity INTEGER DEFAULT 1,
+    unit_amount DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'BDT',
+    payment_method_id UUID REFERENCES payment_methods(id),
+    shipping_address JSONB NOT NULL,
+    billing_address JSONB NOT NULL,
+    delivery_instructions TEXT,
+    delivery_preferences JSONB,
+    pause_reason TEXT,
+    paused_at TIMESTAMP,
+    pause_until TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    cancellation_reason TEXT,
+    ended_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription deliveries table
+CREATE TABLE subscription_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES customer_subscriptions(id),
+    delivery_number VARCHAR(50) NOT NULL,
+    scheduled_date DATE NOT NULL,
+    delivery_status delivery_status DEFAULT 'scheduled',
+    delivery_items JSONB NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    shipping_method VARCHAR(100),
+    tracking_number VARCHAR(255),
+    delivered_at TIMESTAMP,
+    delivery_notes TEXT,
+    customer_rating INTEGER CHECK (customer_rating >= 1 AND customer_rating <= 5),
+    customer_feedback TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription billing history table
+CREATE TABLE subscription_billing_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES customer_subscriptions(id),
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    billing_period_start TIMESTAMP NOT NULL,
+    billing_period_end TIMESTAMP NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'BDT',
+    payment_status payment_status DEFAULT 'pending',
+    payment_method payment_method NOT NULL,
+    payment_reference VARCHAR(255),
+    payment_date TIMESTAMP,
+    due_date TIMESTAMP NOT NULL,
+    attempts_count INTEGER DEFAULT 0,
+    last_attempt_at TIMESTAMP,
+    failure_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription modifications table
+CREATE TABLE subscription_modifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES customer_subscriptions(id),
+    modification_type modification_type NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    effective_date TIMESTAMP NOT NULL,
+    applied_at TIMESTAMP,
+    requested_by UUID NOT NULL REFERENCES users(id),
+    reason TEXT,
+    status modification_status DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription coupons table
+CREATE TABLE subscription_coupons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    coupon_code VARCHAR(50) UNIQUE NOT NULL,
+    coupon_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    discount_type discount_type NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL,
+    minimum_amount DECIMAL(10,2),
+    maximum_discount DECIMAL(10,2),
+    applicable_plans JSONB, -- Array of plan IDs
+    usage_limit INTEGER,
+    usage_count INTEGER DEFAULT 0,
+    customer_usage_limit INTEGER DEFAULT 1,
+    valid_from TIMESTAMP NOT NULL,
+    valid_until TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Subscription analytics table
+CREATE TABLE subscription_analytics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    date DATE NOT NULL,
+    metrics JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(vendor_id, date)
+);
+
+-- Subscription preferences table
+CREATE TABLE subscription_preferences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES users(id),
+    delivery_preferences JSONB DEFAULT '{}',
+    communication_preferences JSONB DEFAULT '{}',
+    payment_preferences JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id)
+);
+
+-- Create custom types
+CREATE TYPE plan_type AS ENUM ('product_subscription', 'service_subscription', 'membership', 'content_subscription');
+CREATE TYPE billing_interval AS ENUM ('day', 'week', 'month', 'quarter', 'year');
+CREATE TYPE subscription_status AS ENUM ('trial', 'active', 'past_due', 'paused', 'cancelled', 'ended');
+CREATE TYPE delivery_status AS ENUM ('scheduled', 'preparing', 'shipped', 'delivered', 'failed', 'skipped');
+CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'failed', 'refunded', 'partially_refunded');
+CREATE TYPE payment_method AS ENUM ('card', 'bkash', 'nagad', 'rocket', 'bank_transfer', 'wallet');
+CREATE TYPE modification_type AS ENUM ('plan_change', 'quantity_change', 'address_change', 'payment_method_change', 'pause', 'resume');
+CREATE TYPE modification_status AS ENUM ('pending', 'applied', 'cancelled');
+CREATE TYPE discount_type AS ENUM ('percentage', 'fixed_amount', 'free_shipping');
+
+-- Create indexes
+CREATE INDEX idx_subscription_plans_vendor ON subscription_plans(vendor_id);
+CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active);
+CREATE INDEX idx_customer_subscriptions_customer ON customer_subscriptions(customer_id);
+CREATE INDEX idx_customer_subscriptions_status ON customer_subscriptions(status);
+CREATE INDEX idx_customer_subscriptions_next_billing ON customer_subscriptions(next_billing_date);
+CREATE INDEX idx_subscription_deliveries_subscription ON subscription_deliveries(subscription_id);
+CREATE INDEX idx_subscription_deliveries_scheduled ON subscription_deliveries(scheduled_date);
+CREATE INDEX idx_subscription_billing_subscription ON subscription_billing_history(subscription_id);
+CREATE INDEX idx_subscription_billing_payment_status ON subscription_billing_history(payment_status);
+```
+
+### 2.2 Redis Schema
+```javascript
+// Billing queue
+BILLING_QUEUE = SORTED_SET[subscription_id:next_billing_timestamp]
+
+// Delivery queue
+DELIVERY_QUEUE = SORTED_SET[subscription_id:scheduled_delivery_timestamp]
+
+// Failed payment retries
+FAILED_PAYMENT_RETRY:{subscription_id} = {
+    attempt_count: 2,
+    next_retry: timestamp,
+    failure_reason: "insufficient_funds"
+}
+
+// Subscription cache
+SUBSCRIPTION:{subscription_id} = {
+    status: "active",
+    next_billing_date: timestamp,
+    customer_id: "uuid",
+    plan_details: {...}
+}
+
+// Customer subscription summary
+CUSTOMER_SUBSCRIPTIONS:{customer_id} = {
+    active_count: 3,
+    total_monthly_amount: 2500.00,
+    next_billing_dates: [timestamp1, timestamp2, timestamp3]
+}
+
+// Vendor subscription metrics
+VENDOR_SUBSCRIPTION_METRICS:{vendor_id} = {
+    total_subscribers: 1250,
+    mrr: 125000.00, // Monthly Recurring Revenue
+    churn_rate: 0.05,
+    ltv: 850.00 // Customer Lifetime Value
+}
+```
+
+## 3. Folder Structure
+
+```
+subscription-service/
+├── src/
+│   ├── controllers/
+│   │   ├── subscription-plan-controller.js  # Subscription plan management
+│   │   ├── customer-subscription-controller.js # Customer subscription management
+│   │   ├── billing-controller.js            # Billing and payment processing
+│   │   ├── delivery-controller.js           # Subscription delivery management
+│   │   ├── coupon-controller.js             # Coupon and discount management
+│   │   ├── analytics-controller.js          # Subscription analytics
+│   │   └── admin-controller.js              # Admin subscription management
+│   ├── models/
+│   │   ├── SubscriptionPlan.js              # Subscription plan model
+│   │   ├── SubscriptionPlanItem.js          # Plan item model
+│   │   ├── CustomerSubscription.js          # Customer subscription model
+│   │   ├── SubscriptionDelivery.js          # Delivery model
+│   │   ├── SubscriptionBilling.js           # Billing history model
+│   │   ├── SubscriptionModification.js      # Modification model
+│   │   ├── SubscriptionCoupon.js            # Coupon model
+│   │   └── SubscriptionPreferences.js       # Customer preferences model
+│   ├── routes/
+│   │   ├── subscription-plan-routes.js      # Plan management endpoints
+│   │   ├── customer-subscription-routes.js  # Customer subscription endpoints
+│   │   ├── billing-routes.js                # Billing endpoints
+│   │   ├── delivery-routes.js               # Delivery endpoints
+│   │   ├── coupon-routes.js                 # Coupon endpoints
+│   │   └── admin-routes.js                  # Admin endpoints
+│   ├── services/
+│   │   ├── subscription-plan-service.js     # Plan management logic
+│   │   ├── subscription-service.js          # Subscription lifecycle management
+│   │   ├── billing-service.js               # Billing and payment logic
+│   │   ├── delivery-service.js              # Delivery scheduling and management
+│   │   ├── payment-processor-service.js     # Payment processing
+│   │   ├── coupon-service.js                # Coupon validation and application
+│   │   ├── inventory-service.js             # Inventory coordination
+│   │   ├── notification-service.js          # Subscription notifications
+│   │   └── analytics-service.js             # Subscription analytics
+│   ├── middleware/
+│   │   ├── subscription-auth.js             # Subscription authorization
+│   │   ├── plan-validation.js               # Plan validation
+│   │   ├── billing-validation.js            # Billing validation
+│   │   ├── subscription-access.js           # Subscription access control
+│   │   └── payment-validation.js            # Payment validation
+│   ├── utils/
+│   │   ├── billing-calculator.js            # Billing calculation utilities
+│   │   ├── proration-calculator.js          # Proration calculation
+│   │   ├── subscription-utils.js            # Subscription utilities
+│   │   ├── date-utils.js                    # Date calculation utilities
+│   │   ├── discount-calculator.js           # Discount calculation
+│   │   └── dunning-utils.js                 # Dunning management utilities
+│   ├── schedulers/
+│   │   ├── billing-scheduler.js             # Automated billing scheduler
+│   │   ├── delivery-scheduler.js            # Delivery scheduling
+│   │   ├── reminder-scheduler.js            # Payment and delivery reminders
+│   │   ├── retry-scheduler.js               # Failed payment retry scheduler
+│   │   └── cleanup-scheduler.js             # Data cleanup scheduler
+│   ├── workers/
+│   │   ├── billing-worker.js                # Billing processing worker
+│   │   ├── delivery-worker.js               # Delivery processing worker
+│   │   ├── notification-worker.js           # Notification worker
+│   │   ├── analytics-worker.js              # Analytics calculation worker
+│   │   └── inventory-worker.js              # Inventory update worker
+│   ├── config/
+│   │   ├── database.js                      # Database configuration
+│   │   ├── payment-config.js                # Payment gateway configuration
+│   │   ├── billing-config.js                # Billing rules configuration
+│   │   ├── delivery-config.js               # Delivery settings
+│   │   └── notification-config.js           # Notification settings
+│   └── app.js                               # Express application setup
+├── bangladesh-features/                     # Bangladesh-specific features
+│   ├── local-payment-methods.js            # bKash, Nagad, Rocket subscription payments
+│   ├── ramadan-pause-feature.js            # Automatic subscription pause during Ramadan
+│   ├── bengali-calendar-integration.js     # Bengali calendar for scheduling
+│   ├── local-delivery-optimization.js      # Dhaka/Chittagong delivery optimization
+│   └── cultural-subscription-products.js   # Cultural and religious product subscriptions
+├── billing/                                # Billing engine
+│   ├── billing-engine.js                   # Core billing engine
+│   ├── proration-engine.js                 # Proration calculation engine
+│   ├── tax-calculator.js                   # Tax calculation for subscriptions
+│   ├── discount-engine.js                  # Discount application engine
+│   ├── dunning-management.js               # Failed payment dunning
+│   └── revenue-recognition.js              # Revenue recognition for accounting
+├── delivery/                               # Delivery management
+│   ├── delivery-scheduler.js               # Intelligent delivery scheduling
+│   ├── inventory-coordinator.js            # Inventory coordination for deliveries
+│   ├── delivery-optimization.js            # Route and schedule optimization
+│   ├── skip-delivery-handler.js            # Handle delivery skips/pauses
+│   └── delivery-feedback-processor.js      # Process delivery feedback
+├── analytics/                              # Subscription analytics
+│   ├── mrr-calculator.js                   # Monthly Recurring Revenue calculation
+│   ├── churn-analyzer.js                   # Churn rate analysis
+│   ├── ltv-calculator.js                   # Customer Lifetime Value calculation
+│   ├── cohort-analyzer.js                  # Cohort analysis
+│   ├── subscription-metrics.js             # Key subscription metrics
+│   └── forecast-engine.js                  # Revenue forecasting
+├── automation/                             # Subscription automation
+│   ├── smart-pause-resume.js               # Intelligent pause/resume
+│   ├── auto-plan-recommendations.js        # Plan upgrade/downgrade recommendations
+│   ├── delivery-preference-learning.js     # Learn customer delivery preferences
+│   ├── payment-method-updater.js           # Automatic payment method updates
+│   └── customer-lifecycle-automation.js    # Lifecycle stage automation
+├── integrations/                           # External integrations
+│   ├── inventory-integration.js            # Inventory management integration
+│   ├── shipping-integration.js             # Shipping provider integration
+│   ├── accounting-integration.js           # Accounting system integration
+│   ├── crm-integration.js                  # CRM system integration
+│   └── analytics-platform-integration.js   # Analytics platform integration
+├── tests/
+│   ├── unit/
+│   │   ├── subscription-service.test.js
+│   │   ├── billing-calculator.test.js
+│   │   ├── proration-calculator.test.js
+│   │   ├── coupon-service.test.js
+│   │   └── delivery-scheduler.test.js
+│   ├── integration/
+│   │   ├── subscription-flow.test.js
+│   │   ├── billing-integration.test.js
+│   │   └── delivery-integration.test.js
+│   └── e2e/
+│       ├── complete-subscription-lifecycle.test.js
+│       └── payment-failure-recovery.test.js
+├── localization/                           # Multi-language support
+│   ├── en/
+│   │   ├── subscription-messages.json      # English subscription messages
+│   │   ├── billing-notifications.json     # English billing notifications
+│   │   ├── delivery-messages.json         # English delivery messages
+│   │   └── email-templates.json           # English email templates
+│   └── bn/                                # Bangla translations
+│       ├── subscription-messages.json      # Bangla subscription messages
+│       ├── billing-notifications.json     # Bangla billing notifications
+│       ├── delivery-messages.json         # Bangla delivery messages
+│       └── email-templates.json           # Bangla email templates
+├── documentation/                          # Subscription service documentation
+│   ├── api-documentation/
+│   │   ├── subscription-apis.md
+│   │   ├── billing-apis.md
+│   │   └── delivery-apis.md
+│   ├── integration-guides/
+│   │   ├── vendor-subscription-setup.md
+│   │   ├── payment-gateway-integration.md
+│   │   └── inventory-integration.md
+│   └── business-guides/
+│       ├── subscription-plan-design.md
+│       ├── pricing-strategies.md
+│       └── customer-retention.md
+├── docker-compose.yml                      # Multi-service composition
+├── Dockerfile                             # Docker configuration
+├── package.json                           # Node.js dependencies
+└── README.md                              # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 Subscription Plan APIs
+```javascript
+// Create subscription plan
+POST /api/v1/subscriptions/plans
+Body: {
+    plan_name: "Monthly Grocery Box",
+    plan_name_bn: "মাসিক গ্রোসারি বক্স",
+    description: "Fresh groceries delivered monthly",
+    plan_type: "product_subscription",
+    billing_interval: "month",
+    billing_interval_count: 1,
+    trial_period_days: 7,
+    setup_fee: 0,
+    plan_items: [
+        {
+            product_id: "uuid",
+            quantity: 2,
+            unit_price: 500.00
+        }
+    ],
+    features: [
+        "Free delivery",
+        "Cancel anytime",
+        "Flexible scheduling"
+    ]
+}
+
+// Get subscription plans
+GET /api/v1/subscriptions/plans
+Query: ?vendor_id=uuid&plan_type=product_subscription&is_active=true
+Response: {
+    plans: [
+        {
+            id: "uuid",
+            plan_name: "Monthly Grocery Box",
+            description: "Fresh groceries delivered monthly",
+            billing_interval: "month",
+            total_price: 1000.00,
+            trial_period_days: 7,
+            current_subscriber_count: 125,
+            features: [...],
+            plan_items: [...]
+        }
+    ],
+    total_count: 15,
+    page: 1,
+    limit: 20
+}
+
+// Update subscription plan
+PUT /api/v1/subscriptions/plans/:plan_id
+Body: {
+    plan_name: "Updated Monthly Grocery Box",
+    description: "Premium fresh groceries delivered monthly"
+}
+
+// Get plan details
+GET /api/v1/subscriptions/plans/:plan_id
+Response: {
+    id: "uuid",
+    plan_name: "Monthly Grocery Box",
+    total_price: 1000.00,
+    plan_items: [
+        {
+            product: {
+                name: "Organic Rice",
+                image_url: "..."
+            },
+            quantity: 2,
+            unit_price: 500.00
+        }
+    ],
+    subscription_summary: {
+        total_subscribers: 125,
+        monthly_revenue: 125000.00,
+        average_subscription_length: 8.5 // months
+    }
+}
+```
+
+### 4.2 Customer Subscription APIs
+```javascript
+// Subscribe to plan
+POST /api/v1/subscriptions/subscribe
+Body: {
+    subscription_plan_id: "uuid",
+    quantity: 1,
+    payment_method_id: "uuid",
+    shipping_address: {
+        name: "John Doe",
+        street: "123 Main St",
+        city: "Dhaka",
+        postal_code: "1205",
+        country: "Bangladesh"
+    },
+    delivery_preferences: {
+        preferred_day: "monday",
+        preferred_time: "morning",
+        delivery_instructions: "Ring doorbell"
+    },
+    coupon_code: "WELCOME10"
+}
+
+// Get customer subscriptions
+GET /api/v1/subscriptions/my-subscriptions
+Response: {
+    subscriptions: [
+        {
+            id: "uuid",
+            subscription_number: "SUB-2024-001234",
+            plan: {
+                name: "Monthly Grocery Box",
+                billing_interval: "month"
+            },
+            status: "active",
+            next_billing_date: "2024-04-17T00:00:00Z",
+            next_delivery_date: "2024-04-15T00:00:00Z",
+            total_amount: 950.00,
+            currency: "BDT"
+        }
+    ]
+}
+
+// Get subscription details
+GET /api/v1/subscriptions/:subscription_id
+Response: {
+    id: "uuid",
+    subscription_number: "SUB-2024-001234",
+    status: "active",
+    plan: {...},
+    billing: {
+        next_billing_date: "2024-04-17T00:00:00Z",
+        amount: 950.00,
+        payment_method: "bkash"
+    },
+    delivery: {
+        next_delivery_date: "2024-04-15T00:00:00Z",
+        shipping_address: {...},
+        delivery_preferences: {...}
+    },
+    history: {
+        total_deliveries: 8,
+        successful_payments: 8,
+        total_spent: 7600.00
+    }
+}
+
+// Modify subscription
+PUT /api/v1/subscriptions/:subscription_id
+Body: {
+    modification_type: "quantity_change",
+    new_values: {
+        quantity: 2
+    },
+    effective_date: "2024-04-17T00:00:00Z",
+    reason: "Family size increased"
+}
+
+// Pause subscription
+POST /api/v1/subscriptions/:subscription_id/pause
+Body: {
+    reason: "Going on vacation",
+    pause_until: "2024-05-15T00:00:00Z"
+}
+
+// Resume subscription
+POST /api/v1/subscriptions/:subscription_id/resume
+
+// Cancel subscription
+POST /api/v1/subscriptions/:subscription_id/cancel
+Body: {
+    reason: "No longer needed",
+    feedback: "Service was good but no longer required",
+    cancel_immediately: false
+}
+```
+
+### 4.3 Billing APIs
+```javascript
+// Get billing history
+GET /api/v1/subscriptions/:subscription_id/billing
+Query: ?page=1&limit=10&status=paid
+Response: {
+    billing_history: [
+        {
+            id: "uuid",
+            invoice_number: "INV-2024-001234",
+            billing_period: {
+                start: "2024-03-17T00:00:00Z",
+                end: "2024-04-17T00:00:00Z"
+            },
+            amount: 950.00,
+            payment_status: "paid",
+            payment_date: "2024-03-17T10:30:00Z",
+            payment_method: "bkash"
+        }
+    ],
+    summary: {
+        total_paid: 7600.00,
+        pending_amount: 0,
+        next_billing_date: "2024-04-17T00:00:00Z"
+    }
+}
+
+// Update payment method
+PUT /api/v1/subscriptions/:subscription_id/payment-method
+Body: {
+    payment_method_id: "uuid"
+}
+
+// Retry failed payment
+POST /api/v1/subscriptions/:subscription_id/retry-payment
+Body: {
+    billing_id: "uuid",
+    payment_method_id: "uuid"
+}
+
+// Get invoice
+GET /api/v1/subscriptions/billing/:billing_id/invoice
+Response: {
+    invoice_number: "INV-2024-001234",
+    subscription: {...},
+    billing_period: {...},
+    line_items: [...],
+    subtotal: 1000.00,
+    discount: 50.00,
+    tax: 0.00,
+    total: 950.00,
+    payment_status: "paid"
+}
+```
+
+### 4.4 Delivery APIs
+```javascript
+// Get delivery schedule
+GET /api/v1/subscriptions/:subscription_id/deliveries
+Query: ?status=scheduled&limit=10
+Response: {
+    deliveries: [
+        {
+            id: "uuid",
+            delivery_number: "DEL-2024-001234",
+            scheduled_date: "2024-04-15",
+            status: "scheduled",
+            items: [
+                {
+                    product_name: "Organic Rice",
+                    quantity: 2
+                }
+            ],
+            tracking_number: null
+        }
+    ]
+}
+
+// Skip next delivery
+POST /api/v1/subscriptions/:subscription_id/skip-delivery
+Body: {
+    delivery_id: "uuid",
+    reason: "Already have enough stock"
+}
+
+// Reschedule delivery
+PUT /api/v1/subscriptions/:subscription_id/deliveries/:delivery_id/reschedule
+Body: {
+    new_date: "2024-04-20",
+    reason: "Will be traveling"
+}
+
+// Update delivery preferences
+PUT /api/v1/subscriptions/:subscription_id/delivery-preferences
+Body: {
+    preferred_day: "tuesday",
+    preferred_time: "afternoon",
+    delivery_instructions: "Leave at door if not home"
+}
+
+// Rate delivery
+POST /api/v1/subscriptions/deliveries/:delivery_id/feedback
+Body: {
+    rating: 5,
+    feedback: "Perfect delivery, all items fresh and on time"
+}
+```
+
+### 4.5 Coupon APIs
+```javascript
+// Validate coupon
+POST /api/v1/subscriptions/coupons/validate
+Body: {
+    coupon_code: "WELCOME10",
+    subscription_plan_id: "uuid",
+    customer_id: "uuid"
+}
+
+// Apply coupon
+POST /api/v1/subscriptions/:subscription_id/apply-coupon
+Body: {
+    coupon_code: "SAVE20"
+}
+
+// Remove coupon
+DELETE /api/v1/subscriptions/:subscription_id/coupon
+
+// Get available coupons for customer
+GET /api/v1/subscriptions/coupons/available
+Query: ?subscription_plan_id=uuid
+Response: {
+    coupons: [
+        {
+            coupon_code: "FIRSTTIME",
+            description: "10% off your first subscription",
+            discount_type: "percentage",
+            discount_value: 10,
+            valid_until: "2024-12-31T23:59:59Z"
+        }
+    ]
+}
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local Payment Methods
+- **Mobile Banking Integration**: bKash, Nagad, Rocket recurring payments
+- **Bank Transfer Options**: Automated bank transfer for subscriptions
+- **Cash on Delivery**: COD option for certain subscription types
+- **Flexible Payment Dates**: Align with local salary payment dates
+- **Payment Reminders**: SMS and call reminders for upcoming payments
+
+### 5.2 Cultural Considerations
+- **Ramadan Pause Feature**: Automatic subscription pause during Ramadan
+- **Festival Delivery Adjustments**: Special delivery schedules during Eid
+- **Bengali Calendar Integration**: Support for Bengali calendar dates
+- **Halal Product Subscriptions**: Specialized halal food subscriptions
+- **Religious Holiday Awareness**: Automatic adjustments for religious holidays
+
+### 5.3 Local Delivery Optimization
+- **Dhaka Traffic Optimization**: Delivery scheduling considering traffic patterns
+- **Area-Based Delivery**: Group deliveries by areas like Dhanmondi, Gulshan
+- **Monsoon Season Adjustments**: Delivery modifications during monsoon
+- **Rural Delivery Support**: Extended delivery options for rural areas
+- **Local Language Support**: Bengali delivery instructions and notifications
+
+### 5.4 Economic Considerations
+- **Flexible Pricing**: Multiple price points for different economic segments
+- **Pay-as-you-go Options**: Flexible payment options for budget-conscious customers
+- **Student Discounts**: Special pricing for students
+- **Group Subscriptions**: Family and community group subscription options
+- **Micro-Payment Support**: Very small subscription amounts
+
+## 6. Subscription Analytics
+
+### 6.1 Key Metrics
+- **Monthly Recurring Revenue (MRR)**: Total predictable monthly revenue
+- **Annual Recurring Revenue (ARR)**: Total predictable annual revenue
+- **Customer Lifetime Value (CLV)**: Average revenue per customer over lifetime
+- **Churn Rate**: Percentage of customers who cancel subscriptions
+- **Customer Acquisition Cost (CAC)**: Cost to acquire a new subscriber
+
+### 6.2 Performance Tracking
+```javascript
+// Subscription metrics calculation
+{
+    mrr: 125000.00, // Monthly Recurring Revenue
+    arr: 1500000.00, // Annual Recurring Revenue
+    total_subscribers: 1250,
+    new_subscribers_this_month: 85,
+    churned_subscribers_this_month: 32,
+    churn_rate: 0.026, // 2.6%
+    retention_rate: 0.974, // 97.4%
+    average_subscription_value: 100.00,
+    customer_lifetime_value: 850.00,
+    payback_period: 4.5 // months
+}
+```
+
+### 6.3 Business Intelligence
+- **Cohort Analysis**: Track subscriber behavior over time
+- **Revenue Forecasting**: Predict future revenue based on trends
+- **Churn Prediction**: AI-powered churn prediction
+- **Product Performance**: Which subscription products perform best
+- **Seasonal Trends**: Identify seasonal subscription patterns
+
+## 7. Automation Features
+
+### 7.1 Smart Scheduling
+- **Delivery Optimization**: AI-powered delivery date optimization
+- **Payment Date Intelligence**: Optimal payment dates based on customer behavior
+- **Inventory Coordination**: Automatic inventory allocation for subscriptions
+- **Seasonal Adjustments**: Automatic adjustments for seasonal demand
+- **Customer Preference Learning**: Learn and adapt to customer preferences
+
+### 7.2 Customer Lifecycle Automation
+- **Onboarding Sequences**: Automated welcome and onboarding emails
+- **Engagement Campaigns**: Re-engagement for inactive subscribers
+- **Upsell/Cross-sell**: Automated upgrade recommendations
+- **Win-back Campaigns**: Campaigns to win back cancelled subscribers
+- **Loyalty Programs**: Automatic loyalty point accrual and rewards
+
+### 7.3 Payment Processing Automation
+- **Smart Retry Logic**: Intelligent failed payment retry with optimal timing
+- **Payment Method Updates**: Automatic payment method updates
+- **Dunning Management**: Automated dunning process for failed payments
+- **Revenue Recovery**: Automated processes to recover lost revenue
+- **Fraud Detection**: Automated subscription fraud detection
+
+## 8. Security & Compliance
+
+### 8.1 Payment Security
+- **PCI DSS Compliance**: Full PCI compliance for payment processing
+- **Data Encryption**: End-to-end encryption for sensitive data
+- **Secure Payment Methods**: Secure storage of payment methods
+- **Fraud Prevention**: Advanced fraud detection and prevention
+- **Audit Logging**: Complete audit trail for all transactions
+
+### 8.2 Subscription Security
+- **Access Control**: Role-based access to subscription data
+- **Data Privacy**: GDPR compliant data handling
+- **Subscription Fraud Protection**: Protection against subscription fraud
+- **Secure APIs**: Secure API endpoints with proper authentication
+- **Regular Security Audits**: Regular security assessments and updates
+
+This comprehensive subscription service enables vendors to offer flexible, automated recurring product and service subscriptions while providing customers with convenient, customizable subscription management designed specifically for Bangladesh's market needs and cultural preferences.

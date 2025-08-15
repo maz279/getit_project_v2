@@ -1,0 +1,258 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: getit-production
+  labels:
+    app: api-gateway
+    platform: getit-bangladesh
+    component: configuration
+  annotations:
+    description: "GetIt Bangladesh API Gateway Configuration"
+    contact: "devops-team@getit.com.bd"
+data:
+  # Rate Limiting Configuration
+  rate-limit: "1000"
+  rate-limit-window: "900000"  # 15 minutes in milliseconds
+  rate-limit-max-requests: "1000"
+  rate-limit-skip-successful: "true"
+  
+  # CORS Configuration
+  cors-origins: "https://getit.com.bd,https://vendor.getit.com.bd,https://admin.getit.com.bd,https://mobile.getit.com.bd"
+  cors-methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  cors-allowed-headers: "Content-Type,Authorization,X-Requested-With,X-API-Key,X-User-Agent,X-Device-ID"
+  cors-exposed-headers: "X-Total-Count,X-Rate-Limit-Remaining,X-Rate-Limit-Reset"
+  cors-credentials: "true"
+  cors-max-age: "86400"  # 24 hours
+  
+  # Logging Configuration
+  log-level: "info"
+  log-format: "combined"
+  log-max-size: "100m"
+  log-max-files: "7"
+  
+  # Security Configuration
+  helmet-enabled: "true"
+  csp-enabled: "true"
+  csp-directives: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com;"
+  
+  # Request Configuration
+  request-timeout: "30000"  # 30 seconds
+  request-size-limit: "50mb"
+  json-limit: "10mb"
+  url-encoded-limit: "10mb"
+  
+  # Health Check Configuration
+  health-check-interval: "30000"
+  health-check-timeout: "5000"
+  health-check-threshold: "3"
+  
+  # Circuit Breaker Configuration
+  circuit-breaker-enabled: "true"
+  circuit-breaker-threshold: "5"
+  circuit-breaker-timeout: "60000"
+  circuit-breaker-reset-timeout: "300000"
+  
+  # Bangladesh-specific Configuration
+  bangladesh-timezone: "Asia/Dhaka"
+  bangladesh-locale: "bn-BD"
+  bangladesh-currency: "BDT"
+  bangladesh-phone-prefix: "+880"
+  
+  # Payment Gateway Configuration
+  payment-gateways: "bkash,nagad,rocket,stripe,paypal"
+  payment-timeout: "300000"  # 5 minutes
+  payment-retry-attempts: "3"
+  payment-retry-delay: "5000"
+  
+  # Shipping Configuration
+  shipping-partners: "pathao,paperfly,sundarban,redx,ecourier"
+  shipping-timeout: "60000"
+  shipping-retry-attempts: "2"
+  
+  # Feature Flags
+  feature-recommendations: "true"
+  feature-social-login: "true"
+  feature-voice-search: "true"
+  feature-visual-search: "true"
+  feature-group-buying: "true"
+  feature-live-chat: "true"
+  feature-loyalty-program: "true"
+  feature-multi-language: "true"
+  
+  # Performance Configuration
+  compression-enabled: "true"
+  compression-level: "6"
+  compression-threshold: "1024"
+  etag-enabled: "true"
+  keep-alive-timeout: "65000"
+  max-connections: "1000"
+  
+  # Monitoring Configuration
+  metrics-enabled: "true"
+  metrics-path: "/metrics"
+  metrics-interval: "15000"
+  tracing-enabled: "true"
+  tracing-sample-rate: "0.1"
+  
+  # Cache Configuration
+  cache-enabled: "true"
+  cache-ttl: "300000"  # 5 minutes
+  cache-max-size: "1000"
+  
+  # Bangladesh Festival Configuration
+  festival-mode-enabled: "true"
+  eid-theme-enabled: "true"
+  pohela-boishakh-theme-enabled: "true"
+  victory-day-theme-enabled: "true"
+  independence-day-theme-enabled: "true"
+  
+  # API Versioning
+  api-version: "v1"
+  api-deprecated-versions: "v0"
+  api-version-header: "X-API-Version"
+  
+  # External Services Configuration
+  google-analytics-enabled: "true"
+  facebook-pixel-enabled: "true"
+  hotjar-enabled: "true"
+  
+  # Environment Configuration
+  environment: "production"
+  debug-mode: "false"
+  maintenance-mode: "false"
+  
+  # Nginx Configuration (for proxy settings)
+  nginx-worker-connections: "1024"
+  nginx-client-max-body-size: "50m"
+  nginx-proxy-connect-timeout: "60s"
+  nginx-proxy-send-timeout: "60s"
+  nginx-proxy-read-timeout: "60s"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-nginx-config
+  namespace: getit-production
+  labels:
+    app: api-gateway
+    platform: getit-bangladesh
+    component: nginx-configuration
+data:
+  nginx.conf: |
+    upstream api_backend {
+        least_conn;
+        server api-gateway:8080 max_fails=3 fail_timeout=30s;
+    }
+    
+    upstream customer_web {
+        least_conn;
+        server customer-web:3000 max_fails=3 fail_timeout=30s;
+    }
+    
+    upstream vendor_dashboard {
+        least_conn;
+        server vendor-dashboard:3001 max_fails=3 fail_timeout=30s;
+    }
+    
+    upstream admin_panel {
+        least_conn;
+        server admin-panel:3002 max_fails=3 fail_timeout=30s;
+    }
+    
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    
+    server {
+        listen 80;
+        server_name getit.com.bd www.getit.com.bd;
+        return 301 https://$server_name$request_uri;
+    }
+    
+    server {
+        listen 443 ssl http2;
+        server_name getit.com.bd www.getit.com.bd;
+        
+        ssl_certificate /etc/ssl/certs/getit.com.bd.crt;
+        ssl_certificate_key /etc/ssl/private/getit.com.bd.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        
+        client_max_body_size 50m;
+        client_body_timeout 60s;
+        client_header_timeout 60s;
+        
+        # API routes
+        location /api/ {
+            proxy_pass http://api_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            proxy_buffering off;
+        }
+        
+        # WebSocket support
+        location /ws/ {
+            proxy_pass http://api_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # Customer web application
+        location / {
+            proxy_pass http://customer_web;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+    
+    server {
+        listen 443 ssl http2;
+        server_name vendor.getit.com.bd;
+        
+        ssl_certificate /etc/ssl/certs/vendor.getit.com.bd.crt;
+        ssl_certificate_key /etc/ssl/private/vendor.getit.com.bd.key;
+        
+        location / {
+            proxy_pass http://vendor_dashboard;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+    
+    server {
+        listen 443 ssl http2;
+        server_name admin.getit.com.bd;
+        
+        ssl_certificate /etc/ssl/certs/admin.getit.com.bd.crt;
+        ssl_certificate_key /etc/ssl/private/admin.getit.com.bd.key;
+        
+        location / {
+            proxy_pass http://admin_panel;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }

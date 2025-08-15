@@ -1,0 +1,13 @@
+🔥 DEBUG: performSearch called with: {searchQuery: 'shampoo', searchType: 'text'}
+AISearchBar.tsx:1573 🔍 DEBUG: performSearch call stack: Error
+    at https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/AISearchBar.tsx:1148:56
+    at https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/AISearchBar.tsx:1399:9
+    at HTMLUnknownElement.callCallback2 (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3674:22)
+    at Object.invokeGuardedCallbackDev (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3699:24)
+    at invokeGuardedCallback (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3736:33)
+    at executeDispatch (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7014:11)
+    at processDispatchQueueItemsInOrder (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7034:15)
+    at processDispatchQueue (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7043:13)
+    at dispatchEventsForPlugins (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7051:11)
+Header.tsx:541 Legacy search callback: shampoo []

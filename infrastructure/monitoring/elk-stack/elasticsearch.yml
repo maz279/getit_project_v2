@@ -1,0 +1,74 @@
+# Elasticsearch Configuration for GetIt Bangladesh
+# Amazon.com/Shopee.sg-Level Log Analytics Platform
+
+cluster.name: "getit-elasticsearch-cluster"
+node.name: "getit-es-master"
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery settings for production cluster
+discovery.type: zen
+discovery.zen.ping.unicast.hosts: ["elasticsearch-master", "elasticsearch-data1", "elasticsearch-data2"]
+discovery.zen.minimum_master_nodes: 2
+
+# Node roles
+node.master: true
+node.data: true
+node.ingest: true
+node.ml: true
+
+# Index settings
+action.auto_create_index: "+getit-*,-*"
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Security settings
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.keystore.path: elasticsearch.p12
+xpack.security.transport.ssl.truststore.path: elasticsearch.p12
+
+# Monitoring
+xpack.monitoring.enabled: true
+xpack.monitoring.collection.enabled: true
+
+# Machine Learning
+xpack.ml.enabled: true
+
+# Index lifecycle management
+xpack.ilm.enabled: true
+
+# Index templates for GetIt Bangladesh
+index.number_of_shards: 3
+index.number_of_replicas: 2
+index.refresh_interval: 30s
+index.max_result_window: 50000
+
+# Custom index patterns
+action.destructive_requires_name: true
+
+# Performance tuning
+indices.memory.index_buffer_size: 20%
+indices.memory.min_index_buffer_size: 96mb
+indices.fielddata.cache.size: 40%
+indices.requests.cache.size: 2%
+indices.queries.cache.size: 10%
+
+# Thread pools
+thread_pool.write.queue_size: 1000
+thread_pool.search.queue_size: 1000
+thread_pool.get.queue_size: 1000
+
+# Circuit breakers
+indices.breaker.total.limit: 70%
+indices.breaker.fielddata.limit: 40%
+indices.breaker.request.limit: 40%
+
+# Logging
+logger.org.elasticsearch.discovery: DEBUG
+logger.org.elasticsearch.cluster.service: DEBUG

@@ -1,0 +1,306 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: getit-production
+  labels:
+    app: payment-service
+    platform: getit-bangladesh
+    component: configuration
+    domain: payments
+    compliance: "pci-dss,bangladesh-bank"
+  annotations:
+    description: "GetIt Bangladesh Payment Service Configuration"
+    contact: "payments-team@getit.com.bd"
+data:
+  # Payment Gateway Configuration
+  payment-timeout: "300000"  # 5 minutes
+  payment-retry-attempts: "3"
+  payment-retry-delay: "5000"
+  payment-verification-timeout: "60000"
+  payment-callback-timeout: "30000"
+  
+  # Amount Limits
+  min-payment-amount: "10"  # 10 BDT
+  max-payment-amount: "500000"  # 500,000 BDT
+  daily-limit: "1000000"  # 1,000,000 BDT
+  monthly-limit: "5000000"  # 5,000,000 BDT
+  
+  # Bangladesh Mobile Banking Configuration
+  bkash-enabled: "true"
+  bkash-base-url: "https://tokenized.pay.bka.sh/v1.2.0-beta"
+  bkash-grant-type: "password"
+  bkash-currency: "BDT"
+  bkash-intent: "sale"
+  bkash-merchant-invoice-number-prefix: "GETIT"
+  bkash-checkout-url: "https://tokenized.pay.bka.sh/v1.2.0-beta/tokenized/checkout"
+  bkash-payment-timeout: "300"  # 5 minutes
+  bkash-callback-url: "https://api.getit.com.bd/api/v1/payments/bkash/callback"
+  bkash-webhook-url: "https://api.getit.com.bd/api/v1/payments/bkash/webhook"
+  
+  nagad-enabled: "true"
+  nagad-base-url: "https://api.mynagad.com/api/dfs"
+  nagad-payment-gateway-url: "https://api.mynagad.com/api/dfs/check-out/initialize"
+  nagad-verification-url: "https://api.mynagad.com/api/dfs/verify/payment"
+  nagad-currency: "BDT"
+  nagad-locale: "en"
+  nagad-callback-url: "https://api.getit.com.bd/api/v1/payments/nagad/callback"
+  nagad-webhook-url: "https://api.getit.com.bd/api/v1/payments/nagad/webhook"
+  nagad-payment-timeout: "300"  # 5 minutes
+  
+  rocket-enabled: "true"
+  rocket-base-url: "https://sandbox.rocket.com.bd/api/v1"
+  rocket-payment-url: "https://sandbox.rocket.com.bd/api/v1/payment/create"
+  rocket-verification-url: "https://sandbox.rocket.com.bd/api/v1/payment/verify"
+  rocket-currency: "BDT"
+  rocket-callback-url: "https://api.getit.com.bd/api/v1/payments/rocket/callback"
+  rocket-webhook-url: "https://api.getit.com.bd/api/v1/payments/rocket/webhook"
+  rocket-payment-timeout: "300"  # 5 minutes
+  
+  # International Payment Gateways
+  stripe-enabled: "true"
+  stripe-api-version: "2022-11-15"
+  stripe-currency: "BDT"
+  stripe-capture-method: "automatic"
+  stripe-confirmation-method: "automatic"
+  stripe-webhook-url: "https://api.getit.com.bd/api/v1/payments/stripe/webhook"
+  stripe-success-url: "https://getit.com.bd/payment/success"
+  stripe-cancel-url: "https://getit.com.bd/payment/cancel"
+  
+  paypal-enabled: "true"
+  paypal-environment: "production"
+  paypal-currency: "USD"
+  paypal-intent: "CAPTURE"
+  paypal-return-url: "https://getit.com.bd/payment/paypal/success"
+  paypal-cancel-url: "https://getit.com.bd/payment/paypal/cancel"
+  paypal-webhook-url: "https://api.getit.com.bd/api/v1/payments/paypal/webhook"
+  
+  # Fraud Detection Configuration
+  fraud-detection-enabled: "true"
+  fraud-check-timeout: "10000"  # 10 seconds
+  fraud-score-threshold: "0.8"
+  velocity-check-enabled: "true"
+  velocity-check-window: "3600000"  # 1 hour
+  velocity-check-limit: "10"
+  
+  # Security Configuration
+  pci-compliance-enabled: "true"
+  encryption-algorithm: "AES-256-GCM"
+  hash-algorithm: "SHA-256"
+  token-expiry: "3600000"  # 1 hour
+  webhook-signature-verification: "true"
+  
+  # Bangladesh Bank Compliance
+  bangladesh-bank-compliance: "true"
+  transaction-reporting-enabled: "true"
+  aml-check-enabled: "true"
+  kyc-verification-required: "true"
+  suspicious-transaction-threshold: "100000"  # 100,000 BDT
+  
+  # Rate Limiting
+  payment-rate-limit-window: "900000"  # 15 minutes
+  payment-rate-limit-max: "50"
+  webhook-rate-limit-window: "60000"  # 1 minute
+  webhook-rate-limit-max: "100"
+  
+  # Refund Configuration
+  refund-enabled: "true"
+  refund-window-days: "7"
+  auto-refund-enabled: "false"
+  refund-processing-time: "7"  # days
+  partial-refund-enabled: "true"
+  
+  # Settlement Configuration
+  settlement-enabled: "true"
+  settlement-frequency: "daily"
+  settlement-minimum-amount: "1000"  # 1,000 BDT
+  settlement-fee-percentage: "2.5"
+  settlement-delay-days: "1"
+  
+  # Notification Configuration
+  payment-notifications-enabled: "true"
+  webhook-notifications-enabled: "true"
+  email-notifications-enabled: "true"
+  sms-notifications-enabled: "true"
+  real-time-notifications-enabled: "true"
+  
+  # Analytics Configuration
+  payment-analytics-enabled: "true"
+  transaction-metrics-enabled: "true"
+  fraud-metrics-enabled: "true"
+  performance-metrics-enabled: "true"
+  revenue-tracking-enabled: "true"
+  
+  # Feature Flags
+  feature-recurring-payments: "true"
+  feature-saved-cards: "true"
+  feature-wallet-payments: "true"
+  feature-installment-payments: "true"
+  feature-group-payments: "false"
+  feature-cryptocurrency: "false"
+  
+  # Cache Configuration
+  payment-cache-ttl: "300000"  # 5 minutes
+  transaction-cache-ttl: "3600000"  # 1 hour
+  fraud-cache-ttl: "1800000"  # 30 minutes
+  
+  # Database Configuration
+  db-connection-pool-min: "10"
+  db-connection-pool-max: "50"
+  db-query-timeout: "30000"
+  db-transaction-timeout: "60000"
+  db-idle-timeout: "600000"
+  
+  # Audit Configuration
+  audit-log-enabled: "true"
+  audit-log-events: "payment_created,payment_completed,payment_failed,refund_created,refund_completed"
+  audit-log-retention: "2555"  # 7 years
+  pci-audit-enabled: "true"
+  
+  # Health Check Configuration
+  health-check-interval: "30000"
+  health-check-timeout: "5000"
+  payment-gateway-health-check: "true"
+  database-health-check: "true"
+  
+  # Performance Configuration
+  connection-timeout: "30000"
+  read-timeout: "60000"
+  max-concurrent-payments: "1000"
+  payment-queue-size: "10000"
+  
+  # Environment Configuration
+  environment: "production"
+  debug-mode: "false"
+  test-mode: "false"
+  sandbox-mode: "false"
+  api-version: "v1"
+  
+  # Logging Configuration
+  log-level: "info"
+  log-payment-details: "false"  # For PCI compliance
+  log-security-events: "true"
+  log-performance-metrics: "true"
+  log-fraud-events: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-currencies
+  namespace: getit-production
+  labels:
+    app: payment-service
+    platform: getit-bangladesh
+    component: currency-configuration
+data:
+  supported-currencies: |
+    {
+      "BDT": {
+        "name": "Bangladeshi Taka",
+        "symbol": "৳",
+        "decimal_places": 2,
+        "default": true,
+        "enabled": true
+      },
+      "USD": {
+        "name": "US Dollar",
+        "symbol": "$",
+        "decimal_places": 2,
+        "default": false,
+        "enabled": true
+      },
+      "EUR": {
+        "name": "Euro",
+        "symbol": "€",
+        "decimal_places": 2,
+        "default": false,
+        "enabled": true
+      },
+      "GBP": {
+        "name": "British Pound",
+        "symbol": "£",
+        "decimal_places": 2,
+        "default": false,
+        "enabled": true
+      }
+    }
+  
+  exchange-rates-api: "https://api.exchangerate-api.com/v4/latest/BDT"
+  exchange-rates-cache-ttl: "3600000"  # 1 hour
+  
+  payment-methods-by-currency: |
+    {
+      "BDT": ["bkash", "nagad", "rocket", "stripe", "paypal", "cod"],
+      "USD": ["stripe", "paypal"],
+      "EUR": ["stripe", "paypal"],
+      "GBP": ["stripe", "paypal"]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-bangladesh-features
+  namespace: getit-production
+  labels:
+    app: payment-service
+    platform: getit-bangladesh
+    component: bangladesh-features
+data:
+  # Festival Payment Features
+  festival-payment-bonuses: |
+    {
+      "eid_ul_fitr": {
+        "enabled": true,
+        "bonus_percentage": 5,
+        "max_bonus": 500,
+        "start_date": "2025-03-30",
+        "end_date": "2025-04-05"
+      },
+      "eid_ul_adha": {
+        "enabled": true,
+        "bonus_percentage": 3,
+        "max_bonus": 300,
+        "start_date": "2025-06-06",
+        "end_date": "2025-06-12"
+      },
+      "pohela_boishakh": {
+        "enabled": true,
+        "bonus_percentage": 4,
+        "max_bonus": 400,
+        "start_date": "2025-04-14",
+        "end_date": "2025-04-16"
+      }
+    }
+  
+  # Mobile Banking Promotions
+  mobile-banking-promotions: |
+    {
+      "bkash": {
+        "cashback_percentage": 2,
+        "max_cashback": 100,
+        "min_transaction": 500
+      },
+      "nagad": {
+        "cashback_percentage": 1.5,
+        "max_cashback": 75,
+        "min_transaction": 300
+      },
+      "rocket": {
+        "cashback_percentage": 1,
+        "max_cashback": 50,
+        "min_transaction": 200
+      }
+    }
+  
+  # Regional Settings
+  bangladesh-regions: |
+    {
+      "dhaka": {"tax_rate": 15, "delivery_charge": 60},
+      "chittagong": {"tax_rate": 15, "delivery_charge": 80},
+      "sylhet": {"tax_rate": 15, "delivery_charge": 100},
+      "rangpur": {"tax_rate": 15, "delivery_charge": 120},
+      "rajshahi": {"tax_rate": 15, "delivery_charge": 100},
+      "khulna": {"tax_rate": 15, "delivery_charge": 100},
+      "barisal": {"tax_rate": 15, "delivery_charge": 120},
+      "mymensingh": {"tax_rate": 15, "delivery_charge": 100}
+    }

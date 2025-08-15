@@ -1,0 +1,275 @@
+# Canary Deployment Configuration for GetIt Platform
+# Amazon.com/Shopee.sg Progressive Deployment Strategy
+
+# Canary Deployment with Istio
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: getit-api-canary-vs
+  namespace: getit-platform
+spec:
+  hosts:
+  - getit-api-service
+  http:
+  # Canary traffic (10% initially)
+  - match:
+    - headers:
+        user-agent:
+          regex: ".*Chrome.*"
+    route:
+    - destination:
+        host: getit-api-service
+        subset: canary
+      weight: 10
+    - destination:
+        host: getit-api-service
+        subset: stable
+      weight: 90
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 100ms
+  # Default traffic (stable version)
+  - route:
+    - destination:
+        host: getit-api-service
+        subset: stable
+      weight: 100
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+    timeout: 10s
+
+---
+# Argo Rollouts Canary Configuration
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: getit-api-canary-rollout
+  namespace: getit-platform
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      maxSurge: "25%"
+      maxUnavailable: 0
+      analysis:
+        templates:
+        - templateName: success-rate
+        startingStep: 2
+        args:
+        - name: service-name
+          value: getit-api-service
+      steps:
+      - setWeight: 10
+      - pause:
+          duration: 5m
+      - analysis:
+          templates:
+          - templateName: success-rate
+          args:
+          - name: service-name
+            value: getit-api-canary-service
+      - setWeight: 25
+      - pause:
+          duration: 10m
+      - analysis:
+          templates:
+          - templateName: success-rate
+          - templateName: latency
+          args:
+          - name: service-name
+            value: getit-api-canary-service
+      - setWeight: 50
+      - pause:
+          duration: 15m
+      - analysis:
+          templates:
+          - templateName: success-rate
+          - templateName: latency
+          - templateName: error-rate
+      - setWeight: 75
+      - pause:
+          duration: 10m
+      - setWeight: 100
+      - pause:
+          duration: 5m
+      canaryService: getit-api-canary-service
+      stableService: getit-api-stable-service
+      trafficRouting:
+        istio:
+          virtualService:
+            name: getit-api-canary-vs
+          destinationRule:
+            name: getit-api-canary-dr
+            canarySubsetName: canary
+            stableSubsetName: stable
+  selector:
+    matchLabels:
+      app: getit-api
+  template:
+    metadata:
+      labels:
+        app: getit-api
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: getit-api
+        image: getit/api:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Analysis Template for Success Rate
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: getit-platform
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: 1m
+    count: 5
+    successCondition: result[0] >= 0.95
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",code!~"5.."}[5m])) /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+
+---
+# Analysis Template for Latency
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency
+  namespace: getit-platform
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: latency
+    interval: 1m
+    count: 5
+    successCondition: result[0] <= 0.5
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[5m])) by (le)
+          )
+
+---
+# Analysis Template for Error Rate
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: getit-platform
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: error-rate
+    interval: 1m
+    count: 5
+    successCondition: result[0] <= 0.05
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",code=~"5.."}[5m])) /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+
+---
+# Notification Template for Rollout Events
+apiVersion: argoproj.io/v1alpha1
+kind: NotificationTemplate
+metadata:
+  name: rollout-notification
+  namespace: getit-platform
+spec:
+  subject: "Rollout {{.rollout.metadata.name}} {{.rollout.status.phase}}"
+  body: |
+    Rollout Name: {{.rollout.metadata.name}}
+    Phase: {{.rollout.status.phase}}
+    Revision: {{.rollout.status.currentStepIndex}}/{{len .rollout.spec.strategy.canary.steps}}
+    Current Weight: {{.rollout.status.canary.weights.canary}}%
+    
+    {{if eq .rollout.status.phase "Degraded"}}
+    ⚠️ Rollout has been automatically rolled back due to failed analysis.
+    {{else if eq .rollout.status.phase "Healthy"}}
+    ✅ Rollout completed successfully.
+    {{else}}
+    🔄 Rollout is in progress.
+    {{end}}
+
+---
+# Webhook Configuration for Slack Notifications
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slack-webhook
+  namespace: getit-platform
+type: Opaque
+stringData:
+  webhook-url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+
+---
+# ConfigMap for Rollout Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rollout-config
+  namespace: getit-platform
+data:
+  rollout.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    metadata:
+      name: getit-platform-rollout
+    spec:
+      analysis:
+        successfulRunHistoryLimit: 5
+        unsuccessfulRunHistoryLimit: 3
+      strategy:
+        canary:
+          canaryMetadata:
+            labels:
+              role: canary
+          stableMetadata:
+            labels:
+              role: stable

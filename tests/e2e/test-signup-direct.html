@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Signup Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .form-container { max-width: 400px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #e11d48; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #dcfce7; border: 1px solid #16a34a; color: #16a34a; }
+        .error { background: #fef2f2; border: 1px solid #dc2626; color: #dc2626; }
+        .loading { background: #fef3c7; border: 1px solid #d97706; color: #d97706; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>🔍 Direct Signup API Test</h2>
+        <p>This test bypasses the React frontend and tests the signup API directly.</p>
+        
+        <form id="signupForm">
+            <div class="form-group">
+                <label for="fullName">Full Name:</label>
+                <input type="text" id="fullName" value="Test User Direct" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" value="" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number:</label>
+                <input type="tel" id="phoneNumber" value="+8801234567890" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="password123" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password:</label>
+                <input type="password" id="confirmPassword" value="password123" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="city">City:</label>
+                <select id="city" required>
+                    <option value="">Select City</option>
+                    <option value="dhaka">Dhaka</option>
+                    <option value="chittagong">Chittagong</option>
+                    <option value="sylhet">Sylhet</option>
+                    <option value="khulna">Khulna</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="agreeToTerms" checked required>
+                    I agree to the Terms and Conditions
+                </label>
+            </div>
+            
+            <button type="submit">Create Account</button>
+        </form>
+        
+        <div id="result"></div>
+        
+        <div style="margin-top: 30px;">
+            <h3>🔧 Debug Information</h3>
+            <button onclick="testAPIConnection()">Test API Connection</button>
+            <button onclick="testReactApp()">Test React App</button>
+            <div id="debugInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        // Generate unique email for each test
+        document.getElementById('email').value = 'test' + Date.now() + '@example.com';
+        
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const formData = {
+                fullName: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                phoneNumber: document.getElementById('phoneNumber').value,
+                password: document.getElementById('password').value,
+                confirmPassword: document.getElementById('confirmPassword').value,
+                city: document.getElementById('city').value,
+                agreeToTerms: document.getElementById('agreeToTerms').checked,
+                language: 'en'
+            };
+            
+            resultDiv.innerHTML = '<div class="loading">🔄 Testing signup...</div>';
+            
+            try {
+                console.log('📤 Sending signup request:', formData);
+                
+                const response = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                });
+                
+                const result = await response.json();
+                console.log('📥 Signup response:', result);
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ <strong>SUCCESS!</strong><br>
+                            User ID: ${result.data.user.id}<br>
+                            Email: ${result.data.user.email}<br>
+                            Token: ${result.data.token ? 'Generated' : 'Missing'}<br>
+                            Status: Account created successfully!
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>API ERROR:</strong><br>
+                            ${result.error?.message || 'Unknown error'}<br>
+                            Code: ${result.error?.code || 'N/A'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('🚨 Network error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        🚨 <strong>NETWORK ERROR:</strong><br>
+                        ${error.message}<br>
+                        This indicates a connection issue with the backend.
+                    </div>
+                `;
+            }
+        });
+        
+        async function testAPIConnection() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = '<div class="loading">🔄 Testing API connection...</div>';
+            
+            try {
+                const response = await fetch('/api/health');
+                const result = await response.json();
+                
+                debugDiv.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>API CONNECTION OK</strong><br>
+                        Status: ${response.status}<br>
+                        Health: ${result.success ? 'Healthy' : 'Unhealthy'}
+                    </div>
+                `;
+            } catch (error) {
+                debugDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>API CONNECTION FAILED</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function testReactApp() {
+            const debugDiv = document.getElementById('debugInfo');
+            
+            try {
+                // Navigate to React app signup page
+                debugDiv.innerHTML = `
+                    <div class="loading">
+                        🔄 <strong>TESTING REACT APP</strong><br>
+                        Opening React signup page in new tab...
+                    </div>
+                `;
+                
+                window.open('/register', '_blank');
+                
+                setTimeout(() => {
+                    debugDiv.innerHTML += `
+                        <div style="margin-top: 10px;">
+                            <strong>✅ React app test initiated</strong><br>
+                            Check the new tab for React app functionality.<br>
+                            Compare with this direct API test results.
+                        </div>
+                    `;
+                }, 1000);
+                
+            } catch (error) {
+                debugDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>REACT APP TEST FAILED</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-test API connection on load
+        setTimeout(testAPIConnection, 1000);
+    </script>
+</body>
+</html>

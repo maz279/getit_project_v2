@@ -1,0 +1,792 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Search, 
+  Mic, 
+  Camera, 
+  QrCode, 
+  User, 
+  ShoppingCart, 
+  Globe, 
+  Menu, 
+  X, 
+  Store,
+  ChevronDown,
+  Heart,
+  Settings,
+  LogOut,
+  Package,
+  CreditCard,
+  Bell,
+  Sparkles,
+  MapPin,
+  Truck,
+  Shield,
+  Star,
+  Gift,
+  Headphones,
+  Crown,
+  Zap,
+  TrendingUp,
+  Award,
+  MessageCircle,
+  BadgeCheck,
+  Rocket,
+  DollarSign,
+  ShoppingBag,
+  Banknote,
+  Gauge,
+  Users,
+  Target,
+  Briefcase
+} from 'lucide-react';
+
+const GetItHeader = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [language, setLanguage] = useState('EN');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [cartCount, setCartCount] = useState(7);
+  const [notificationCount, setNotificationCount] = useState(12);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('signin');
+  const [isVoiceSearch, setIsVoiceSearch] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
+  const [userTier, setUserTier] = useState('Premium');
+
+  // Enhanced search suggestions with icons
+  const searchSuggestions = [
+    { 
+      text: language === 'EN' ? 'iPhone 15 Pro Max' : 'আইফোন ১৫ প্রো ম্যাক্স',
+      icon: '📱',
+      trending: true
+    },
+    { 
+      text: language === 'EN' ? 'Samsung Smart TV' : 'স্যামসাং স্মার্ট টিভি',
+      icon: '📺',
+      trending: false
+    },
+    { 
+      text: language === 'EN' ? 'Nike Air Jordan' : 'নাইকি এয়ার জর্ডান',
+      icon: '👟',
+      trending: true
+    },
+    { 
+      text: language === 'EN' ? 'MacBook Pro M3' : 'ম্যাকবুক প্রো এম৩',
+      icon: '💻',
+      trending: false
+    },
+    { 
+      text: language === 'EN' ? 'PlayStation 5' : 'প্লেস্টেশন ৫',
+      icon: '🎮',
+      trending: true
+    }
+  ];
+
+  const categories = [
+    { 
+      en: 'Electronics', 
+      bn: 'ইলেকট্রনিক্স',
+      icon: '📱',
+      color: 'from-blue-500 to-cyan-500',
+      subcategories: ['Mobile', 'Laptop', 'TV', 'Camera']
+    },
+    { 
+      en: 'Fashion', 
+      bn: 'ফ্যাশন',
+      icon: '👗',
+      color: 'from-pink-500 to-rose-500',
+      subcategories: ['Men', 'Women', 'Kids', 'Accessories']
+    },
+    { 
+      en: 'Home & Living', 
+      bn: 'হোম অ্যান্ড লিভিং',
+      icon: '🏠',
+      color: 'from-green-500 to-emerald-500',
+      subcategories: ['Furniture', 'Decor', 'Kitchen', 'Garden']
+    },
+    { 
+      en: 'Health & Beauty', 
+      bn: 'স্বাস্থ্য ও সৌন্দর্য',
+      icon: '💄',
+      color: 'from-purple-500 to-violet-500',
+      subcategories: ['Skincare', 'Makeup', 'Health', 'Fragrance']
+    },
+    { 
+      en: 'Sports & Outdoors', 
+      bn: 'খেলাধুলা ও বহিরঙ্গন',
+      icon: '⚽',
+      color: 'from-orange-500 to-amber-500',
+      subcategories: ['Sports', 'Fitness', 'Outdoor', 'Travel']
+    },
+    { 
+      en: 'Books & Media', 
+      bn: 'বই ও মিডিয়া',
+      icon: '📚',
+      color: 'from-indigo-500 to-blue-500',
+      subcategories: ['Books', 'Music', 'Movies', 'Games']
+    }
+  ];
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'EN' ? 'বাং' : 'EN');
+  };
+
+  const handleVoiceSearch = () => {
+    setIsVoiceSearch(true);
+    setTimeout(() => {
+      setIsVoiceSearch(false);
+      setSearchQuery(language === 'EN' ? 'Samsung Galaxy S24 Ultra' : 'স্যামসাং গ্যালাক্সি এস২৪ আল্ট্রা');
+    }, 2000);
+  };
+
+  const userMenuItems = [
+    { 
+      icon: User, 
+      label: language === 'EN' ? 'My Profile' : 'আমার প্রোফাইল',
+      href: '/profile',
+      badge: null
+    },
+    { 
+      icon: Package, 
+      label: language === 'EN' ? 'My Orders' : 'আমার অর্ডার',
+      href: '/orders',
+      badge: '3'
+    },
+    { 
+      icon: Heart, 
+      label: language === 'EN' ? 'Wishlist' : 'উইশলিস্ট',
+      href: '/wishlist',
+      badge: '24'
+    },
+    { 
+      icon: CreditCard, 
+      label: language === 'EN' ? 'Payment & Refunds' : 'পেমেন্ট ও রিফান্ড',
+      href: '/payments',
+      badge: null
+    },
+    { 
+      icon: Gift, 
+      label: language === 'EN' ? 'Vouchers' : 'ভাউচার',
+      href: '/vouchers',
+      badge: '2'
+    },
+    { 
+      icon: Bell, 
+      label: language === 'EN' ? 'Notifications' : 'নোটিফিকেশন',
+      href: '/notifications',
+      badge: notificationCount.toString()
+    },
+    { 
+      icon: Headphones, 
+      label: language === 'EN' ? 'Help Center' : 'সাহায্য কেন্দ্র',
+      href: '/help',
+      badge: null
+    },
+    { 
+      icon: Settings, 
+      label: language === 'EN' ? 'Account Settings' : 'অ্যাকাউন্ট সেটিংস',
+      href: '/settings',
+      badge: null
+    }
+  ];
+
+  const text = {
+    EN: {
+      search: 'Search for products, brands and more...',
+      signin: 'Sign In',
+      signup: 'Sign Up',
+      vendor: 'Sell on GetIt',
+      cart: 'Cart',
+      menu: 'Menu',
+      logout: 'Logout',
+      categories: 'Categories',
+      aiSearch: 'AI Search',
+      voiceSearch: 'Voice Search',
+      imageSearch: 'Image Search',
+      qrSearch: 'QR Scanner',
+      deliver: 'Deliver to',
+      location: 'Dhaka 1000',
+      trending: 'Trending',
+      premium: 'Premium Member',
+      tagline: 'Buy Smart, Ship Fast and Pay Easy'
+    },
+    বাং: {
+      search: 'পণ্য, ব্র্যান্ড এবং আরও অনেক কিছু খুঁজুন...',
+      signin: 'সাইন ইন',
+      signup: 'সাইন আপ',
+      vendor: 'GetIt-এ বিক্রয় করুন',
+      cart: 'কার্ট',
+      menu: 'মেনু',
+      logout: 'লগ আউট',
+      categories: 'ক্যাটাগরি',
+      aiSearch: 'এআই সার্চ',
+      voiceSearch: 'ভয়েস সার্চ',
+      imageSearch: 'ইমেজ সার্চ',
+      qrSearch: 'কিউআর স্ক্যানার',
+      deliver: 'ডেলিভারি',
+      location: 'ঢাকা ১০০০',
+      trending: 'ট্রেন্ডিং',
+      premium: 'প্রিমিয়াম সদস্য',
+      tagline: 'স্মার্ট কিনুন, দ্রুত পান এবং সহজে পেমেন্ট করুন'
+    }
+  };
+
+  const currentText = text[language];
+
+  return (
+    <div className="relative">
+      {/* Enhanced Top Strip */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 text-white py-2 px-4 text-xs shadow-lg">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                <Truck className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-medium">{language === 'EN' ? 'FREE delivery on orders over ৳500' : '৳৫০০+ অর্ডারে ফ্রি ডেলিভারি'}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full flex items-center justify-center">
+                <Shield className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-medium">{language === 'EN' ? '100% Secure Shopping' : '১০০% নিরাপদ কেনাকাটা'}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                <Banknote className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-medium">{language === 'EN' ? 'Cash on Delivery Available' : 'ক্যাশ অন ডেলিভারি সুবিধা'}</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button className="flex items-center space-x-2 hover:text-yellow-300 transition-colors duration-300 px-3 py-1 rounded-full hover:bg-white/10">
+              <MessageCircle className="w-4 h-4" />
+              <span className="font-medium">{language === 'EN' ? 'Live Chat' : 'লাইভ চ্যাট'}</span>
+            </button>
+            <button className="flex items-center space-x-2 hover:text-yellow-300 transition-colors duration-300 px-3 py-1 rounded-full hover:bg-white/10">
+              <Headphones className="w-4 h-4" />
+              <span className="font-medium">{language === 'EN' ? 'Help' : 'সাহায্য'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Main Header with Gradient Background */}
+      <header className="bg-gradient-to-r from-white via-blue-50 to-purple-50 shadow-xl border-b border-gray-200 sticky top-0 z-40 backdrop-blur-sm">
+        {/* Subtle animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-blue-100/30 to-purple-100/30 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-to-br from-purple-100/30 to-pink-100/30 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="lg:hidden text-gray-700 hover:text-blue-600 transition-all duration-300 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md"
+              aria-label={currentText.menu}
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+
+            {/* Enhanced Logo Section */}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-3 rounded-2xl shadow-xl transform hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:rotate-3">
+                  <span className="text-white font-black text-2xl">G</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    getit
+                  </h1>
+                  <p className="text-[10px] text-gray-600 font-medium -mt-1 leading-tight">
+                    {currentText.tagline}
+                  </p>
+                </div>
+              </div>
+
+              {/* Enhanced Delivery Location */}
+              <div className="hidden lg:flex items-center space-x-2 text-sm text-gray-600 hover:text-blue-600 cursor-pointer transition-all duration-300 px-3 py-2 rounded-lg hover:bg-blue-100 hover:shadow-md">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
+                  <MapPin className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">{currentText.deliver}</p>
+                  <p className="font-bold text-gray-700">{currentText.location}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced Search Bar */}
+            <div className="flex-1 max-w-3xl mx-6 relative">
+              <div className={`relative bg-white/80 backdrop-blur-sm rounded-full shadow-xl border-2 transition-all duration-300 ${
+                isSearchFocused ? 'border-blue-500 shadow-2xl ring-4 ring-blue-200/50 bg-white' : 'border-gray-200 hover:border-gray-300 hover:shadow-2xl'
+              }`}>
+                <div className="flex items-center">
+                  
+                  {/* Enhanced Categories Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowCategories(!showCategories)}
+                      className="flex items-center space-x-2 px-4 py-3 text-gray-700 hover:text-blue-600 transition-all duration-300 border-r border-gray-200 hover:bg-blue-50 rounded-l-full"
+                    >
+                      <span className="text-sm font-semibold whitespace-nowrap">{currentText.categories}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showCategories ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Enhanced Categories Mega Menu */}
+                    {showCategories && (
+                      <div className="absolute top-full left-0 mt-2 w-80 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-100 py-4 z-50">
+                        <div className="grid grid-cols-1 gap-1">
+                          {categories.map((category, index) => (
+                            <button
+                              key={index}
+                              className="flex items-center space-x-4 px-4 py-3 hover:bg-blue-50 transition-all duration-200 text-left hover:shadow-md rounded-lg mx-2"
+                            >
+                              <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${category.color} flex items-center justify-center text-white text-lg shadow-lg hover:shadow-xl transition-all duration-300`}>
+                                {category.icon}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-bold text-gray-900">{category[language.toLowerCase()]}</p>
+                                <p className="text-xs text-gray-500 mt-1">{category.subcategories.join(', ')}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder={currentText.search}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => {
+                        setIsSearchFocused(true);
+                        setShowSuggestions(true);
+                      }}
+                      onBlur={() => {
+                        setIsSearchFocused(false);
+                        setTimeout(() => setShowSuggestions(false), 200);
+                      }}
+                      className="w-full py-3 px-4 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-sm"
+                    />
+                  </div>
+
+                  {/* Enhanced Search Actions */}
+                  <div className="flex items-center space-x-1 pr-2">
+                    <button
+                      onClick={handleVoiceSearch}
+                      className={`p-2 rounded-full transition-all duration-300 ${
+                        isVoiceSearch 
+                          ? 'bg-red-500 text-white animate-pulse shadow-lg' 
+                          : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                      }`}
+                      title={currentText.voiceSearch}
+                    >
+                      <Mic size={16} />
+                    </button>
+                    
+                    <button
+                      className="p-2 rounded-full text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all duration-300"
+                      title={currentText.imageSearch}
+                    >
+                      <Camera size={16} />
+                    </button>
+                    
+                    <button
+                      className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all duration-300"
+                      title={currentText.qrSearch}
+                    >
+                      <QrCode size={16} />
+                    </button>
+                    
+                    <button
+                      className="p-2 rounded-full text-gray-400 hover:text-pink-600 hover:bg-pink-50 transition-all duration-300"
+                      title={currentText.aiSearch}
+                    >
+                      <Sparkles size={16} />
+                    </button>
+                  </div>
+
+                  {/* Enhanced Search Button */}
+                  <button className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-r-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <Search size={18} />
+                  </button>
+                </div>
+
+                {/* Enhanced Search Suggestions */}
+                {showSuggestions && (
+                  <div className="absolute top-full left-0 right-0 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl mt-2 border border-gray-100 z-50 overflow-hidden">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                          <TrendingUp className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="text-sm font-bold text-gray-700">{currentText.trending}</span>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {searchSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-blue-50 text-left transition-all duration-200 border-b border-gray-50 last:border-b-0 hover:shadow-md"
+                          onClick={() => {
+                            setSearchQuery(suggestion.text);
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <span className="text-xl">{suggestion.icon}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-700 font-medium">{suggestion.text}</span>
+                              {suggestion.trending && (
+                                <span className="bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">
+                                  {language === 'EN' ? 'HOT' : 'জনপ্রিয়'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Search className="w-4 h-4 text-gray-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Enhanced Right Section */}
+            <div className="flex items-center space-x-3">
+              
+              {/* Enhanced Language Toggle */}
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center space-x-2 px-3 py-2 rounded-full border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 text-gray-700 hover:text-blue-600 hover:shadow-md"
+              >
+                <div className="w-5 h-5 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                  <Globe size={12} className="text-white" />
+                </div>
+                <span className="text-sm font-semibold">{language}</span>
+              </button>
+
+              {/* Enhanced Become a Vendor Button */}
+              <button className="hidden lg:flex items-center space-x-2 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <Store size={14} />
+                </div>
+                <span className="text-sm">{currentText.vendor}</span>
+                <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center">
+                  <Briefcase size={10} />
+                </div>
+              </button>
+
+              {/* Enhanced User Account */}
+              <div className="relative">
+                {isLoggedIn ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                      className="flex items-center space-x-2 px-3 py-2 rounded-full hover:bg-blue-50 transition-all duration-300 text-gray-700 hover:shadow-md"
+                    >
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                          <User size={18} className="text-white" />
+                        </div>
+                        {userTier === 'Premium' && (
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-md">
+                            <Crown size={12} className="text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="hidden sm:block text-left">
+                        <p className="text-xs text-gray-500 font-medium">{language === 'EN' ? 'Hello' : 'হ্যালো'}</p>
+                        <p className="text-sm font-bold text-gray-700">John Doe</p>
+                      </div>
+                      <ChevronDown size={16} className={`transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Enhanced User Dropdown Menu */}
+                    {isUserMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-80 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                        {/* Enhanced User Info Header */}
+                        <div className="p-4 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 border-b border-gray-100">
+                          <div className="flex items-center space-x-3">
+                            <div className="relative">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                                <User size={20} className="text-white" />
+                              </div>
+                              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-md">
+                                <Crown size={12} className="text-white" />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-gray-900">John Doe</p>
+                              <p className="text-sm text-gray-600">john@example.com</p>
+                              <div className="flex items-center space-x-1 mt-1">
+                                <div className="w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                                  <Star className="w-2 h-2 text-white fill-current" />
+                                </div>
+                                <span className="text-xs text-gray-500 font-bold">{currentText.premium}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Enhanced Menu Items */}
+                        <div className="max-h-80 overflow-y-auto">
+                          {userMenuItems.map((item, index) => (
+                            <a
+                              key={index}
+                              href={item.href}
+                              className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-all duration-200 border-b border-gray-50 last:border-b-0 hover:shadow-md"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center shadow-sm">
+                                  <item.icon size={16} />
+                                </div>
+                                <span className="text-sm font-semibold">{item.label}</span>
+                              </div>
+                              {item.badge && (
+                                <span className="bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                        
+                        {/* Enhanced Logout */}
+                        <div className="p-4 bg-gradient-to-r from-red-50 to-pink-50 border-t border-gray-100">
+                          <button
+                            onClick={() => setIsLoggedIn(false)}
+                            className="flex items-center space-x-3 w-full text-left text-red-600 hover:text-red-700 transition-colors duration-200 font-semibold"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                              <LogOut size={16} />
+                            </div>
+                            <span className="text-sm">{currentText.logout}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        setAuthMode('signin');
+                        setShowAuthModal(true);
+                      }}
+                      className="text-gray-700 hover:text-blue-600 transition-colors duration-300 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-blue-50"
+                    >
+                      {currentText.signin}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAuthMode('signup');
+                        setShowAuthModal(true);
+                      }}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      {currentText.signup}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Enhanced Notifications */}
+              <div className="relative">
+                <button className="relative p-2 rounded-full hover:bg-blue-50 transition-all duration-300 text-gray-700 hover:text-blue-600 hover:shadow-md">
+                  <Bell size={20} />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                      {notificationCount > 9 ? '9+' : notificationCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Enhanced Shopping Cart */}
+              <div className="relative">
+                <button className="relative p-2 rounded-full hover:bg-blue-50 transition-all duration-300 text-gray-700 hover:text-blue-600 transform hover:scale-105 hover:shadow-md">
+                  <ShoppingCart size={20} />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-lg animate-bounce">
+                      {cartCount > 9 ? '9+' : cartCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Enhanced Mobile Menu */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:hidden">
+          <div className="bg-gradient-to-b from-white to-blue-50 w-80 h-full shadow-2xl overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 p-2 rounded-xl shadow-lg">
+                    <span className="text-white font-bold text-lg">G</span>
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      getit
+                    </h1>
+                    <p className="text-[10px] text-gray-600 font-medium -mt-1">
+                      {currentText.tagline}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 transition-colors duration-300 p-2"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Enhanced User Profile (Mobile) */}
+              {isLoggedIn && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 mb-6 shadow-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                        <User size={20} className="text-white" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-md">
+                        <Crown size={12} className="text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">John Doe</p>
+                      <p className="text-sm text-gray-600">{currentText.premium}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Enhanced Mobile Categories */}
+              <div className="space-y-2 mb-6">
+                <h3 className="text-gray-900 font-bold text-lg mb-4">{currentText.categories}</h3>
+                {categories.map((category, index) => (
+                  <button
+                    key={index}
+                    className="flex items-center space-x-3 w-full text-left p-3 rounded-xl hover:bg-blue-50 transition-all duration-200 hover:shadow-md"
+                  >
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${category.color} flex items-center justify-center text-white shadow-md`}>
+                      {category.icon}
+                    </div>
+                    <span className="font-semibold text-gray-700">{category[language.toLowerCase()]}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Enhanced Mobile Actions */}
+              <div className="space-y-3">
+                <button className="w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                    <Store size={16} />
+                  </div>
+                  <span>{currentText.vendor}</span>
+                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                    <Briefcase size={16} />
+                  </div>
+                </button>
+                
+                <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Headphones size={20} />
+                  <span>{language === 'EN' ? 'Customer Service' : 'কাস্টমার সার্ভিস'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Authentication Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    {authMode === 'signin' ? currentText.signin : currentText.signup}
+                  </h2>
+                  <p className="text-blue-100 text-sm mt-1">
+                    {authMode === 'signin' 
+                      ? (language === 'EN' ? 'Welcome back to GetIt' : 'GetIt-এ আবার স্বাগতম')
+                      : (language === 'EN' ? 'Join GetIt today' : 'আজই GetIt-এ যোগ দিন')
+                    }
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="text-white/80 hover:text-white transition-colors duration-300 p-2"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="relative">
+                  <input
+                    type="email"
+                    placeholder={language === 'EN' ? 'Email or Phone Number' : 'ইমেইল বা ফোন নম্বর'}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 placeholder-gray-400"
+                  />
+                </div>
+                
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder={language === 'EN' ? 'Password' : 'পাসওয়ার্ড'}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 placeholder-gray-400"
+                  />
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setIsLoggedIn(true);
+                    setShowAuthModal(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  {authMode === 'signin' ? currentText.signin : currentText.signup}
+                </button>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition-colors duration-300"
+                  >
+                    {authMode === 'signin' 
+                      ? (language === 'EN' ? "Don't have an account? Sign up" : "অ্যাকাউন্ট নেই? সাইন আপ করুন")
+                      : (language === 'EN' ? "Already have an account? Sign in" : "অ্যাকাউন্ট আছে? সাইন ইন করুন")
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default GetItHeader;

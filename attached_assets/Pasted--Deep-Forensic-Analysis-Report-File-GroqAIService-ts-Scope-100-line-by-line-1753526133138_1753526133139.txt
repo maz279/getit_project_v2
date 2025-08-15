@@ -1,0 +1,78 @@
+# 🕵️ Deep Forensic Analysis Report  
+**File:** `GroqAIService.ts`  
+**Scope:** 100 % line-by-line audit, focusing on **runtime correctness**, **security**, **performance**, **maintainability** and **Bangladesh-specific cultural accuracy**.
+
+---
+
+## 🔴 Critical / High-impact Issues
+
+| # | Line(s) | Severity | Issue & Explanation | Fix |
+|---|---------|----------|---------------------|-----|
+| 1 | 88-92 | 🔴 **CRITICAL** | **Malformed `baseURL`**<br>The value `https://api.groq.com/openai/v1` is wrapped in a **failed HTML tag** (`<url id="...">`) instead of a plain string. This causes **network layer failure** and makes every request **404 / unresolved host**. | Replace with plain string: `baseURL: "https://api.groq.com/openai/v1"` |
+| 2 | 139-141 | 🔴 **SECURITY** | **Validation bypass**<br>`this.validateInput(message, 'message')` passes the **literal** `"message"` instead of the **max length** constant. The check becomes `input.length > "message"` → **`NaN > NaN`** → always `false`. | Use `CONFIG.VALIDATION.INPUT_MAX_LENGTH` |
+| 3 | 725 | 🔴 **SECURITY** | **ReDoS vector**<br>`/<script/i` is **case-insensitive** and un-anchored; attackers can craft **200 kB+ payloads** of repeating `<ScRiPt` to block the event loop. | Use **case-sensitive, length-capped** regex: `/^[\s\S]{0,1000}$/i.test(input)` |
+| 4 | 614 | 🟠 **MEMORY LEAK** | **Unbounded cache**<br>`this.setCache(key, suggestions)` uses **default TTL = CACHE_TTL** but the property is **never declared** (`this.CACHE_TTL` is `undefined`). This silently sets TTL to zero → **immediate expiry** or **infinite retention** depending on coercion. | Declare `private readonly CACHE_TTL = CONFIG.CACHE.TTL;` |
+| 5 | 581, 665, 740 | 🟠 **TYPE MISMATCH** | **Zod schema mismatch**<br>Functions call `SearchEnhancementSchema.parse(...)` but the LLM may return **float strings** (`"0.85"`). `z.number()` **fails** → throws instead of coercing. | Use `z.coerce.number()` or add pre-coercion. |
+
+---
+
+## 🟡 Medium-impact Issues
+
+| # | Line(s) | Severity | Issue & Explanation | Fix |
+|---|---------|----------|---------------------|-----|
+| 6 | 117 | 🟡 **BUG** | **Invalid singleton lock**<br>`Symbol('GroqAIService.instance')` is **re-created** every import → **not** a true lock. Multiple test suites will still spawn **multiple instances**. | Move symbol to **module scope**: `const INSTANCE_LOCK = Symbol('lock');` |
+| 7 | 799 | 🟡 **PARSING** | **Regex greediness**<br>`/\{.*\}/s` can **over-match** nested JSON or markdown blocks, leading to **malformed JSON**. | Use **non-greedy**: `/\{[^{}]*\}/s` or proper JSON extraction. |
+| 8 | 851 | 🟡 **LOCALE** | **Fallback Bengali tone**<br>Fallback response uses **formal** Bengali (`আমি আপনার...`) which may feel **robotic** to younger shoppers. | Provide **colloquial variant** based on `userProfile.ageGroup`. |
+| 9 | 1052 | 🟡 **MAINTAINABILITY** | **Magic festival logic**<br>Hard-coded months drift every year; **Eid dates** change annually. | Integrate **lunar calendar API** or **configurable table**. |
+| 10 | 1105 | 🟡 **ERROR HANDLING** | **Request ID lost**<br>`generateRequestId()` is called but **never defined**. | Add `private generateRequestId = () => crypto.randomUUID();` |
+
+---
+
+## 🟢 Low-impact / Style Issues
+
+| # | Line(s) | Severity | Issue & Explanation | Fix |
+|---|---------|----------|---------------------|-----|
+| 11 | 103-105 | 🟢 **STYLE** | **Asymmetric spacing**<br>`CONFIG.CACHE.TTL` uses `5 * 60 * 1000` while `CLEANUP_INTERVAL` uses literal `60000`. | Harmonize style: `CONFIG.CACHE.CLEANUP_INTERVAL = 60 * 1000`. |
+| 12 | 770 | 🟢 **LOGGING** | **Verbose key logging**<br>`console.log` prints **`key.length`** which **leaks entropy** (≈ API key length). | Remove or obfuscate: `console.log('API key present:', !!trimmedKey)`. |
+| 13 | 1208 | 🟢 **NAMING** | **Typo in property**<br>`price_range` vs `priceRange` (camelCase vs snake_case) mismatch between schema and prompt. | Align to camelCase everywhere. |
+
+---
+
+## 📌 Bangladesh Cultural Accuracy Check
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| **Festivals** | ✅ | Lists correct major festivals (`Eid ul-Fitr`, `Pohela Boishakh`, etc.) |
+| **Payment** | ✅ | Includes `bKash`, `Nagad`, `COD` |
+| **Cities** | ✅ | All 8 divisional cities present |
+| **Brands** | ✅ | Major local brands (`Walton`, `Symphony`, `Pran`) |
+| **Seasons** | ⚠️ | Simplified 4-season model; **Bangladesh has 6 micro-seasons** (`Grishmo`, `Barsha`, `Sharat`, etc.). Consider deeper granularity for **agricultural products** or **fashion**. |
+
+---
+
+## ✅ Quick Patch Summary (TL;DR)
+
+```diff
+- baseURL: 'https://api.groq.com/openai/v1  ',
++ baseURL: 'https://api.groq.com/openai/v1',
+
+- this.validateInput(message, 'message');
++ this.validateInput(message, CONFIG.VALIDATION.INPUT_MAX_LENGTH);
+
++ private readonly CACHE_TTL = CONFIG.CACHE.TTL;
++ private generateRequestId = () => crypto.randomUUID();
+```
+
+---
+
+## 🧪 Test Checklist After Fixes
+
+- [ ] **Network ping** to `https://api.groq.com/openai/v1` returns 200.  
+- [ ] **Singleton** is truly singleton across Jest test suites.  
+- [ ] **Validation** rejects 1 kB+ payloads with `<script>` tags.  
+- [ ] **Cache TTL** correctly evicts after 5 minutes.  
+- [ ] **Bengali fallback** renders without control-character artifacts.
+
+---
+
+> 🛡️ **Recommendation:** Address the **Critical** items first (lines 88-92, 139-141, 725). They break **core functionality** and **security**. The rest can be batched into the next sprint.

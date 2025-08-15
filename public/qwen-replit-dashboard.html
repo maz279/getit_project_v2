@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen 3 Coder - Replit-Style AI Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; overflow: hidden; background: #1a1a1a; color: #e5e5e5; }
+        
+        /* Header */
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .header h1 { color: white; font-size: 18px; font-weight: 600; }
+        .header .status { background: #22c55e; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+        .header .back-btn { background: rgba(255,255,255,0.2); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 14px; }
+        .header .back-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        /* Main layout */
+        .main-container { display: flex; height: calc(100vh - 60px); }
+        
+        /* Left sidebar - File browser */
+        .sidebar { width: 280px; background: #252526; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid #333; font-weight: 600; color: #cccccc; font-size: 14px; }
+        .file-tree { flex: 1; overflow-y: auto; padding: 8px; }
+        .file-item { padding: 6px 12px; cursor: pointer; border-radius: 4px; margin: 2px 0; font-size: 13px; color: #cccccc; display: flex; align-items: center; }
+        .file-item:hover { background: #2a2d2e; }
+        .file-item.active { background: #094771; color: #ffffff; }
+        .file-item i { margin-right: 8px; width: 16px; text-align: center; }
+        .folder { color: #ffcc02; }
+        .file { color: #519aba; }
+        .folder-toggle { margin-right: 4px; cursor: pointer; color: #cccccc; width: 12px; text-align: center; user-select: none; }
+        .folder-toggle.collapsed::before { content: '▶'; }
+        .folder-toggle.expanded::before { content: '▼'; }
+        .file-children { margin-left: 16px; display: none; }
+        .file-children.expanded { display: block; }
+        .file-extension { font-size: 11px; color: #888; margin-left: 4px; }
+        .loading-tree { text-align: center; color: #007acc; padding: 20px; }
+        .tree-stats { padding: 8px 16px; color: #888; font-size: 12px; border-top: 1px solid #333; }
+        
+        /* Center workspace */
+        .workspace { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; }
+        .workspace-header { padding: 12px 16px; border-bottom: 1px solid #333; display: flex; justify-content: between; align-items: center; }
+        .workspace-title { font-weight: 600; color: #cccccc; font-size: 14px; }
+        .workspace-content { flex: 1; padding: 16px; overflow-y: auto; }
+        
+        /* Right panel - Preview */
+        .preview-panel { width: 350px; background: #252526; border-left: 1px solid #333; display: flex; flex-direction: column; }
+        .preview-header { padding: 12px 16px; border-bottom: 1px solid #333; font-weight: 600; color: #cccccc; font-size: 14px; }
+        .preview-content { flex: 1; padding: 16px; overflow-y: auto; }
+        
+        /* AI Actions */
+        .ai-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .ai-action { background: #2d2d30; border: 1px solid #3c3c3c; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s; }
+        .ai-action:hover { background: #363640; border-color: #007acc; }
+        .ai-action.active { background: #094771; border-color: #007acc; }
+        .ai-action h3 { color: #ffffff; font-size: 14px; margin-bottom: 4px; }
+        .ai-action p { color: #cccccc; font-size: 12px; }
+        .ai-action i { color: #007acc; margin-right: 8px; }
+        
+        /* Input area */
+        .input-area { margin: 20px 0; }
+        .input-area label { display: block; color: #cccccc; font-size: 14px; margin-bottom: 8px; font-weight: 500; }
+        .input-area textarea { width: 100%; padding: 12px; background: #2d2d30; border: 1px solid #3c3c3c; border-radius: 6px; color: #ffffff; font-size: 14px; resize: vertical; min-height: 80px; }
+        .input-area textarea:focus { outline: none; border-color: #007acc; }
+        .input-area button { background: #007acc; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 8px; }
+        .input-area button:hover { background: #106ebe; }
+        .input-area button:disabled { background: #333; cursor: not-allowed; }
+        
+        /* Code viewer */
+        .code-viewer { background: #1e1e1e; border: 1px solid #3c3c3c; border-radius: 6px; padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; color: #d4d4d4; overflow-x: auto; white-space: pre; }
+        
+        /* Results */
+        .result-container { background: #2d2d30; border: 1px solid #3c3c3c; border-radius: 6px; padding: 16px; margin-top: 16px; max-height: 400px; overflow-y: auto; }
+        .result-container h3 { color: #ffffff; margin-bottom: 12px; font-size: 14px; }
+        .result-container pre { color: #d4d4d4; font-size: 13px; white-space: pre-wrap; line-height: 1.5; }
+        
+        /* Loading state */
+        .loading { display: none; text-align: center; color: #007acc; margin: 20px 0; }
+        .loading.show { display: block; }
+        .loading i { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* Status indicators */
+        .status-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+        .status-success { background: #22c55e; }
+        .status-error { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; }
+            .sidebar, .preview-panel { width: 100%; height: 200px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div>
+            <h1><i class="fas fa-robot"></i> Qwen 3 Coder AI Assistant</h1>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="status">✅ Connected</span>
+            <a href="/" class="back-btn">← Back to App</a>
+        </div>
+    </header>
+
+    <!-- Main container -->
+    <div class="main-container">
+        <!-- Left sidebar - File browser -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-folder-open"></i> Project Explorer
+            </div>
+            <div class="file-tree" id="fileTree">
+                <div class="loading-tree">
+                    <i class="fas fa-spinner fa-spin"></i> Loading GetIt Project Files...
+                </div>
+            </div>
+            <div class="tree-stats" id="treeStats" style="display: none;">
+                📁 <span id="totalDirs">0</span> directories • 📄 <span id="totalFiles">0</span> files
+            </div>
+        </div>
+
+        <!-- Center workspace -->
+        <div class="workspace">
+            <div class="workspace-header">
+                <div class="workspace-title" id="workspaceTitle">AI Assistant Workspace</div>
+            </div>
+            <div class="workspace-content">
+                <!-- AI Actions Grid -->
+                <div class="ai-actions">
+                    <div class="ai-action" data-action="analyze">
+                        <h3><i class="fas fa-search"></i>Analyze Codebase</h3>
+                        <p>Comprehensive architecture analysis</p>
+                    </div>
+                    <div class="ai-action" data-action="generate">
+                        <h3><i class="fas fa-code"></i>Generate Code</h3>
+                        <p>AI-powered code generation</p>
+                    </div>
+                    <div class="ai-action" data-action="review">
+                        <h3><i class="fas fa-check-circle"></i>Review Code</h3>
+                        <p>Code quality and best practices</p>
+                    </div>
+                    <div class="ai-action" data-action="bugs">
+                        <h3><i class="fas fa-bug"></i>Find Bugs</h3>
+                        <p>Bug detection and fixes</p>
+                    </div>
+                    <div class="ai-action" data-action="ask">
+                        <h3><i class="fas fa-question-circle"></i>Ask Question</h3>
+                        <p>Interactive Q&A assistance</p>
+                    </div>
+                    <div class="ai-action" data-action="architecture">
+                        <h3><i class="fas fa-sitemap"></i>Architecture</h3>
+                        <p>Architectural improvements</p>
+                    </div>
+                </div>
+
+                <!-- Input area -->
+                <div class="input-area">
+                    <label for="userInput">Input / Instructions:</label>
+                    <textarea id="userInput" placeholder="Enter your question, code description, or file path..."></textarea>
+                    <button id="executeBtn" onclick="executeAction()">Execute</button>
+                </div>
+
+                <!-- Loading state -->
+                <div class="loading" id="loading">
+                    <i class="fas fa-spinner"></i> Processing...
+                </div>
+            </div>
+        </div>
+
+        <!-- Right panel - Preview/Results -->
+        <div class="preview-panel">
+            <div class="preview-header">
+                <i class="fas fa-eye"></i> Preview & Results
+            </div>
+            <div class="preview-content" id="previewContent">
+                <div style="text-align: center; color: #888; margin-top: 40px;">
+                    <i class="fas fa-robot" style="font-size: 48px; margin-bottom: 16px;"></i>
+                    <h3>Ready to Assist</h3>
+                    <p>Select an action and provide input to get started</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAction = null;
+        let currentFile = 'overview';
+
+        // File tree interaction
+        document.getElementById('fileTree').addEventListener('click', (e) => {
+            const fileItem = e.target.closest('.file-item');
+            if (fileItem) {
+                // Remove active class from all items
+                document.querySelectorAll('.file-item').forEach(item => item.classList.remove('active'));
+                // Add active class to clicked item
+                fileItem.classList.add('active');
+                
+                currentFile = fileItem.dataset.file;
+                document.getElementById('workspaceTitle').textContent = `Viewing: ${currentFile}`;
+                
+                // Load file content if it's a real file
+                if (currentFile !== 'overview') {
+                    loadFileContent(currentFile);
+                } else {
+                    showProjectOverview();
+                }
+            }
+        });
+
+        // AI action selection
+        document.querySelectorAll('.ai-action').forEach(action => {
+            action.addEventListener('click', () => {
+                // Remove active class from all actions
+                document.querySelectorAll('.ai-action').forEach(a => a.classList.remove('active'));
+                // Add active class to clicked action
+                action.classList.add('active');
+                
+                currentAction = action.dataset.action;
+                updateInputPlaceholder();
+            });
+        });
+
+        function updateInputPlaceholder() {
+            const input = document.getElementById('userInput');
+            const placeholders = {
+                analyze: 'Click Execute to analyze the entire codebase...',
+                generate: 'Describe the code you want to generate (e.g., "Create a React button component")...',
+                review: 'Enter file path to review (e.g., "client/src/app/App.tsx") or leave empty for current file...',
+                bugs: 'Enter file path to check for bugs or leave empty to check key files...',
+                ask: 'Ask any question about the codebase or development...',
+                architecture: 'Click Execute to get architectural improvement suggestions...'
+            };
+            input.placeholder = placeholders[currentAction] || 'Enter your input...';
+        }
+
+        function showProjectOverview() {
+            document.getElementById('previewContent').innerHTML = `
+                <div style="padding: 20px;">
+                    <h3 style="color: #ffffff; margin-bottom: 16px;">GetIt Bangladesh E-commerce Platform</h3>
+                    <div style="background: #1e1e1e; padding: 16px; border-radius: 6px; margin-bottom: 16px;">
+                        <h4 style="color: #007acc; margin-bottom: 8px;">Architecture</h4>
+                        <p style="color: #cccccc; font-size: 13px; line-height: 1.5;">
+                            • React/TypeScript frontend<br>
+                            • Node.js/Express backend<br>
+                            • PostgreSQL with Drizzle ORM<br>
+                            • AI integration (Qwen + Groq)<br>
+                            • Multi-vendor marketplace
+                        </p>
+                    </div>
+                    <div style="background: #1e1e1e; padding: 16px; border-radius: 6px;">
+                        <h4 style="color: #22c55e; margin-bottom: 8px;">Status</h4>
+                        <p style="color: #cccccc; font-size: 13px;">
+                            <span class="status-indicator status-success"></span>Production ready<br>
+                            <span class="status-indicator status-success"></span>AI integration active<br>
+                            <span class="status-indicator status-success"></span>Database connected
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadFileContent(filePath) {
+            document.getElementById('previewContent').innerHTML = `
+                <div style="padding: 16px;">
+                    <h3 style="color: #ffffff; margin-bottom: 12px;">${filePath}</h3>
+                    <div class="code-viewer">Loading file content...</div>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/file-system/content?path=${encodeURIComponent(filePath)}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const content = result.content;
+                    const lines = content.split('\n').length;
+                    const size = (result.size / 1024).toFixed(1);
+                    
+                    document.getElementById('previewContent').innerHTML = `
+                        <div style="padding: 16px;">
+                            <h3 style="color: #ffffff; margin-bottom: 8px;">${filePath}</h3>
+                            <div style="color: #888; font-size: 12px; margin-bottom: 12px;">
+                                ${lines} lines • ${size} KB • Modified: ${new Date(result.lastModified).toLocaleDateString()}
+                            </div>
+                            <div class="code-viewer">${content}</div>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                document.getElementById('previewContent').innerHTML = `
+                    <div style="padding: 16px;">
+                        <h3 style="color: #ef4444; margin-bottom: 12px;">Error Loading File</h3>
+                        <div style="background: #2d1b1b; border: 1px solid #ef4444; border-radius: 6px; padding: 16px;">
+                            <p style="color: #ef4444; margin: 0;">${error.message}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function executeAction() {
+            if (!currentAction) {
+                alert('Please select an action first');
+                return;
+            }
+
+            const input = document.getElementById('userInput').value;
+            const loading = document.getElementById('loading');
+            const executeBtn = document.getElementById('executeBtn');
+            
+            // Show loading state
+            loading.classList.add('show');
+            executeBtn.disabled = true;
+            executeBtn.textContent = 'Processing...';
+
+            try {
+                const endpoint = `/api/qwen-coder/${currentAction}`;
+                const requestBody = {};
+                
+                // Prepare request based on action type
+                if (currentAction === 'generate' || currentAction === 'ask') {
+                    if (!input.trim()) {
+                        throw new Error('Please provide input for this action');
+                    }
+                    requestBody.description = input;
+                    requestBody.question = input;
+                }
+                
+                if (currentAction === 'review') {
+                    requestBody.filePath = input.trim() || currentFile;
+                }
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResult(result);
+                } else {
+                    throw new Error(result.error || 'Request failed');
+                }
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                // Hide loading state
+                loading.classList.remove('show');
+                executeBtn.disabled = false;
+                executeBtn.textContent = 'Execute';
+            }
+        }
+
+        function displayResult(result) {
+            const content = result.analysis || result.generatedCode || result.review || result.answer || result.suggestions || result.results || 'No content available';
+            
+            document.getElementById('previewContent').innerHTML = `
+                <div style="padding: 16px;">
+                    <h3 style="color: #22c55e; margin-bottom: 12px;">
+                        <i class="fas fa-check-circle"></i> ${currentAction.charAt(0).toUpperCase() + currentAction.slice(1)} Result
+                    </h3>
+                    <div class="result-container">
+                        <pre>${content}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayError(error) {
+            document.getElementById('previewContent').innerHTML = `
+                <div style="padding: 16px;">
+                    <h3 style="color: #ef4444; margin-bottom: 12px;">
+                        <i class="fas fa-exclamation-triangle"></i> Error
+                    </h3>
+                    <div style="background: #2d1b1b; border: 1px solid #ef4444; border-radius: 6px; padding: 16px;">
+                        <p style="color: #ef4444; margin: 0;">${error}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Dynamic file tree functions
+        function getFileIcon(item) {
+            if (item.type === 'directory') return 'fas fa-folder folder';
+            
+            const ext = item.extension || '';
+            const iconMap = {
+                '.tsx': 'fab fa-react file',
+                '.ts': 'fas fa-code file', 
+                '.js': 'fab fa-js-square file',
+                '.jsx': 'fab fa-react file',
+                '.json': 'fas fa-brackets-curly file',
+                '.md': 'fab fa-markdown file',
+                '.html': 'fab fa-html5 file',
+                '.css': 'fab fa-css3-alt file',
+                '.sql': 'fas fa-database file',
+                '.txt': 'fas fa-file-text file'
+            };
+            return iconMap[ext] || 'fas fa-file file';
+        }
+
+        function renderFileTree(items, container, level = 0) {
+            items.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'file-item';
+                itemDiv.style.paddingLeft = `${16 + level * 16}px`;
+                itemDiv.dataset.file = item.path;
+                itemDiv.dataset.type = item.type;
+
+                let html = '';
+                
+                if (item.type === 'directory' && item.children && item.children.length > 0) {
+                    html += `<span class="folder-toggle collapsed" onclick="toggleFolder(this, event)"></span>`;
+                } else if (item.type === 'directory') {
+                    html += `<span style="width: 16px; display: inline-block;"></span>`;
+                }
+
+                html += `<i class="${getFileIcon(item)}"></i>`;
+                html += `<span>${item.name}</span>`;
+                
+                if (item.type === 'file' && item.extension) {
+                    html += `<span class="file-extension">${item.extension}</span>`;
+                }
+
+                itemDiv.innerHTML = html;
+                container.appendChild(itemDiv);
+
+                // Add children container if directory
+                if (item.type === 'directory' && item.children && item.children.length > 0) {
+                    const childrenDiv = document.createElement('div');
+                    childrenDiv.className = 'file-children';
+                    renderFileTree(item.children, childrenDiv, level + 1);
+                    container.appendChild(childrenDiv);
+                }
+            });
+        }
+
+        function toggleFolder(toggle, event) {
+            event.stopPropagation();
+            const children = toggle.parentElement.nextElementSibling;
+            if (children && children.classList.contains('file-children')) {
+                if (toggle.classList.contains('collapsed')) {
+                    toggle.classList.remove('collapsed');
+                    toggle.classList.add('expanded');
+                    children.classList.add('expanded');
+                } else {
+                    toggle.classList.remove('expanded');
+                    toggle.classList.add('collapsed');
+                    children.classList.remove('expanded');
+                }
+            }
+        }
+
+        async function loadDynamicFileTree() {
+            try {
+                const response = await fetch('/api/file-system/tree');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const fileTree = document.getElementById('fileTree');
+                    const treeStats = document.getElementById('treeStats');
+                    
+                    // Clear loading message
+                    fileTree.innerHTML = '';
+                    
+                    // Add overview item first
+                    const overviewDiv = document.createElement('div');
+                    overviewDiv.className = 'file-item active';
+                    overviewDiv.dataset.file = 'overview';
+                    overviewDiv.innerHTML = '<i class="fas fa-home"></i> Project Overview';
+                    fileTree.appendChild(overviewDiv);
+                    
+                    // Render dynamic file tree
+                    renderFileTree(result.tree, fileTree);
+                    
+                    // Update stats
+                    const totalDirs = result.tree.filter(item => item.type === 'directory').length;
+                    document.getElementById('totalDirs').textContent = totalDirs;
+                    document.getElementById('totalFiles').textContent = result.totalFiles;
+                    treeStats.style.display = 'block';
+                    
+                    console.log('✅ Dynamic file tree loaded:', result.totalFiles, 'files');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Failed to load file tree:', error);
+                document.getElementById('fileTree').innerHTML = `
+                    <div style="padding: 16px; color: #ef4444; text-align: center;">
+                        <i class="fas fa-exclamation-triangle"></i><br>
+                        Failed to load file tree<br>
+                        <small>${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize
+        loadDynamicFileTree();
+        showProjectOverview();
+    </script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+# Kibana Configuration for GetIt Bangladesh
+# Amazon.com/Shopee.sg-Level Analytics Dashboard
+
+# Server configuration
+server.name: "getit-kibana"
+server.host: "0.0.0.0"
+server.port: 5601
+server.basePath: ""
+server.rewriteBasePath: false
+
+# Elasticsearch configuration
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: "elastic"
+elasticsearch.password: "changeme"
+elasticsearch.ssl.verificationMode: none
+
+# Security
+xpack.security.enabled: true
+xpack.security.encryptionKey: "something_at_least_32_characters"
+xpack.security.session.idleTimeout: "1h"
+xpack.security.session.lifespan: "30d"
+
+# Monitoring
+xpack.monitoring.enabled: true
+xpack.monitoring.kibana.collection.enabled: true
+xpack.monitoring.ui.enabled: true
+
+# Machine Learning
+xpack.ml.enabled: true
+
+# Canvas
+xpack.canvas.enabled: true
+
+# Reporting
+xpack.reporting.enabled: true
+xpack.reporting.encryptionKey: "something_at_least_32_characters"
+
+# Alerting
+xpack.alerting.enabled: true
+xpack.actions.enabled: true
+
+# Maps
+xpack.maps.enabled: true
+
+# APM
+xpack.apm.enabled: true
+xpack.apm.ui.enabled: true
+
+# Index patterns
+kibana.defaultAppId: "dashboard"
+kibana.index: ".kibana-getit"
+
+# Default index pattern
+kibana.defaultIndex: "getit-logs-*"
+
+# Logging
+logging.dest: /var/log/kibana/kibana.log
+logging.silent: false
+logging.quiet: false
+logging.verbose: false
+
+# Advanced settings
+map.includeElasticMapsService: true
+map.proxyElasticMapsServiceInMaps: false
+regionmap.includeElasticMapsService: true
+
+# Tile map settings
+tilemap.url: "https://tiles-{s}.elastic.co/v2/default/{z}/{x}/{y}.png?elastic_tile_service_tos=agree&my_app_name=kibana"
+tilemap.options.maxZoom: 18
+tilemap.options.attribution: "© [Elastic Maps Service](https://www.elastic.co/elastic-maps-service)"
+
+# Bangladesh-specific settings
+map.regionmap.layers:
+  - name: "Bangladesh Divisions"
+    url: "https://raw.githubusercontent.com/geodata/bangladesh-divisions.json"
+    format: "geojson"
+    meta:
+      feature_collection_path: "features"
+
+# Custom visualizations
+newsfeed.enabled: true
+telemetry.enabled: false
+telemetry.optIn: false
+
+# Dashboard settings
+dashboard.defaultDarkMode: false
+discover.sampleSize: 500
+discover.aggs.terms.size: 20
+
+# Autocomplete settings
+kibana.autocompleteTimeout: 1000
+kibana.autocompleteTerminateAfter: 100000
+
+# Performance settings
+elasticsearch.requestTimeout: 30000
+elasticsearch.shardTimeout: 30000
+elasticsearch.pingTimeout: 3000
+elasticsearch.startupTimeout: 5000
+
+# Memory settings
+node.max_old_space_size: 4096
+
+# Custom dashboard templates
+dashboard.templates:
+  - name: "GetIt Business Intelligence"
+    description: "Amazon.com/Shopee.sg-level business analytics"
+    pattern: "getit-business-*"
+  - name: "GetIt Performance Monitoring"
+    description: "Application performance and infrastructure monitoring"
+    pattern: "getit-performance-*"
+  - name: "GetIt Error Tracking"
+    description: "Error monitoring and debugging dashboard"
+    pattern: "getit-errors-*"

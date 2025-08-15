@@ -1,0 +1,271 @@
+# Phase 5 Blue-Green Deployment Strategy
+# Amazon.com/Shopee.sg-Level Zero-Downtime Deployments
+# Author: GetIt Platform Team
+# Version: 5.0.0
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: getit-app-rollout
+  namespace: getit-enterprise
+  labels:
+    app: getit-app
+    strategy: blue-green
+spec:
+  replicas: 6
+  strategy:
+    blueGreen:
+      # Active service points to the stable version
+      activeService: getit-app-active
+      # Preview service points to the new version
+      previewService: getit-app-preview
+      # Automatically promote after successful validation
+      autoPromotionEnabled: false
+      # Analysis template for validation
+      analysisTemplate:
+        templateRef:
+          name: success-rate
+        args:
+        - name: service-name
+          value: getit-app-preview.getit-enterprise.svc.cluster.local
+      # Pre-promotion analysis
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: getit-app-preview.getit-enterprise.svc.cluster.local
+      # Post-promotion analysis
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: getit-app-active.getit-enterprise.svc.cluster.local
+      # Abort scaling down old version for 30 seconds
+      scaleDownDelaySeconds: 30
+      # Seconds before scaling down old version (default: 30)
+      prePromotionDelay: 60
+  selector:
+    matchLabels:
+      app: getit-app
+  template:
+    metadata:
+      labels:
+        app: getit-app
+    spec:
+      containers:
+      - name: getit-app
+        image: getit-bangladesh/app:latest
+        ports:
+        - containerPort: 5000
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 2
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+# Active Service (Production Traffic)
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-app-active
+  namespace: getit-enterprise
+  labels:
+    app: getit-app
+    type: active
+spec:
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: getit-app
+
+---
+# Preview Service (New Version Testing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-app-preview
+  namespace: getit-enterprise
+  labels:
+    app: getit-app
+    type: preview
+spec:
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: getit-app
+
+---
+# Analysis Template for Success Rate Validation
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: getit-enterprise
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    # Query Prometheus for success rate
+    provider:
+      prometheus:
+        address: http://prometheus.getit-enterprise.svc.cluster.local:9090
+        query: |
+          sum(irate(
+            istio_requests_total{reporter="destination",destination_service_name=~"{{args.service-name}}",response_code!~"5.*"}[2m]
+          )) / 
+          sum(irate(
+            istio_requests_total{reporter="destination",destination_service_name=~"{{args.service-name}}"}[2m]
+          ))
+    # Success criteria: > 95% success rate
+    successCondition: result[0] >= 0.95
+    # Run analysis for 5 minutes
+    interval: 30s
+    count: 10
+    failureLimit: 3
+
+  - name: avg-response-time
+    provider:
+      prometheus:
+        address: http://prometheus.getit-enterprise.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.95,
+            sum(irate(
+              istio_request_duration_milliseconds_bucket{reporter="destination",destination_service_name=~"{{args.service-name}}"}[2m]
+            )) by (le)
+          )
+    # Success criteria: < 500ms P95 response time
+    successCondition: result[0] <= 500
+    interval: 30s
+    count: 10
+    failureLimit: 3
+
+---
+# Canary Deployment Alternative Strategy
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: getit-app-canary
+  namespace: getit-enterprise
+  labels:
+    app: getit-app
+    strategy: canary
+spec:
+  replicas: 6
+  strategy:
+    canary:
+      # Traffic splitting steps
+      steps:
+      - setWeight: 10
+      - pause: {duration: 2m}
+      - setWeight: 25
+      - pause: {duration: 2m}
+      - setWeight: 50
+      - pause: {duration: 2m}
+      - setWeight: 75
+      - pause: {duration: 2m}
+      
+      # Analysis during canary
+      analysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: getit-app-canary.getit-enterprise.svc.cluster.local
+        startingStep: 2
+        
+      # Traffic routing
+      trafficRouting:
+        istio:
+          virtualService:
+            name: getit-vs
+            routes:
+            - primary
+          destinationRule:
+            name: getit-destination-rule
+            canarySubsetName: canary
+            stableSubsetName: stable
+            
+      # Max surge for canary pods
+      maxSurge: "25%"
+      maxUnavailable: 0
+      
+  selector:
+    matchLabels:
+      app: getit-app
+  template:
+    metadata:
+      labels:
+        app: getit-app
+    spec:
+      containers:
+      - name: getit-app
+        image: getit-bangladesh/app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: DEPLOYMENT_TYPE
+          value: canary
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10

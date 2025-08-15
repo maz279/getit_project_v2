@@ -1,0 +1,587 @@
+# GetIt Inventory Service
+
+## Overview
+The Inventory Service manages all inventory-related operations for the GetIt multi-vendor ecommerce platform. It handles real-time stock tracking, inventory reservations, multi-location inventory management, automated reordering, and provides comprehensive inventory analytics while supporting the unique requirements of Bangladesh's multi-vendor marketplace.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: PostgreSQL (primary), Redis (real-time cache)
+- **Message Queue**: Apache Kafka for inventory events
+- **Background Jobs**: Bull Queue with Redis for scheduled tasks
+- **Real-time Updates**: WebSocket for live inventory updates
+- **Analytics**: Time-series database (InfluxDB) for historical data
+- **Monitoring**: Custom metrics with Prometheus
+
+## Core Responsibilities
+
+### 1. Real-Time Inventory Tracking
+- Live stock level monitoring across all vendors
+- Automatic inventory updates from sales and returns
+- Multi-location inventory synchronization
+- Real-time availability checking
+- Inventory movement tracking and audit trails
+
+### 2. Inventory Reservation System
+- Temporary stock reservation for pending orders
+- Automatic reservation expiry and release
+- Priority-based reservation management
+- Bulk reservation for promotional events
+- Conflict resolution for concurrent reservations
+
+### 3. Multi-Vendor Inventory Management
+- Vendor-specific inventory isolation
+- Cross-vendor inventory analytics
+- Vendor inventory performance tracking
+- Independent inventory policies per vendor
+- Consolidated inventory reporting
+
+### 4. Automated Reordering & Alerts
+- Low stock threshold monitoring
+- Automated reorder suggestions
+- Vendor notification system
+- Seasonal demand forecasting
+- Emergency stock alerts
+
+### 5. Inventory Analytics & Reporting
+- Inventory turnover analysis
+- Dead stock identification
+- Demand forecasting and planning
+- Vendor inventory performance metrics
+- Cost analysis and optimization
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **Multi-Location Support**: Inventory across different districts and warehouses
+- **Local Supplier Integration**: Bangladesh supplier and manufacturer tracking
+- **Seasonal Inventory**: Festival and monsoon season inventory planning
+- **Rural Distribution**: Inventory management for rural area delivery
+- **Local Product Categories**: Traditional and cultural product inventory
+
+### Advanced Inventory Features
+- **Predictive Analytics**: Machine learning for demand forecasting
+- **Automated Reordering**: Smart reorder point calculation
+- **Batch and Serial Tracking**: Individual item tracking capabilities
+- **Expiry Date Management**: Perishable goods inventory tracking
+- **Quality Control Integration**: Damaged and defective item handling
+
+### Real-Time Features
+- **Live Stock Updates**: Instant inventory synchronization
+- **Reservation Management**: Real-time stock reservation and release
+- **Alert System**: Immediate notifications for stock issues
+- **Dashboard Integration**: Live inventory dashboards
+- **API Rate Limiting**: High-frequency inventory query handling
+
+## API Endpoints
+
+### Core Inventory APIs
+```yaml
+Stock Management:
+  GET /api/v1/inventory/stock/:productId
+  PUT /api/v1/inventory/stock/:productId
+  POST /api/v1/inventory/stock/adjust
+  GET /api/v1/inventory/stock/available
+  POST /api/v1/inventory/stock/bulk-update
+
+Inventory Operations:
+  POST /api/v1/inventory/reserve
+  POST /api/v1/inventory/release
+  POST /api/v1/inventory/commit
+  GET /api/v1/inventory/reserved
+  POST /api/v1/inventory/transfer
+```
+
+### Multi-Location APIs
+```yaml
+Location Management:
+  GET /api/v1/inventory/locations
+  POST /api/v1/inventory/locations
+  GET /api/v1/inventory/locations/:id/stock
+  PUT /api/v1/inventory/locations/:id
+  POST /api/v1/inventory/locations/transfer
+
+Warehouse Operations:
+  GET /api/v1/inventory/warehouses
+  POST /api/v1/inventory/warehouses/:id/receive
+  POST /api/v1/inventory/warehouses/:id/dispatch
+  GET /api/v1/inventory/warehouses/:id/movements
+```
+
+### Vendor Inventory APIs
+```yaml
+Vendor Stock Management:
+  GET /api/v1/vendor/inventory
+  PUT /api/v1/vendor/inventory/:productId
+  POST /api/v1/vendor/inventory/adjust
+  GET /api/v1/vendor/inventory/low-stock
+  POST /api/v1/vendor/inventory/reorder
+
+Vendor Analytics:
+  GET /api/v1/vendor/inventory/analytics
+  GET /api/v1/vendor/inventory/turnover
+  GET /api/v1/vendor/inventory/forecast
+  GET /api/v1/vendor/inventory/performance
+```
+
+### Reservation APIs
+```yaml
+Reservation Management:
+  POST /api/v1/inventory/reservations
+  GET /api/v1/inventory/reservations/:id
+  PUT /api/v1/inventory/reservations/:id/extend
+  DELETE /api/v1/inventory/reservations/:id
+  GET /api/v1/inventory/reservations/expired
+
+Bulk Reservations:
+  POST /api/v1/inventory/reservations/bulk
+  POST /api/v1/inventory/reservations/release-bulk
+  GET /api/v1/inventory/reservations/pending
+```
+
+### Analytics APIs
+```yaml
+Inventory Analytics:
+  GET /api/v1/inventory/analytics/overview
+  GET /api/v1/inventory/analytics/turnover
+  GET /api/v1/inventory/analytics/dead-stock
+  GET /api/v1/inventory/analytics/forecast
+  POST /api/v1/inventory/analytics/custom-report
+
+Movement Tracking:
+  GET /api/v1/inventory/movements
+  GET /api/v1/inventory/movements/:productId
+  POST /api/v1/inventory/movements/track
+  GET /api/v1/inventory/movements/audit
+```
+
+### Admin APIs
+```yaml
+System Management:
+  GET /api/v1/admin/inventory/dashboard
+  POST /api/v1/admin/inventory/reconcile
+  GET /api/v1/admin/inventory/discrepancies
+  POST /api/v1/admin/inventory/bulk-adjust
+  GET /api/v1/admin/inventory/system-health
+```
+
+## Database Schema
+
+### Primary Tables
+```sql
+inventory:
+  - id (Primary Key)
+  - product_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - location_id (Foreign Key)
+  - sku
+  - quantity_available
+  - quantity_reserved
+  - quantity_committed
+  - quantity_damaged
+  - quantity_total
+  - reorder_point
+  - reorder_quantity
+  - max_stock_level
+  - cost_per_unit
+  - last_restock_date
+  - last_sale_date
+  - created_at
+  - updated_at
+
+inventory_movements:
+  - id (Primary Key)
+  - inventory_id (Foreign Key)
+  - movement_type (inbound, outbound, adjustment, transfer, damage, return)
+  - quantity
+  - unit_cost
+  - reference_id
+  - reference_type (order, return, adjustment, transfer)
+  - reason
+  - performed_by
+  - notes
+  - timestamp
+  - created_at
+
+inventory_reservations:
+  - id (Primary Key)
+  - inventory_id (Foreign Key)
+  - order_id (Foreign Key)
+  - customer_id (Foreign Key)
+  - quantity_reserved
+  - reservation_type (cart, order, promotion)
+  - priority_level
+  - expires_at
+  - status (active, expired, committed, released)
+  - created_at
+  - updated_at
+
+inventory_locations:
+  - id (Primary Key)
+  - vendor_id (Foreign Key)
+  - name
+  - type (warehouse, store, distribution_center)
+  - address
+  - district
+  - postal_code
+  - contact_person
+  - contact_phone
+  - is_active
+  - capacity
+  - current_utilization
+  - created_at
+
+low_stock_alerts:
+  - id (Primary Key)
+  - inventory_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - product_id (Foreign Key)
+  - current_quantity
+  - reorder_point
+  - suggested_reorder_quantity
+  - urgency_level
+  - alert_sent_at
+  - acknowledged_at
+  - status (pending, acknowledged, resolved)
+  - created_at
+
+inventory_batches:
+  - id (Primary Key)
+  - inventory_id (Foreign Key)
+  - batch_number
+  - quantity
+  - manufacturing_date
+  - expiry_date
+  - supplier_id
+  - cost_per_unit
+  - quality_status
+  - is_active
+  - created_at
+
+demand_forecasts:
+  - id (Primary Key)
+  - product_id (Foreign Key)
+  - vendor_id (Foreign Key)
+  - forecast_period
+  - predicted_demand
+  - confidence_level
+  - seasonality_factor
+  - trend_factor
+  - forecast_date
+  - actual_demand
+  - accuracy_score
+  - created_at
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **Product Service**: Product information and availability updates
+- **Order Service**: Inventory reservation and commitment for orders
+- **Cart Service**: Real-time availability checking during cart operations
+- **Vendor Service**: Vendor-specific inventory management and alerts
+- **Analytics Service**: Inventory performance metrics and forecasting
+- **Notification Service**: Low stock alerts and reorder notifications
+- **Shipping Service**: Inventory location for optimal shipping
+
+### External Service Integration
+- **Supplier APIs**: Automated supplier communication and ordering
+- **Warehouse Management Systems**: Integration with external WMS
+- **ERP Systems**: Enterprise resource planning integration
+- **Barcode/RFID Systems**: Automated inventory tracking
+- **Demand Planning Tools**: External forecasting and planning systems
+
+## Inventory Management Workflow
+
+### Stock Level Management
+```yaml
+Stock Update Process:
+  1. Receive stock level change event
+  2. Validate change against business rules
+  3. Update inventory record atomically
+  4. Check low stock thresholds
+  5. Generate alerts if necessary
+  6. Update product availability status
+  7. Notify relevant services
+  8. Log movement for audit trail
+
+Real-Time Synchronization:
+  - WebSocket updates to connected clients
+  - Cache invalidation for affected products
+  - Dashboard refresh notifications
+  - Vendor notification dispatch
+  - Analytics data point creation
+```
+
+### Reservation Management
+```yaml
+Reservation Process:
+  1. Check product availability
+  2. Validate reservation request
+  3. Create temporary reservation
+  4. Set expiration timer
+  5. Update available quantity
+  6. Notify requesting service
+  7. Monitor reservation status
+
+Reservation Expiry:
+  1. Background job monitors expiring reservations
+  2. Send expiry warning notifications
+  3. Auto-release expired reservations
+  4. Update inventory availability
+  5. Log reservation release
+```
+
+## Multi-Vendor Inventory Management
+
+### Vendor Isolation
+```yaml
+Vendor-Specific Features:
+  - Independent inventory tracking per vendor
+  - Vendor-specific reorder points and policies
+  - Isolated inventory analytics and reporting
+  - Custom alert thresholds per vendor
+  - Individual vendor location management
+
+Cross-Vendor Analytics:
+  - Platform-wide inventory trends
+  - Category-level inventory analysis
+  - Competitive inventory insights
+  - Market demand patterns
+  - Vendor performance comparisons
+```
+
+### Inventory Policies
+```yaml
+Configurable Policies:
+  - Minimum stock levels per product
+  - Maximum storage capacity limits
+  - Automatic reorder triggers
+  - Quality control requirements
+  - Expiry date management rules
+
+Policy Enforcement:
+  - Automated policy compliance checking
+  - Violation alerts and notifications
+  - Policy override permissions
+  - Audit trail for policy changes
+  - Performance impact tracking
+```
+
+## Demand Forecasting & Planning
+
+### Forecasting Algorithms
+```yaml
+Forecasting Methods:
+  - Time series analysis (ARIMA, Prophet)
+  - Machine learning models (Random Forest, Neural Networks)
+  - Seasonal decomposition and trend analysis
+  - Economic indicator correlation
+  - External event impact modeling
+
+Data Sources:
+  - Historical sales data
+  - Seasonal patterns and trends
+  - Economic indicators
+  - Weather data correlation
+  - Market events and promotions
+  - Competitor analysis
+```
+
+### Automated Reordering
+```yaml
+Reorder Logic:
+  - Dynamic reorder point calculation
+  - Lead time consideration
+  - Safety stock optimization
+  - Bulk discount optimization
+  - Supplier performance factors
+
+Reorder Triggers:
+  - Stock level thresholds
+  - Demand forecast signals
+  - Seasonal preparation
+  - Promotional event planning
+  - Emergency stock situations
+```
+
+## Inventory Analytics
+
+### Key Performance Indicators
+```yaml
+Inventory KPIs:
+  - Inventory turnover ratio
+  - Days sales of inventory (DSI)
+  - Stock-out frequency
+  - Carrying cost percentage
+  - Dead stock percentage
+  - Fill rate accuracy
+
+Vendor Performance Metrics:
+  - Vendor inventory turnover
+  - Stock accuracy rates
+  - Reorder compliance
+  - Demand forecast accuracy
+  - Cost optimization achievements
+```
+
+### Advanced Analytics
+```yaml
+Predictive Analytics:
+  - Demand forecasting accuracy
+  - Optimal stock level recommendations
+  - Seasonal demand patterns
+  - Product lifecycle analysis
+  - Market trend correlation
+
+Optimization Analytics:
+  - Cost reduction opportunities
+  - Space utilization optimization
+  - Supplier performance analysis
+  - Procurement timing optimization
+  - Dead stock minimization strategies
+```
+
+## Quality Control & Compliance
+
+### Quality Management
+```yaml
+Quality Control Features:
+  - Damaged goods tracking
+  - Quality inspection workflows
+  - Supplier quality ratings
+  - Return and refund impact tracking
+  - Quality cost analysis
+
+Compliance Tracking:
+  - Regulatory compliance monitoring
+  - Expiry date management
+  - Safety stock requirements
+  - Industry standard adherence
+  - Documentation and audit trails
+```
+
+### Inventory Auditing
+```yaml
+Audit Procedures:
+  - Cycle counting schedules
+  - Physical inventory reconciliation
+  - Discrepancy investigation
+  - Variance analysis and reporting
+  - Corrective action tracking
+
+Audit Trail:
+  - Complete movement history
+  - User action logging
+  - System change tracking
+  - Approval workflow history
+  - Compliance documentation
+```
+
+## Performance Optimization
+
+### High-Performance Features
+```yaml
+Caching Strategy:
+  - Redis cache for frequently accessed inventory
+  - In-memory cache for real-time availability
+  - Database query optimization
+  - Connection pooling
+  - Read replica utilization
+
+Scalability Features:
+  - Horizontal partitioning by vendor/location
+  - Asynchronous processing for non-critical updates
+  - Bulk operation optimization
+  - Event-driven architecture
+  - Microservice isolation
+```
+
+### Real-Time Processing
+```yaml
+Event-Driven Updates:
+  - Kafka streaming for inventory events
+  - Real-time aggregation and calculation
+  - WebSocket notifications
+  - Background job processing
+  - Cache invalidation strategies
+
+Performance Monitoring:
+  - Response time tracking
+  - Query performance analysis
+  - System resource monitoring
+  - Error rate tracking
+  - SLA compliance monitoring
+```
+
+## Bangladesh Market Considerations
+
+### Local Market Features
+```yaml
+Regional Inventory:
+  - District-wise inventory distribution
+  - Urban vs. rural stock allocation
+  - Local supplier integration
+  - Regional demand patterns
+  - Transportation hub optimization
+
+Cultural Considerations:
+  - Festival season preparation
+  - Religious holiday impact
+  - Traditional product categories
+  - Seasonal agricultural products
+  - Local craft and artisan goods
+```
+
+### Economic Factors
+```yaml
+Economic Impact:
+  - Currency fluctuation impact on costs
+  - Import/export inventory tracking
+  - Local vs. international product mix
+  - Economic indicator correlation
+  - Inflation impact on inventory costs
+
+Business Continuity:
+  - Monsoon season preparation
+  - Power outage contingency
+  - Transportation disruption handling
+  - Political event impact planning
+  - Natural disaster recovery
+```
+
+## Security & Compliance
+
+### Data Security
+```yaml
+Security Measures:
+  - Role-based access control
+  - Inventory data encryption
+  - Audit trail protection
+  - API security and authentication
+  - Vendor data isolation
+
+Compliance Requirements:
+  - Financial reporting accuracy
+  - Tax calculation compliance
+  - Import/export documentation
+  - Quality standard adherence
+  - Environmental compliance
+```
+
+## Business Objectives
+
+### Primary Goals
+1. **Inventory Accuracy**: Maintain accurate real-time inventory levels
+2. **Cost Optimization**: Minimize inventory carrying costs and waste
+3. **Service Level**: Ensure product availability and reduce stockouts
+4. **Vendor Success**: Support vendor inventory management and profitability
+5. **Operational Efficiency**: Streamline inventory operations and processes
+
+### Bangladesh Market Alignment
+1. **Local Supply Chain**: Support Bangladesh suppliers and manufacturers
+2. **Regional Distribution**: Optimize inventory for Bangladesh's geographic diversity
+3. **Economic Efficiency**: Cost-effective inventory management for price-sensitive market
+4. **Cultural Products**: Special handling for traditional and cultural products
+5. **Seasonal Adaptation**: Inventory planning for Bangladesh's seasonal patterns
+
+This Inventory Service provides comprehensive, real-time, and intelligent inventory management that supports the complex needs of a multi-vendor marketplace while addressing the specific challenges and opportunities of the Bangladesh market.

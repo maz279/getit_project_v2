@@ -1,0 +1,74 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <defs>
+    <radialGradient id="eidGradient" cx="600" cy="200" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="50%" stop-color="#FFA500"/>
+      <stop offset="100%" stop-color="#FF8C00"/>
+    </radialGradient>
+    <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="400" fill="url(#eidGradient)"/>
+  
+  <!-- Stars and Crescents -->
+  <g opacity="0.3">
+    <polygon points="150,50 155,65 170,65 158,75 163,90 150,80 137,90 142,75 130,65 145,65" fill="#FFF" filter="url(#starGlow)"/>
+    <polygon points="1050,80 1055,95 1070,95 1058,105 1063,120 1050,110 1037,120 1042,105 1030,95 1045,95" fill="#FFF" filter="url(#starGlow)"/>
+    <polygon points="100,300 105,315 120,315 108,325 113,340 100,330 87,340 92,325 80,315 95,315" fill="#FFF" filter="url(#starGlow)"/>
+    <polygon points="1100,300 1105,315 1120,315 1108,325 1113,340 1100,330 1087,340 1092,325 1080,315 1095,315" fill="#FFF" filter="url(#starGlow)"/>
+    
+    <!-- Crescents -->
+    <path d="M200 150 A 20 20 0 1 1 200 190 A 15 15 0 1 0 200 150" fill="#FFF"/>
+    <path d="M1000 250 A 20 20 0 1 1 1000 290 A 15 15 0 1 0 1000 250" fill="#FFF"/>
+  </g>
+  
+  <!-- Main Content -->
+  <g transform="translate(100, 120)">
+    <!-- Bengali Eid Mubarak -->
+    <text x="400" y="0" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#8B4513" text-anchor="middle">
+      ঈদ মুবারক
+    </text>
+    
+    <!-- English -->
+    <text x="400" y="60" font-family="Arial, sans-serif" font-size="36" font-weight="600" fill="#8B4513" text-anchor="middle">
+      Eid Mubarak
+    </text>
+    
+    <!-- Subtitle -->
+    <text x="400" y="100" font-family="Arial, sans-serif" font-size="20" fill="#8B4513" text-anchor="middle">
+      Special Eid Collection with Exclusive Offers
+    </text>
+    
+    <!-- Offer Highlight -->
+    <g transform="translate(200, 130)">
+      <rect x="0" y="0" width="400" height="60" rx="30" fill="#8B4513" opacity="0.9"/>
+      <text x="200" y="25" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFD700" text-anchor="middle">
+        UP TO 70% OFF
+      </text>
+      <text x="200" y="45" font-family="Arial, sans-serif" font-size="14" fill="#FFD700" text-anchor="middle">
+        Free Delivery • EMI Available • Mobile Banking
+      </text>
+    </g>
+  </g>
+  
+  <!-- Decorative Islamic Pattern -->
+  <g transform="translate(50, 50)" opacity="0.2">
+    <circle cx="0" cy="0" r="30" fill="none" stroke="#8B4513" stroke-width="2"/>
+    <circle cx="0" cy="0" r="20" fill="none" stroke="#8B4513" stroke-width="2"/>
+    <circle cx="0" cy="0" r="10" fill="none" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  
+  <g transform="translate(1100, 350)" opacity="0.2">
+    <circle cx="0" cy="0" r="30" fill="none" stroke="#8B4513" stroke-width="2"/>
+    <circle cx="0" cy="0" r="20" fill="none" stroke="#8B4513" stroke-width="2"/>
+    <circle cx="0" cy="0" r="10" fill="none" stroke="#8B4513" stroke-width="2"/>
+  </g>
+</svg>

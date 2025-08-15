@@ -1,0 +1,45 @@
+
+export const tangailSareeProducts = [
+  {
+    id: 'tangail-saree-1',
+    name: 'Traditional Tangail Saree - Handwoven',
+    nameBn: 'ঐতিহ্যবাহী তাঁগাইল শাড়ি - হস্তবোনা',
+    price: 4500,
+    originalPrice: 6000,
+    rating: 4.6,
+    reviews: 198,
+    vendor: 'Tangail Heritage',
+    image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=400&fit=crop',
+    discount: 25,
+    freeShipping: true,
+    location: 'Tangail',
+    verified: true,
+    quickDelivery: true,
+    sold: 167,
+    category: 'Tangail Saree',
+    stock: { status: 'in_stock', quantity: 28 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  },
+  {
+    id: 'tangail-saree-2',
+    name: 'Tangail Cotton Saree - Border Design',
+    nameBn: 'তাঁগাইল সুতি শাড়ি - বর্ডার ডিজাইন',
+    price: 3800,
+    originalPrice: 5000,
+    rating: 4.4,
+    reviews: 145,
+    vendor: 'Tangail Weavers',
+    image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=400&fit=crop',
+    discount: 24,
+    freeShipping: true,
+    location: 'Tangail',
+    verified: true,
+    quickDelivery: false,
+    sold: 134,
+    category: 'Tangail Saree',
+    stock: { status: 'in_stock', quantity: 32 },
+    delivery: { estimatedDays: 3, express: false, cod: true, freeShipping: true },
+    features: { trending: false, festival: true, priceHistory: false, emi: true }
+  }
+];

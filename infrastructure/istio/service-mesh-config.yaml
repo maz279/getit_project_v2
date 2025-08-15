@@ -1,0 +1,191 @@
+# GetIt Platform Istio Service Mesh Configuration
+# Amazon.com/Shopee.sg Enterprise Service Mesh Implementation
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: getit-service-mesh
+  namespace: istio-system
+spec:
+  values:
+    pilot:
+      traceSampling: 1.0
+      env:
+        EXTERNAL_ISTIOD: false
+    global:
+      meshID: getit-mesh
+      multiCluster:
+        clusterName: getit-primary
+      network: getit-network
+      proxy:
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+          metrics:
+          - type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 80
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        hpaSpec:
+          maxReplicas: 10
+          minReplicas: 3
+        service:
+          type: LoadBalancer
+          ports:
+          - port: 15021
+            targetPort: 15021
+            name: status-port
+          - port: 80
+            targetPort: 8080
+            name: http2
+          - port: 443
+            targetPort: 8443
+            name: https
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+
+---
+# Virtual Service Configuration for GetIt Platform
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: getit-platform-vs
+  namespace: getit-platform
+spec:
+  hosts:
+  - getit.com.bd
+  - api.getit.com.bd
+  gateways:
+  - getit-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api/"
+    route:
+    - destination:
+        host: getit-api-service
+        port:
+          number: 5000
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: getit-frontend-service
+        port:
+          number: 3000
+    timeout: 30s
+
+---
+# Gateway Configuration
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: getit-gateway
+  namespace: getit-platform
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - getit.com.bd
+    - api.getit.com.bd
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: getit-platform-tls
+    hosts:
+    - getit.com.bd
+    - api.getit.com.bd
+
+---
+# Destination Rules for Load Balancing
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: getit-api-destination-rule
+  namespace: getit-platform
+spec:
+  host: getit-api-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 10
+    circuitBreaker:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2

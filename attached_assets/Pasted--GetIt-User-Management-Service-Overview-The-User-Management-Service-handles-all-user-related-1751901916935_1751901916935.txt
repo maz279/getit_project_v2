@@ -1,0 +1,295 @@
+# GetIt User Management Service
+
+## Overview
+The User Management Service handles all user-related operations including registration, authentication, authorization, and profile management for the GetIt multi-vendor ecommerce platform. It supports multiple user roles and provides comprehensive user lifecycle management specifically tailored for the Bangladesh market.
+
+## Technology Stack
+- **Primary Technology**: Node.js + Express.js
+- **Database**: PostgreSQL (primary), Redis (sessions/cache)
+- **Authentication**: JWT tokens with refresh token rotation
+- **Password Security**: bcrypt with salt rounds
+- **SMS Provider**: SSL Wireless, Robi, Grameenphone (for OTP)
+- **Email Service**: AWS SES, SendGrid
+
+## Core Responsibilities
+
+### 1. User Registration & Onboarding
+- Multi-channel user registration (email, phone, social media)
+- Bangladesh mobile number validation (+88 format)
+- Email verification with multi-language templates
+- SMS-based OTP verification for phone numbers
+- Social login integration (Google, Facebook)
+
+### 2. Authentication & Authorization
+- Secure login/logout functionality
+- JWT token generation and validation
+- Refresh token management with rotation
+- Multi-factor authentication (MFA) support
+- Session management and timeout handling
+
+### 3. Role-Based Access Control (RBAC)
+- **Customer Role**: Product browsing, ordering, reviews
+- **Vendor Role**: Store management, product listings, order fulfillment
+- **Admin Role**: Platform management, vendor approval, system monitoring
+- **Support Role**: Customer service, dispute resolution
+- **Super Admin Role**: System-wide access and configuration
+
+### 4. Profile Management
+- Personal information management
+- Address book management (multiple addresses)
+- Preference settings (language, currency, notifications)
+- Account verification status tracking
+- Privacy settings and data export
+
+## Key Features
+
+### Bangladesh-Specific Features
+- **Bangla Language Support**: Full Unicode support for Bangla names and addresses
+- **National ID Integration**: NID validation for identity verification
+- **Mobile Banking Integration**: Support for bKash, Nagad, Rocket account linking
+- **Local Address Format**: Bangladesh postal code and district validation
+- **Festival Preferences**: Religious and cultural festival notification preferences
+
+### Security Features
+- **Password Policy**: Minimum 8 characters with complexity requirements
+- **Account Lockout**: Temporary lockout after 5 failed login attempts
+- **Suspicious Activity Detection**: Login from new devices/locations
+- **Data Encryption**: Personal data encryption at rest
+- **GDPR Compliance**: Data subject rights and consent management
+
+### User Experience Features
+- **Progressive Registration**: Collect user data gradually
+- **Social Profile Import**: Auto-populate from social media profiles
+- **Quick Registration**: Express signup for mobile users
+- **Guest Checkout**: Allow purchases without full registration
+- **Account Merger**: Combine guest and registered accounts
+
+## API Endpoints
+
+### Authentication APIs
+```yaml
+Registration:
+  POST /api/v1/users/register
+  POST /api/v1/users/verify-email
+  POST /api/v1/users/verify-phone
+  POST /api/v1/users/resend-verification
+
+Login/Logout:
+  POST /api/v1/users/login
+  POST /api/v1/users/logout
+  POST /api/v1/users/refresh-token
+  POST /api/v1/users/forgot-password
+  POST /api/v1/users/reset-password
+
+Social Authentication:
+  GET /api/v1/users/auth/google
+  GET /api/v1/users/auth/facebook
+  POST /api/v1/users/auth/callback
+```
+
+### Profile Management APIs
+```yaml
+Profile:
+  GET /api/v1/users/profile
+  PUT /api/v1/users/profile
+  PATCH /api/v1/users/profile
+  DELETE /api/v1/users/account
+
+Addresses:
+  GET /api/v1/users/addresses
+  POST /api/v1/users/addresses
+  PUT /api/v1/users/addresses/:id
+  DELETE /api/v1/users/addresses/:id
+
+Preferences:
+  GET /api/v1/users/preferences
+  PUT /api/v1/users/preferences
+  PATCH /api/v1/users/preferences/notifications
+  PATCH /api/v1/users/preferences/language
+```
+
+### Admin APIs
+```yaml
+User Management:
+  GET /api/v1/admin/users
+  GET /api/v1/admin/users/:id
+  PATCH /api/v1/admin/users/:id/status
+  DELETE /api/v1/admin/users/:id
+
+Role Management:
+  GET /api/v1/admin/roles
+  POST /api/v1/admin/roles
+  PUT /api/v1/admin/users/:id/roles
+  DELETE /api/v1/admin/users/:id/roles/:roleId
+```
+
+## Database Schema
+
+### Primary Tables
+```sql
+users:
+  - id (Primary Key)
+  - email (Unique)
+  - phone (Unique, Bangladesh format)
+  - password_hash
+  - first_name
+  - last_name
+  - date_of_birth
+  - gender
+  - nid_number (Bangladesh National ID)
+  - email_verified_at
+  - phone_verified_at
+  - status (active, inactive, suspended)
+  - created_at
+  - updated_at
+
+user_profiles:
+  - user_id (Foreign Key)
+  - avatar_url
+  - bio
+  - preferred_language
+  - preferred_currency
+  - timezone
+  - marketing_consent
+  - data_processing_consent
+  - last_active_at
+
+user_addresses:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - type (home, office, billing, shipping)
+  - address_line_1
+  - address_line_2
+  - district
+  - upazila
+  - postal_code
+  - is_default
+  - coordinates (lat, lng)
+
+user_roles:
+  - user_id (Foreign Key)
+  - role_name
+  - granted_at
+  - granted_by
+  - expires_at
+
+user_sessions:
+  - id (Primary Key)
+  - user_id (Foreign Key)
+  - session_token
+  - refresh_token
+  - device_info
+  - ip_address
+  - location
+  - expires_at
+  - last_activity
+```
+
+## Service Connections
+
+### Internal Service Integration
+- **Vendor Service**: User role validation for vendor operations
+- **Order Service**: User authentication for order processing
+- **Payment Service**: User verification for payment processing
+- **Notification Service**: User preferences for communication
+- **Analytics Service**: User behavior tracking and reporting
+
+### External Service Integration
+- **SMS Providers**: OTP delivery through local telecom operators
+- **Email Service**: Transactional and marketing emails
+- **Social Media APIs**: Google, Facebook OAuth integration
+- **Government APIs**: National ID verification (future integration)
+
+## Security Architecture
+
+### Authentication Flow
+1. User submits credentials (email/phone + password)
+2. System validates credentials against database
+3. Generate JWT access token (15 minutes expiry)
+4. Generate refresh token (30 days expiry)
+5. Store refresh token in secure HTTP-only cookie
+6. Return access token to client
+
+### Password Security
+- **Hashing Algorithm**: bcrypt with 12 salt rounds
+- **Password Requirements**: Minimum 8 characters, mixed case, numbers
+- **Password History**: Prevent reuse of last 5 passwords
+- **Password Expiry**: Optional 90-day expiry for high-privilege accounts
+
+### Session Management
+- **Concurrent Sessions**: Maximum 5 active sessions per user
+- **Session Timeout**: 24 hours of inactivity
+- **Device Tracking**: Track and manage trusted devices
+- **Anomaly Detection**: Flag unusual login patterns
+
+## Business Logic
+
+### User Lifecycle Management
+```yaml
+Registration Process:
+  1. User provides basic information
+  2. System validates uniqueness (email/phone)
+  3. Send verification email/SMS
+  4. User verifies account
+  5. Account activated and welcome sequence triggered
+
+Account Verification Levels:
+  - Basic: Email or phone verified
+  - Verified: Both email and phone verified
+  - Enhanced: NID verification completed
+  - Premium: Additional KYC documents verified
+```
+
+### Role Assignment Logic
+- **Automatic Assignment**: New users get "Customer" role by default
+- **Vendor Application**: Separate vendor onboarding process
+- **Admin Assignment**: Manual role assignment by existing admins
+- **Role Inheritance**: Hierarchical permission structure
+
+## Data Privacy & Compliance
+
+### GDPR Compliance Features
+- **Consent Management**: Granular consent for different data processing activities
+- **Right to Access**: Users can download their data
+- **Right to Rectification**: Users can correct their information
+- **Right to Erasure**: Account deletion with data anonymization
+- **Data Portability**: Export user data in machine-readable format
+
+### Bangladesh Data Protection
+- **Local Data Storage**: User data stored in Bangladesh data centers
+- **Cross-border Transfer Restrictions**: Compliance with local regulations
+- **Financial Data Protection**: Enhanced security for payment information
+- **Audit Logging**: Comprehensive access logs for compliance
+
+## Monitoring & Analytics
+
+### Key Performance Indicators
+- **Registration Rate**: New user registrations per day
+- **Verification Rate**: Email/phone verification completion rate
+- **Login Success Rate**: Successful logins vs. failed attempts
+- **Session Duration**: Average user session length
+- **Password Reset Rate**: Frequency of password reset requests
+
+### Alerting Thresholds
+- Failed login attempts > 100/hour
+- Registration rate drops > 50% from baseline
+- Email verification rate < 80%
+- Unusual geographic login patterns
+- High volume of password reset requests
+
+## Business Objectives
+
+### Primary Goals
+1. **Secure User Management**: Robust authentication and authorization
+2. **User Experience**: Seamless registration and login process
+3. **Compliance**: Meet local and international data protection standards
+4. **Scalability**: Support millions of users across Bangladesh
+5. **Integration**: Seamless integration with all platform services
+
+### Bangladesh Market Alignment
+1. **Local Preferences**: Support for Bangla language and local customs
+2. **Mobile-First**: Optimized for mobile user experience
+3. **Trust Building**: Transparent privacy practices and security
+4. **Accessibility**: Support for users with varying technical literacy
+
+This User Management Service ensures secure, compliant, and user-friendly authentication and profile management while catering specifically to the needs and preferences of Bangladesh's diverse user base.

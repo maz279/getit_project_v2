@@ -1,0 +1,494 @@
+# PostgreSQL Aurora-style Cluster Configuration
+# Amazon.com/Shopee.sg-Level Database Infrastructure
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-database
+  labels:
+    istio-injection: enabled
+---
+# PostgreSQL Primary Instance
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-primary
+  namespace: getit-database
+  labels:
+    app: postgres
+    role: primary
+spec:
+  serviceName: postgres-primary
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+      role: primary
+  template:
+    metadata:
+      labels:
+        app: postgres
+        role: primary
+        version: "15"
+    spec:
+      serviceAccountName: postgres-service-account
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: "getit_production"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: POSTGRES_REPLICATION_USER
+              value: "replicator"
+            - name: POSTGRES_REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: replication-password
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
+            - name: postgres-hba
+              mountPath: /etc/postgresql/pg_hba.conf
+              subPath: pg_hba.conf
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - getit_production
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - getit_production
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-config
+          configMap:
+            name: postgres-config
+        - name: postgres-hba
+          configMap:
+            name: postgres-hba-config
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "high-performance-ssd"
+        resources:
+          requests:
+            storage: 100Gi
+---
+# PostgreSQL Read Replicas
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+  namespace: getit-database
+  labels:
+    app: postgres
+    role: replica
+spec:
+  serviceName: postgres-replica
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres
+      role: replica
+  template:
+    metadata:
+      labels:
+        app: postgres
+        role: replica
+        version: "15"
+    spec:
+      serviceAccountName: postgres-service-account
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      initContainers:
+        - name: replica-setup
+          image: postgres:15-alpine
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: REPLICA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: replication-password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pg_basebackup -h postgres-primary.getit-database.svc.cluster.local \
+                -D /var/lib/postgresql/data/pgdata \
+                -U replicator \
+                -W \
+                -R \
+                -X stream
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: "getit_production"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-replica-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - getit_production
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+                - -d
+                - getit_production
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-replica-config
+          configMap:
+            name: postgres-replica-config
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "high-performance-ssd"
+        resources:
+          requests:
+            storage: 100Gi
+---
+# Primary Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary
+  namespace: getit-database
+  labels:
+    app: postgres
+    role: primary
+spec:
+  selector:
+    app: postgres
+    role: primary
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  type: ClusterIP
+---
+# Read Replica Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+  namespace: getit-database
+  labels:
+    app: postgres
+    role: replica
+spec:
+  selector:
+    app: postgres
+    role: replica
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  type: ClusterIP
+---
+# Load Balancer Service for External Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-external
+  namespace: getit-database
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+    role: primary
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+---
+# PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: getit-database
+data:
+  postgresql.conf: |
+    # Aurora-style PostgreSQL Configuration
+    
+    # Connection Settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    superuser_reserved_connections = 3
+    
+    # Memory Settings
+    shared_buffers = 1GB
+    effective_cache_size = 3GB
+    work_mem = 16MB
+    maintenance_work_mem = 256MB
+    
+    # Write-Ahead Logging
+    wal_level = replica
+    max_wal_senders = 10
+    max_replication_slots = 10
+    wal_keep_size = 1GB
+    archive_mode = on
+    archive_command = 'test ! -f /var/lib/postgresql/archive/%f && cp %p /var/lib/postgresql/archive/%f'
+    
+    # Checkpoints
+    checkpoint_timeout = 5min
+    checkpoint_completion_target = 0.9
+    max_wal_size = 2GB
+    min_wal_size = 1GB
+    
+    # Performance
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    default_statistics_target = 100
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_temp_files = 0
+    
+    # Autovacuum
+    autovacuum = on
+    log_autovacuum_min_duration = 0
+    autovacuum_max_workers = 3
+    autovacuum_naptime = 1min
+    autovacuum_vacuum_threshold = 50
+    autovacuum_analyze_threshold = 50
+    autovacuum_vacuum_scale_factor = 0.2
+    autovacuum_analyze_scale_factor = 0.1
+    
+    # Connection Pooling
+    max_prepared_transactions = 100
+    
+    # Replication
+    hot_standby = on
+    hot_standby_feedback = on
+    wal_receiver_timeout = 60s
+    
+    # Security
+    ssl = on
+    ssl_cert_file = '/var/lib/postgresql/server.crt'
+    ssl_key_file = '/var/lib/postgresql/server.key'
+---
+# PostgreSQL HBA Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-hba-config
+  namespace: getit-database
+data:
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    
+    # Local connections
+    local   all             postgres                                trust
+    local   all             all                                     md5
+    
+    # IPv4 local connections
+    host    all             postgres        127.0.0.1/32           trust
+    host    all             all             127.0.0.1/32           md5
+    
+    # IPv6 local connections
+    host    all             postgres        ::1/128                trust
+    host    all             all             ::1/128                md5
+    
+    # Kubernetes cluster connections
+    host    all             all             10.0.0.0/8             md5
+    host    all             all             172.16.0.0/12          md5
+    host    all             all             192.168.0.0/16         md5
+    
+    # Replication connections
+    host    replication     replicator      10.0.0.0/8             md5
+    host    replication     replicator      172.16.0.0/12          md5
+    host    replication     replicator      192.168.0.0/16         md5
+---
+# Replica Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-replica-config
+  namespace: getit-database
+data:
+  postgresql.conf: |
+    # Replica-specific PostgreSQL Configuration
+    include '/etc/postgresql/postgresql.conf'
+    
+    # Replica Settings
+    hot_standby = on
+    max_standby_archive_delay = 30s
+    max_standby_streaming_delay = 30s
+    wal_receiver_status_interval = 10s
+    hot_standby_feedback = on
+    wal_receiver_timeout = 60s
+---
+# Credentials Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: getit-database
+type: Opaque
+data:
+  username: cG9zdGdyZXM=  # postgres
+  password: cG9zdGdyZXM=  # postgres (change in production)
+  replication-password: cmVwbGljYXRvcg==  # replicator (change in production)
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-service-account
+  namespace: getit-database
+---
+# Storage Class for High Performance
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: high-performance-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+  zones: us-central1-a,us-central1-b,us-central1-c
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Horizontal Pod Autoscaler for Replicas
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: postgres-replica-hpa
+  namespace: getit-database
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: postgres-replica
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

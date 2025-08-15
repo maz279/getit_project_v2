@@ -1,0 +1,253 @@
+# Prometheus Alert Rules for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Alerting and Monitoring
+
+groups:
+  # =============================================================================
+  # CRITICAL SYSTEM ALERTS
+  # =============================================================================
+  
+  - name: critical.rules
+    rules:
+    - alert: InstanceDown
+      expr: up == 0
+      for: 5m
+      labels:
+        severity: critical
+        category: infrastructure
+      annotations:
+        summary: "Instance {{ $labels.instance }} is down"
+        description: "{{ $labels.instance }} has been down for more than 5 minutes."
+        runbook: "https://docs.getit.com.bd/runbooks/instance-down"
+
+    - alert: HighCPUUsage
+      expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 10m
+      labels:
+        severity: critical
+        category: performance
+      annotations:
+        summary: "High CPU usage on {{ $labels.instance }}"
+        description: "CPU usage is above 80% for more than 10 minutes on {{ $labels.instance }}."
+
+    - alert: HighMemoryUsage
+      expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+      for: 10m
+      labels:
+        severity: critical
+        category: performance
+      annotations:
+        summary: "High memory usage on {{ $labels.instance }}"
+        description: "Memory usage is above 85% for more than 10 minutes on {{ $labels.instance }}."
+
+    - alert: DiskSpaceLow
+      expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+      for: 5m
+      labels:
+        severity: critical
+        category: storage
+      annotations:
+        summary: "Low disk space on {{ $labels.instance }}"
+        description: "Disk space is below 10% on {{ $labels.instance }}."
+
+  # =============================================================================
+  # APPLICATION ALERTS
+  # =============================================================================
+
+  - name: application.rules
+    rules:
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5
+      for: 5m
+      labels:
+        severity: warning
+        category: application
+      annotations:
+        summary: "High error rate in {{ $labels.service }}"
+        description: "Error rate is above 5% for {{ $labels.service }}."
+
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+      for: 10m
+      labels:
+        severity: warning
+        category: performance
+      annotations:
+        summary: "High response time in {{ $labels.service }}"
+        description: "95th percentile response time is above 2 seconds for {{ $labels.service }}."
+
+    - alert: DatabaseConnectionsHigh
+      expr: postgres_stat_database_numbackends / postgres_settings_max_connections * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+        category: database
+      annotations:
+        summary: "High database connections"
+        description: "Database connections are above 80% of the maximum."
+
+    - alert: RedisMemoryHigh
+      expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+      for: 5m
+      labels:
+        severity: warning
+        category: cache
+      annotations:
+        summary: "High Redis memory usage"
+        description: "Redis memory usage is above 90%."
+
+  # =============================================================================
+  # BUSINESS METRICS ALERTS
+  # =============================================================================
+
+  - name: business.rules
+    rules:
+    - alert: PaymentFailureRateHigh
+      expr: rate(payment_transactions_total{status="failed"}[5m]) / rate(payment_transactions_total[5m]) * 100 > 2
+      for: 5m
+      labels:
+        severity: critical
+        category: business
+      annotations:
+        summary: "High payment failure rate"
+        description: "Payment failure rate is above 2% for the last 5 minutes."
+
+    - alert: OrderProcessingDelayed
+      expr: increase(orders_processing_duration_seconds[10m]) > 300
+      for: 10m
+      labels:
+        severity: warning
+        category: business
+      annotations:
+        summary: "Order processing delayed"
+        description: "Order processing is taking more than 5 minutes."
+
+    - alert: LowConversionRate
+      expr: rate(checkout_completed_total[1h]) / rate(checkout_started_total[1h]) * 100 < 5
+      for: 30m
+      labels:
+        severity: warning
+        category: business
+      annotations:
+        summary: "Low conversion rate"
+        description: "Checkout conversion rate is below 5% for the last hour."
+
+    - alert: HighCartAbandonmentRate
+      expr: rate(cart_abandoned_total[1h]) / rate(cart_created_total[1h]) * 100 > 70
+      for: 30m
+      labels:
+        severity: warning
+        category: business
+      annotations:
+        summary: "High cart abandonment rate"
+        description: "Cart abandonment rate is above 70% for the last hour."
+
+  # =============================================================================
+  # SECURITY ALERTS
+  # =============================================================================
+
+  - name: security.rules
+    rules:
+    - alert: HighLoginFailureRate
+      expr: rate(auth_login_attempts_total{status="failed"}[5m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+        category: security
+      annotations:
+        summary: "High login failure rate"
+        description: "Login failure rate is above 10 attempts per second."
+
+    - alert: SuspiciousTrafficPattern
+      expr: rate(http_requests_total[5m]) > 1000
+      for: 10m
+      labels:
+        severity: warning
+        category: security
+      annotations:
+        summary: "Suspicious traffic pattern detected"
+        description: "Request rate is above 1000 requests per second for 10 minutes."
+
+    - alert: UnauthorizedAccessAttempts
+      expr: rate(http_requests_total{status="401"}[5m]) > 50
+      for: 5m
+      labels:
+        severity: warning
+        category: security
+      annotations:
+        summary: "High unauthorized access attempts"
+        description: "Unauthorized access attempts are above 50 per second."
+
+  # =============================================================================
+  # BANGLADESH SPECIFIC ALERTS
+  # =============================================================================
+
+  - name: bangladesh.rules
+    rules:
+    - alert: MobileBankingServiceDown
+      expr: up{job="mobile-banking"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        category: payment
+        region: bangladesh
+      annotations:
+        summary: "Mobile banking service is down"
+        description: "{{ $labels.service }} mobile banking integration is down."
+
+    - alert: HighMobileBankingFailureRate
+      expr: rate(mobile_banking_transactions_total{status="failed"}[5m]) / rate(mobile_banking_transactions_total[5m]) * 100 > 5
+      for: 5m
+      labels:
+        severity: warning
+        category: payment
+        region: bangladesh
+      annotations:
+        summary: "High mobile banking failure rate"
+        description: "Mobile banking transaction failure rate is above 5%."
+
+    - alert: CourierServiceIntegrationDown
+      expr: up{job="courier-service"} == 0
+      for: 5m
+      labels:
+        severity: warning
+        category: logistics
+        region: bangladesh
+      annotations:
+        summary: "Courier service integration is down"
+        description: "{{ $labels.service }} courier service integration is down."
+
+  # =============================================================================
+  # KUBERNETES ALERTS
+  # =============================================================================
+
+  - name: kubernetes.rules
+    rules:
+    - alert: KubernetesPodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        category: kubernetes
+      annotations:
+        summary: "Pod is crash looping"
+        description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping."
+
+    - alert: KubernetesNodeNotReady
+      expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        category: kubernetes
+      annotations:
+        summary: "Kubernetes node not ready"
+        description: "Node {{ $labels.node }} is not ready."
+
+    - alert: KubernetesPersistentVolumeErrors
+      expr: kube_persistentvolume_status_phase{phase=~"Failed|Pending"} > 0
+      for: 5m
+      labels:
+        severity: warning
+        category: kubernetes
+      annotations:
+        summary: "Persistent volume errors"
+        description: "Persistent volume {{ $labels.persistentvolume }} is in {{ $labels.phase }} state."

@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-bangladesh-compliance
+  labels:
+    name: getit-bangladesh-compliance
+    environment: shared
+    platform: getit-bangladesh
+    tier: compliance
+    purpose: regulatory-compliance
+    region: bangladesh
+  annotations:
+    description: "GetIt Bangladesh Regulatory Compliance and Audit Infrastructure"
+    contact: "compliance-team@getit.com.bd"
+    cost-center: "compliance"
+    regulatory-bodies: "bangladesh-bank,nbr,rjsc,btrc"
+    data-classification: "confidential"
+    audit-required: "true"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: bangladesh-compliance-resource-quota
+  namespace: getit-bangladesh-compliance
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "15"
+    pods: "20"
+    services: "10"
+    secrets: "50"
+    configmaps: "30"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: bangladesh-compliance-limit-range
+  namespace: getit-bangladesh-compliance
+spec:
+  limits:
+  - default:
+      cpu: 1
+      memory: 2Gi
+    defaultRequest:
+      cpu: 200m
+      memory: 512Mi
+    type: Container
+  - max:
+      cpu: 2
+      memory: 4Gi
+    min:
+      cpu: 100m
+      memory: 256Mi
+    type: Container
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bangladesh-compliance-network-policy
+  namespace: getit-bangladesh-compliance
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: getit-production
+    - namespaceSelector:
+        matchLabels:
+          name: getit-monitoring
+    - podSelector:
+        matchLabels:
+          tier: api-gateway
+    - podSelector:
+        matchLabels:
+          compliance: "required"
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: getit-production
+    - namespaceSelector:
+        matchLabels:
+          name: getit-monitoring
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 9200  # Elasticsearch
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bangladesh-compliance-service-account
+  namespace: getit-bangladesh-compliance
+  annotations:
+    description: "Service account for Bangladesh compliance operations"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: bangladesh-compliance-role
+  namespace: getit-bangladesh-compliance
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "configmaps", "pods", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: bangladesh-compliance-role-binding
+  namespace: getit-bangladesh-compliance
+subjects:
+- kind: ServiceAccount
+  name: bangladesh-compliance-service-account
+  namespace: getit-bangladesh-compliance
+roleRef:
+  kind: Role
+  name: bangladesh-compliance-role
+  apiGroup: rbac.authorization.k8s.io

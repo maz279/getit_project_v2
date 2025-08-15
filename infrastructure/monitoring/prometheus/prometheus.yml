@@ -1,0 +1,225 @@
+# Prometheus Configuration for GetIt Bangladesh
+# Amazon.com/Shopee.sg-Level Metrics Collection
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'getit-bangladesh'
+    environment: 'production'
+    region: 'bangladesh'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+  - "/etc/prometheus/rules/business/*.yml"
+  - "/etc/prometheus/rules/infrastructure/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 15s
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 15s
+
+  # Elasticsearch metrics
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+    scrape_interval: 30s
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 15s
+
+  # Jaeger metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger-query:16687', 'jaeger-collector:14269']
+    scrape_interval: 30s
+
+  # Application metrics - Backend services
+  - job_name: 'getit-backend'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - getit-production
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: getit-backend
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+    scrape_interval: 10s
+    metrics_path: '/api/v1/metrics'
+
+  # API Gateway metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    scrape_interval: 10s
+    metrics_path: '/api/v1/gateway/metrics'
+
+  # Microservices metrics
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:3001']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'product-service'
+    static_configs:
+      - targets: ['product-service:3002']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:3003']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['payment-service:3004']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  - job_name: 'cart-service'
+    static_configs:
+      - targets: ['cart-service:3005']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  - job_name: 'search-service'
+    static_configs:
+      - targets: ['search-service:3006']
+    scrape_interval: 20s
+    metrics_path: '/metrics'
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:3007']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  - job_name: 'review-service'
+    static_configs:
+      - targets: ['review-service:3008']
+    scrape_interval: 20s
+    metrics_path: '/metrics'
+
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:3009']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  - job_name: 'vendor-service'
+    static_configs:
+      - targets: ['vendor-service:3010']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  # Business metrics endpoints
+  - job_name: 'business-metrics'
+    static_configs:
+      - targets: ['getit-backend:5000']
+    scrape_interval: 60s
+    metrics_path: '/api/v1/metrics/business'
+
+  # Performance metrics
+  - job_name: 'performance-metrics'
+    static_configs:
+      - targets: ['getit-backend:5000']
+    scrape_interval: 30s
+    metrics_path: '/api/v1/metrics/performance'
+
+  # Custom application metrics
+  - job_name: 'custom-metrics'
+    static_configs:
+      - targets: ['getit-backend:5000']
+    scrape_interval: 45s
+    metrics_path: '/api/v1/metrics/custom'
+
+  # Load testing metrics (when active)
+  - job_name: 'load-test-metrics'
+    static_configs:
+      - targets: ['k6-prometheus-adapter:9090']
+    scrape_interval: 5s
+    scrape_timeout: 4s
+
+  # Bangladesh-specific monitoring
+  - job_name: 'bangladesh-metrics'
+    static_configs:
+      - targets: ['getit-backend:5000']
+    scrape_interval: 60s
+    metrics_path: '/api/v1/metrics/bangladesh'
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "http://victoriametrics:8428/api/v1/write"
+    queue_config:
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+      min_shards: 1
+      max_shards: 200
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 50GB
+    wal-compression: true
+
+# Performance tuning
+query:
+  max_concurrent: 20
+  timeout: 2m
+  max_samples: 50000000

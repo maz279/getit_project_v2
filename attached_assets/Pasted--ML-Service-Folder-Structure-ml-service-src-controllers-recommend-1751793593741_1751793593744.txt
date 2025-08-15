@@ -1,0 +1,340 @@
+# ML Service - Folder Structure
+
+```
+ml-service/
+├── src/
+│   ├── controllers/
+│   │   ├── recommendation-controller.py # Product recommendation endpoints
+│   │   ├── fraud-detection-controller.py # Fraud detection endpoints
+│   │   ├── price-optimization-controller.py # Dynamic pricing endpoints
+│   │   ├── sentiment-analysis-controller.py # Review sentiment analysis
+│   │   ├── demand-forecasting-controller.py # Demand prediction endpoints
+│   │   ├── search-optimization-controller.py # Search result optimization
+│   │   └── customer-segmentation-controller.py # Customer segmentation
+│   ├── models/
+│   │   ├── recommendation/
+│   │   │   ├── collaborative_filtering.py # User-based collaborative filtering
+│   │   │   ├── content_based.py         # Content-based filtering
+│   │   │   ├── hybrid_model.py          # Hybrid recommendation model
+│   │   │   ├── matrix_factorization.py  # Matrix factorization model
+│   │   │   ├── deep_recommendation.py   # Deep learning recommendations
+│   │   │   └── seasonal_recommendation.py # Festival/seasonal recommendations
+│   │   ├── fraud_detection/
+│   │   │   ├── anomaly_detector.py      # Anomaly detection model
+│   │   │   ├── rule_engine.py           # Rule-based fraud detection
+│   │   │   ├── ensemble_model.py        # Ensemble fraud detection
+│   │   │   ├── transaction_analyzer.py  # Transaction pattern analysis
+│   │   │   └── behavioral_analysis.py   # User behavior analysis
+│   │   ├── price_optimization/
+│   │   │   ├── dynamic_pricing.py       # Dynamic pricing model
+│   │   │   ├── competitor_analysis.py   # Competitor price analysis
+│   │   │   ├── elasticity_model.py      # Price elasticity calculation
+│   │   │   ├── demand_based_pricing.py  # Demand-driven pricing
+│   │   │   └── seasonal_pricing.py      # Festival/seasonal pricing
+│   │   ├── sentiment_analysis/
+│   │   │   ├── review_analyzer.py       # Product review sentiment
+│   │   │   ├── bangla_sentiment.py      # Bangla language sentiment
+│   │   │   ├── emotion_detector.py      # Emotion classification
+│   │   │   ├── mixed_language_sentiment.py # Bangla-English mixed text
+│   │   │   └── vendor_sentiment.py      # Vendor review sentiment
+│   │   ├── forecasting/
+│   │   │   ├── demand_predictor.py      # Product demand forecasting
+│   │   │   ├── seasonal_analyzer.py     # Seasonal pattern analysis
+│   │   │   ├── trend_analyzer.py        # Market trend analysis
+│   │   │   ├── festival_forecasting.py  # Festival demand prediction
+│   │   │   └── inventory_optimizer.py   # Inventory level optimization
+│   │   ├── search_optimization/
+│   │   │   ├── search_ranking.py        # Search result ranking
+│   │   │   ├── query_understanding.py   # Search query understanding
+│   │   │   ├── personalized_search.py   # Personalized search results
+│   │   │   ├── bangla_search_ml.py      # Bangla language search ML
+│   │   │   └── autocomplete_ml.py       # ML-powered autocomplete
+│   │   └── customer_segmentation/
+│   │       ├── behavioral_segmentation.py # Behavior-based segments
+│   │       ├── demographic_segmentation.py # Demographic clustering
+│   │       ├── value_based_segmentation.py # Customer value segments
+│   │       ├── geographic_segmentation.py # Location-based segments
+│   │       └── lifecycle_segmentation.py # Customer lifecycle stages
+│   ├── routes/
+│   │   ├── recommendation_routes.py     # Recommendation API routes
+│   │   ├── fraud_detection_routes.py    # Fraud detection API routes
+│   │   ├── price_optimization_routes.py # Pricing API routes
+│   │   ├── sentiment_routes.py          # Sentiment analysis routes
+│   │   ├── forecasting_routes.py        # Forecasting API routes
+│   │   ├── search_routes.py             # Search optimization routes
+│   │   └── segmentation_routes.py       # Customer segmentation routes
+│   ├── services/
+│   │   ├── recommendation_service.py    # Recommendation orchestration
+│   │   ├── fraud_detection_service.py   # Fraud detection orchestration
+│   │   ├── price_optimization_service.py # Pricing service orchestration
+│   │   ├── sentiment_service.py         # Sentiment analysis service
+│   │   ├── forecasting_service.py       # Forecasting service
+│   │   ├── search_service.py            # Search optimization service
+│   │   ├── model_training_service.py    # Model training orchestration
+│   │   └── model_serving_service.py     # Model serving & inference
+│   ├── data/
+│   │   ├── preprocessors/
+│   │   │   ├── text_preprocessor.py     # Text data preprocessing
+│   │   │   ├── image_preprocessor.py    # Image data preprocessing
+│   │   │   ├── numerical_preprocessor.py # Numerical data preprocessing
+│   │   │   ├── categorical_preprocessor.py # Categorical data preprocessing
+│   │   │   └── bangla_preprocessor.py   # Bangla text preprocessing
+│   │   ├── feature_extractors/
+│   │   │   ├── text_features.py         # Text feature extraction
+│   │   │   ├── user_features.py         # User behavior features
+│   │   │   ├── product_features.py      # Product feature extraction
+│   │   │   ├── transaction_features.py  # Transaction features
+│   │   │   └── temporal_features.py     # Time-based features
+│   │   ├── transformers/
+│   │   │   ├── data_scaler.py           # Data scaling & normalization
+│   │   │   ├── encoder.py               # Categorical encoding
+│   │   │   ├── dimensionality_reducer.py # Dimensionality reduction
+│   │   │   └── feature_selector.py      # Feature selection
+│   │   └── validators/
+│   │       ├── data_quality_checker.py  # Data quality validation
+│   │       ├── outlier_detector.py      # Outlier detection
+│   │       ├── missing_value_handler.py # Missing data handling
+│   │       └── consistency_checker.py   # Data consistency validation
+│   ├── training/
+│   │   ├── pipelines/
+│   │   │   ├── recommendation_pipeline.py # Recommendation training pipeline
+│   │   │   ├── fraud_detection_pipeline.py # Fraud detection training
+│   │   │   ├── sentiment_pipeline.py    # Sentiment analysis training
+│   │   │   ├── forecasting_pipeline.py  # Forecasting model training
+│   │   │   └── segmentation_pipeline.py # Segmentation training
+│   │   ├── schedulers/
+│   │   │   ├── daily_training_scheduler.py # Daily model retraining
+│   │   │   ├── weekly_training_scheduler.py # Weekly model updates
+│   │   │   ├── model_drift_detector.py  # Model performance monitoring
+│   │   │   └── auto_retrain_trigger.py  # Automatic retraining triggers
+│   │   ├── evaluators/
+│   │   │   ├── recommendation_evaluator.py # Recommendation metrics
+│   │   │   ├── classification_evaluator.py # Classification metrics
+│   │   │   ├── regression_evaluator.py  # Regression metrics
+│   │   │   ├── clustering_evaluator.py  # Clustering metrics
+│   │   │   └── business_metric_evaluator.py # Business impact metrics
+│   │   └── model_versioning/
+│   │       ├── model_registry.py        # Model version management
+│   │       ├── experiment_tracker.py    # ML experiment tracking
+│   │       ├── model_comparator.py      # Model performance comparison
+│   │       └── deployment_manager.py    # Model deployment management
+│   ├── utils/
+│   │   ├── data_loader.py               # Data loading utilities
+│   │   ├── feature_engineer.py          # Feature engineering utilities
+│   │   ├── model_utils.py               # Model utility functions
+│   │   ├── evaluation_metrics.py        # Model evaluation metrics
+│   │   ├── visualization_utils.py       # Data visualization utilities
+│   │   └── bangladesh_ml_utils.py       # Bangladesh-specific ML utilities
+│   ├── config/
+│   │   ├── database.py                  # Database configuration
+│   │   ├── ml_config.py                 # ML model configurations
+│   │   ├── model_config.py              # Individual model configs
+│   │   ├── training_config.py           # Training configurations
+│   │   └── serving_config.py            # Model serving configurations
+│   └── app.py                           # FastAPI application setup
+├── bangladesh_specific/                 # Bangladesh market ML features
+│   ├── local_patterns/
+│   │   ├── festival_pattern_analyzer.py # Festival shopping patterns
+│   │   ├── seasonal_behavior_analyzer.py # Seasonal behavior analysis
+│   │   ├── cultural_preference_model.py # Cultural preference modeling
+│   │   ├── regional_demand_model.py     # Regional demand patterns
+│   │   └── payment_preference_model.py  # Payment method preferences
+│   ├── language_models/
+│   │   ├── bangla_word2vec.py           # Bangla word embeddings
+│   │   ├── bangla_bert_model.py         # Bangla BERT model
+│   │   ├── mixed_language_model.py      # Bangla-English mixed model
+│   │   ├── phonetic_similarity_model.py # Phonetic similarity model
+│   │   └── code_switching_model.py      # Code-switching language model
+│   ├── cultural_models/
+│   │   ├── festival_recommendation.py   # Festival-specific recommendations
+│   │   ├── cultural_sentiment.py        # Cultural sentiment analysis
+│   │   ├── traditional_product_model.py # Traditional product modeling
+│   │   └── local_brand_preference.py    # Local brand preference model
+│   └── economic_models/
+│   │   ├── price_sensitivity_bd.py      # BD market price sensitivity
+│   │   ├── income_based_segmentation.py # Income-based customer segments
+│   │   ├── mobile_banking_adoption.py   # Mobile banking adoption model
+│   │   └── rural_urban_behavior.py      # Rural vs urban behavior
+├── real_time_inference/                 # Real-time ML inference
+│   ├── serving/
+│   │   ├── recommendation_server.py     # Real-time recommendation serving
+│   │   ├── fraud_detection_server.py    # Real-time fraud detection
+│   │   ├── price_optimization_server.py # Real-time pricing
+│   │   ├── sentiment_server.py          # Real-time sentiment analysis
+│   │   └── search_ranking_server.py     # Real-time search ranking
+│   ├── caching/
+│   │   ├── model_cache.py               # Model caching layer
+│   │   ├── feature_cache.py             # Feature caching
+│   │   ├── prediction_cache.py          # Prediction result caching
+│   │   └── embedding_cache.py           # Embedding vector caching
+│   ├── optimization/
+│   │   ├── model_quantization.py        # Model size optimization
+│   │   ├── inference_optimization.py    # Inference speed optimization
+│   │   ├── batch_inference.py           # Batch prediction optimization
+│   │   └── gpu_acceleration.py          # GPU acceleration utilities
+│   └── monitoring/
+│       ├── model_performance_monitor.py # Model performance monitoring
+│       ├── drift_detection.py           # Data/model drift detection
+│       ├── latency_monitor.py           # Inference latency monitoring
+│       └── accuracy_monitor.py          # Model accuracy monitoring
+├── data_processing/                     # Data processing pipelines
+│   ├── batch_processing/
+│   │   ├── user_behavior_processor.py   # User behavior data processing
+│   │   ├── product_data_processor.py    # Product data processing
+│   │   ├── transaction_processor.py     # Transaction data processing
+│   │   ├── review_processor.py          # Review text processing
+│   │   └── seasonal_data_processor.py   # Seasonal data aggregation
+│   ├── stream_processing/
+│   │   ├── real_time_events.py          # Real-time event processing
+│   │   ├── clickstream_processor.py     # Clickstream data processing
+│   │   ├── transaction_stream.py        # Real-time transaction processing
+│   │   └── user_session_processor.py    # User session analysis
+│   ├── feature_stores/
+│   │   ├── user_feature_store.py        # User feature storage
+│   │   ├── product_feature_store.py     # Product feature storage
+│   │   ├── transaction_feature_store.py # Transaction feature storage
+│   │   └── contextual_feature_store.py  # Contextual features
+│   └── data_validation/
+│       ├── schema_validator.py          # Data schema validation
+│       ├── quality_checker.py           # Data quality checks
+│       ├── freshness_checker.py         # Data freshness validation
+│       └── completeness_checker.py      # Data completeness validation
+├── notebooks/                           # Jupyter notebooks for analysis
+│   ├── exploratory_analysis/
+│   │   ├── user_behavior_analysis.ipynb # User behavior exploration
+│   │   ├── product_analysis.ipynb       # Product performance analysis
+│   │   ├── seasonal_patterns.ipynb      # Seasonal pattern analysis
+│   │   ├── fraud_pattern_analysis.ipynb # Fraud pattern exploration
+│   │   └── bangladesh_market_analysis.ipynb # BD market analysis
+│   ├── model_experiments/
+│   │   ├── recommendation_experiments.ipynb # Recommendation experiments
+│   │   ├── fraud_detection_experiments.ipynb # Fraud detection experiments
+│   │   ├── sentiment_experiments.ipynb  # Sentiment analysis experiments
+│   │   ├── forecasting_experiments.ipynb # Forecasting experiments
+│   │   └── pricing_experiments.ipynb    # Pricing optimization experiments
+│   ├── performance_analysis/
+│   │   ├── model_performance_analysis.ipynb # Model performance review
+│   │   ├── business_impact_analysis.ipynb # Business impact assessment
+│   │   ├── ab_test_analysis.ipynb       # A/B test result analysis
+│   │   └── roi_analysis.ipynb           # ROI analysis of ML models
+│   └── bangladesh_insights/
+│       ├── festival_impact_analysis.ipynb # Festival impact on sales
+│       ├── payment_behavior_analysis.ipynb # Payment method analysis
+│       ├── regional_preference_analysis.ipynb # Regional preferences
+│       └── cultural_trend_analysis.ipynb # Cultural trend analysis
+├── deployment/                          # Model deployment configurations
+│   ├── docker/
+│   │   ├── training.Dockerfile          # Training environment
+│   │   ├── serving.Dockerfile           # Serving environment
+│   │   ├── batch_processing.Dockerfile  # Batch processing environment
+│   │   └── jupyter.Dockerfile           # Jupyter notebook environment
+│   ├── kubernetes/
+│   │   ├── training-deployment.yaml     # Training job deployment
+│   │   ├── serving-deployment.yaml      # Model serving deployment
+│   │   ├── batch-job.yaml              # Batch processing job
+│   │   └── ingress.yaml                # API ingress configuration
+│   ├── monitoring/
+│   │   ├── prometheus-config.yaml       # Prometheus monitoring
+│   │   ├── grafana-dashboard.json       # Grafana dashboard
+│   │   └── alerting-rules.yaml          # ML model alerting rules
+│   └── scaling/
+│       ├── auto-scaler.yaml            # Automatic scaling configuration
+│       ├── resource-limits.yaml        # Resource limit configurations
+│       └── load-balancer.yaml          # Load balancer for ML services
+├── tests/
+│   ├── unit/
+│   │   ├── test_recommendation_models.py
+│   │   ├── test_fraud_detection.py
+│   │   ├── test_sentiment_analysis.py
+│   │   ├── test_forecasting_models.py
+│   │   └── test_data_processors.py
+│   ├── integration/
+│   │   ├── test_ml_pipelines.py
+│   │   ├── test_model_serving.py
+│   │   ├── test_data_flows.py
+│   │   └── test_feature_stores.py
+│   └── performance/
+│       ├── test_inference_latency.py
+│       ├── test_model_accuracy.py
+│       ├── test_throughput.py
+│       └── test_resource_usage.py
+├── requirements.txt                     # Python dependencies
+├── requirements-dev.txt                 # Development dependencies
+├── requirements-gpu.txt                 # GPU-specific dependencies
+├── setup.py                            # Package setup configuration
+├── Dockerfile                          # Main Docker configuration
+├── docker-compose.yml                  # Multi-service composition
+└── README.md                           # Documentation
+```
+
+## Bangladesh-Specific ML Features:
+
+### Recommendation Systems:
+- **Cultural Preferences** - Traditional vs modern product preferences
+- **Festival Recommendations** - Eid, Durga Puja, Pohela Boishakh specific items
+- **Regional Preferences** - Dhaka vs Chittagong vs rural preferences
+- **Seasonal Recommendations** - Monsoon, winter clothing, summer products
+- **Price-conscious Recommendations** - Budget-aware suggestions for BD market
+
+### Fraud Detection:
+- **COD Fraud Detection** - Cash on delivery fraud patterns
+- **Mobile Banking Fraud** - bKash, Nagad, Rocket fraud detection
+- **Geographic Anomalies** - Unusual shipping location patterns
+- **Behavioral Analysis** - User behavior deviation detection
+- **Transaction Pattern Analysis** - Suspicious transaction patterns
+
+### Price Optimization:
+- **Local Market Pricing** - Bangladesh market price sensitivity
+- **Festival Pricing** - Dynamic pricing for festival seasons
+- **Competitor Price Monitoring** - Local competitor price tracking
+- **Currency Fluctuation Impact** - BDT exchange rate impact
+- **Regional Price Variation** - Urban vs rural pricing strategies
+
+### Sentiment Analysis:
+- **Bangla Language Processing** - Native Bangla review analysis
+- **Mixed Language Analysis** - Bangla-English code-switched text
+- **Cultural Context Understanding** - Cultural nuances in reviews
+- **Emotion Detection** - Joy, frustration, satisfaction detection
+- **Product Quality Insights** - Quality issues from review sentiment
+
+### Demand Forecasting:
+- **Festival Demand Prediction** - Eid, Puja shopping surge prediction
+- **Seasonal Demand Patterns** - Monsoon gear, winter clothes demand
+- **Regional Demand Variations** - City-wise demand predictions
+- **Economic Impact Modeling** - Economic conditions effect on demand
+- **Supply Chain Optimization** - Inventory planning for Bangladesh
+
+### Search Optimization:
+- **Bangla Search Enhancement** - Native language search improvement
+- **Phonetic Search** - English transliteration of Bangla queries
+- **Cultural Product Discovery** - Traditional product search enhancement
+- **Local Brand Promotion** - Made-in-Bangladesh product promotion
+- **Festival Search Boost** - Festival-related product visibility
+
+### Customer Segmentation:
+- **Economic Segmentation** - Income-based customer groups
+- **Geographic Segmentation** - Urban, suburban, rural segments
+- **Payment Behavior Segmentation** - COD vs digital payment users
+- **Cultural Preference Segmentation** - Traditional vs modern preferences
+- **Engagement Level Segmentation** - Active, occasional, dormant users
+
+### Language Processing:
+- **Bangla NLP Models** - Native Bangla text processing
+- **Code-switching Detection** - Bangla-English mixed text handling
+- **Phonetic Similarity** - Sound-based text matching
+- **Cultural Term Recognition** - Local terminology understanding
+- **Multilingual Embeddings** - Cross-language semantic understanding
+
+### Business Intelligence:
+- **Market Trend Analysis** - Bangladesh e-commerce trends
+- **Competitive Intelligence** - Competitor strategy analysis
+- **Customer Lifetime Value** - CLV prediction for BD market
+- **Churn Prediction** - Customer retention modeling
+- **Revenue Optimization** - Revenue maximization strategies
+
+### Model Deployment & Monitoring:
+- **Real-time Inference** - Low-latency prediction serving
+- **Batch Processing** - Large-scale offline processing
+- **Model Performance Monitoring** - Accuracy and drift detection
+- **A/B Testing Framework** - ML model experimentation
+- **Cost Optimization** - Efficient resource utilization

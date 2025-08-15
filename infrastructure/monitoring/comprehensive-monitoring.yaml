@@ -1,0 +1,371 @@
+# Comprehensive Monitoring and Alerting for GetIt Platform
+# Amazon.com/Shopee.sg Enterprise Monitoring Stack
+
+# Prometheus Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+    - "/etc/prometheus/rules/*.yml"
+    
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets:
+          - alertmanager:9093
+    
+    scrape_configs:
+    # Kubernetes API Server
+    - job_name: 'kubernetes-apiservers'
+      kubernetes_sd_configs:
+      - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+    
+    # Kubernetes Nodes
+    - job_name: 'kubernetes-nodes'
+      kubernetes_sd_configs:
+      - role: node
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+    
+    # GetIt Platform Services
+    - job_name: 'getit-api'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - getit-platform
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: getit-api
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+    
+    # Istio Service Mesh
+    - job_name: 'istio-mesh'
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - istio-system
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: istio-proxy;http-monitoring
+    
+    # Database Monitoring
+    - job_name: 'postgresql'
+      static_configs:
+      - targets: ['postgresql-exporter:9187']
+    
+    # Redis Monitoring
+    - job_name: 'redis'
+      static_configs:
+      - targets: ['redis-exporter:9121']
+
+---
+# Alerting Rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  alerts.yml: |
+    groups:
+    - name: getit-platform-alerts
+      rules:
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{code=~"5.."}[5m])) by (service) /
+            sum(rate(http_requests_total[5m])) by (service)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High error rate detected for {{ $labels.service }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+      
+      # High Latency Alert
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High latency detected for {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s for service {{ $labels.service }}"
+      
+      # Database Connection Alert
+      - alert: DatabaseDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+      
+      # Memory Usage Alert
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name!=""} /
+            container_spec_memory_limit_bytes{name!=""} * 100
+          ) > 90
+        for: 5m
+        labels:
+          severity: warning
+          container: "{{ $labels.name }}"
+        annotations:
+          summary: "High memory usage for container {{ $labels.name }}"
+          description: "Memory usage is {{ $value }}% for container {{ $labels.name }}"
+      
+      # CPU Usage Alert
+      - alert: HighCPUUsage
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100
+          ) > 80
+        for: 5m
+        labels:
+          severity: warning
+          container: "{{ $labels.name }}"
+        annotations:
+          summary: "High CPU usage for container {{ $labels.name }}"
+          description: "CPU usage is {{ $value }}% for container {{ $labels.name }}"
+      
+      # Pod Restart Alert
+      - alert: PodRestartingTooOften
+        expr: |
+          increase(kube_pod_container_status_restarts_total[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+          pod: "{{ $labels.pod }}"
+          namespace: "{{ $labels.namespace }}"
+        annotations:
+          summary: "Pod {{ $labels.pod }} is restarting too often"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last 15 minutes"
+      
+      # Disk Space Alert
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) /
+            node_filesystem_size_bytes{fstype!="tmpfs"} * 100
+          ) > 85
+        for: 5m
+        labels:
+          severity: warning
+          instance: "{{ $labels.instance }}"
+        annotations:
+          summary: "Disk space is low on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: getit-dashboard
+  namespace: monitoring
+data:
+  getit-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "GetIt Platform Overview",
+        "tags": ["getit", "overview"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{code=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Error Rate"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Response Time (95th percentile)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Seconds"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Active Users",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "sum(active_users_total)",
+                "legendFormat": "Active Users"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "5s"
+      }
+    }
+
+---
+# AlertManager Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@getit.com.bd'
+      slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+      - match:
+          severity: warning
+        receiver: 'warning-alerts'
+    
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://webhook-service:5000/alerts'
+        send_resolved: true
+    
+    - name: 'critical-alerts'
+      slack_configs:
+      - channel: '#alerts-critical'
+        title: 'Critical Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+      email_configs:
+      - to: 'ops-team@getit.com.bd'
+        subject: 'Critical Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    
+    - name: 'warning-alerts'
+      slack_configs:
+      - channel: '#alerts-warning'
+        title: 'Warning: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+
+---
+# Jaeger Tracing Configuration
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: getit-jaeger
+  namespace: monitoring
+spec:
+  strategy: production
+  storage:
+    type: elasticsearch
+    elasticsearch:
+      nodeCount: 3
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "4Gi"
+          cpu: "1"
+  collector:
+    replicas: 3
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "200m"
+      limits:
+        memory: "2Gi"
+        cpu: "500m"
+  query:
+    replicas: 2
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "200m"

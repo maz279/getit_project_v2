@@ -1,0 +1,401 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-chatbot-config
+  namespace: getit-production
+  labels:
+    component: ai-integration
+    tier: conversational-ai
+data:
+  rasa-config.yml: |
+    recipe: default.v1
+    language: en
+    pipeline:
+    - name: WhitespaceTokenizer
+    - name: RegexFeaturizer
+    - name: LexicalSyntacticFeaturizer
+    - name: CountVectorsFeaturizer
+      analyzer: char_wb
+      min_ngram: 1
+      max_ngram: 4
+    - name: DIETClassifier
+      epochs: 100
+      constrain_similarities: true
+    - name: EntitySynonymMapper
+    - name: ResponseSelector
+      epochs: 100
+      constrain_similarities: true
+    - name: FallbackClassifier
+      threshold: 0.3
+      ambiguity_threshold: 0.1
+
+    policies:
+    - name: MemoizationPolicy
+    - name: RulePolicy
+    - name: UnexpecTEDIntentPolicy
+      max_history: 5
+      epochs: 100
+    - name: TEDPolicy
+      max_history: 5
+      epochs: 100
+      constrain_similarities: true
+
+  nlu-training-data.yml: |
+    version: "3.1"
+    nlu:
+    - intent: greet
+      examples: |
+        - hello
+        - hi
+        - hey there
+        - good morning
+        - good evening
+        - assalamu alaikum
+        - namaskar
+        - adaab
+
+    - intent: order_status
+      examples: |
+        - what's the status of my order
+        - where is my order
+        - track my order [12345](order_number)
+        - order [67890](order_number) status
+        - amar order kothay
+        - order er obostha ki
+
+    - intent: payment_help
+      examples: |
+        - how to pay with bkash
+        - nagad payment not working
+        - rocket payment failed
+        - payment methods
+        - bkash diye kivabe pay korbo
+        - nagad problem
+
+    - intent: product_search
+      examples: |
+        - find smartphones
+        - search for sarees
+        - show me electronics
+        - mobile phone dekhan
+        - fashion items chai
+
+    - intent: return_refund
+      examples: |
+        - how to return item
+        - refund policy
+        - exchange product
+        - return korte chai
+        - money back
+
+    - intent: shipping_info
+      examples: |
+        - shipping cost
+        - delivery time
+        - shipping to dhaka
+        - pathao delivery
+        - paperfly shipping
+
+    entities:
+    - order_number
+    - product_category
+    - location
+    - payment_method
+
+  domain.yml: |
+    version: "3.1"
+    intents:
+    - greet
+    - order_status
+    - payment_help
+    - product_search
+    - return_refund
+    - shipping_info
+    - goodbye
+    - affirm
+    - deny
+    - mood_great
+    - mood_unhappy
+    - bot_challenge
+
+    entities:
+    - order_number
+    - product_category
+    - location
+    - payment_method
+
+    slots:
+      order_number:
+        type: text
+        mappings:
+        - type: from_entity
+          entity: order_number
+      
+      user_language:
+        type: categorical
+        values:
+        - english
+        - bengali
+        - hindi
+        mappings:
+        - type: custom
+
+    responses:
+      utter_greet:
+      - text: "Hello! Welcome to GetIt. How can I help you today?"
+      - text: "Hi there! I'm your GetIt shopping assistant. What can I do for you?"
+      - text: "Assalamu Alaikum! GetIt-এ আপনাকে স্বাগতম। আমি কীভাবে সাহায্য করতে পারি?"
+
+      utter_order_status:
+      - text: "I can help you track your order. Please provide your order number."
+      - text: "আপনার অর্ডারের স্ট্যাটাস জানতে অর্ডার নম্বর দিন।"
+
+      utter_payment_help:
+      - text: "We accept bKash, Nagad, Rocket, and credit cards. Which payment method do you need help with?"
+      - text: "আমরা বিকাশ, নগদ, রকেট এবং ক্রেডিট কার্ড গ্রহণ করি। কোন পেমেন্ট নিয়ে সাহায্য চান?"
+
+      utter_goodbye:
+      - text: "Thank you for choosing GetIt! Have a great day!"
+      - text: "GetIt বেছে নেওয়ার জন্য ধন্যবাদ! ভালো থাকবেন!"
+
+    actions:
+    - action_track_order
+    - action_search_products
+    - action_payment_assistance
+    - action_shipping_calculator
+
+  custom-actions.py: |
+    from typing import Any, Text, Dict, List
+    from rasa_sdk import Action, Tracker
+    from rasa_sdk.executor import CollectingDispatcher
+    import requests
+    import os
+
+    class ActionTrackOrder(Action):
+        def name(self) -> Text:
+            return "action_track_order"
+
+        def run(self, dispatcher: CollectingDispatcher,
+                tracker: Tracker,
+                domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+            
+            order_number = tracker.get_slot('order_number')
+            
+            if not order_number:
+                dispatcher.utter_message(text="Please provide your order number to track your order.")
+                return []
+            
+            # Call GetIt API to get order status
+            api_url = f"{os.getenv('GETIT_API_URL')}/api/v1/orders/{order_number}"
+            headers = {"Authorization": f"Bearer {os.getenv('API_TOKEN')}"}
+            
+            try:
+                response = requests.get(api_url, headers=headers)
+                if response.status_code == 200:
+                    order_data = response.json()
+                    status = order_data.get('status', 'Unknown')
+                    
+                    message = f"Your order #{order_number} is currently {status}."
+                    
+                    if status == 'shipped':
+                        tracking_id = order_data.get('tracking_id')
+                        message += f" Tracking ID: {tracking_id}"
+                    
+                    dispatcher.utter_message(text=message)
+                else:
+                    dispatcher.utter_message(text="Sorry, I couldn't find that order. Please check your order number.")
+            except Exception as e:
+                dispatcher.utter_message(text="Sorry, there was an error retrieving your order information.")
+            
+            return []
+
+    class ActionSearchProducts(Action):
+        def name(self) -> Text:
+            return "action_search_products"
+
+        def run(self, dispatcher: CollectingDispatcher,
+                tracker: Tracker,
+                domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+            
+            category = tracker.get_slot('product_category')
+            
+            if not category:
+                dispatcher.utter_message(text="What type of product are you looking for?")
+                return []
+            
+            # Call GetIt search API
+            api_url = f"{os.getenv('GETIT_API_URL')}/api/v1/products/search"
+            params = {"category": category, "limit": 5}
+            
+            try:
+                response = requests.get(api_url, params=params)
+                if response.status_code == 200:
+                    products = response.json().get('products', [])
+                    
+                    if products:
+                        message = f"Here are some {category} products:\n"
+                        for product in products:
+                            message += f"• {product['name']} - ৳{product['price']}\n"
+                        message += "\nWould you like to see more details about any of these?"
+                    else:
+                        message = f"Sorry, no {category} products found at the moment."
+                    
+                    dispatcher.utter_message(text=message)
+                else:
+                    dispatcher.utter_message(text="Sorry, I couldn't search for products right now.")
+            except Exception as e:
+                dispatcher.utter_message(text="Sorry, there was an error searching for products.")
+            
+            return []
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rasa-server
+  namespace: getit-production
+  labels:
+    app: rasa-server
+    component: ai-integration
+    tier: conversational-ai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rasa-server
+  template:
+    metadata:
+      labels:
+        app: rasa-server
+    spec:
+      containers:
+      - name: rasa-server
+        image: getit/rasa:latest
+        ports:
+        - containerPort: 5005
+        env:
+        - name: GETIT_API_URL
+          value: "http://api-gateway:3000"
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: api-secret
+              key: token
+        - name: RASA_MODEL_PATH
+          value: "/app/models"
+        volumeMounts:
+        - name: rasa-models
+          mountPath: /app/models
+        - name: rasa-config
+          mountPath: /app/config
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 5005
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 5005
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: rasa-models
+        persistentVolumeClaim:
+          claimName: rasa-models-pvc
+      - name: rasa-config
+        configMap:
+          name: ai-chatbot-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rasa-server
+  namespace: getit-production
+  labels:
+    app: rasa-server
+    component: ai-integration
+spec:
+  selector:
+    app: rasa-server
+  ports:
+  - port: 5005
+    targetPort: 5005
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chatbot-nlp-config
+  namespace: getit-production
+  labels:
+    component: ai-integration
+    tier: nlp
+data:
+  spacy-config.json: |
+    {
+      "nlp_models": {
+        "english": "en_core_web_sm",
+        "bengali": "bn_core_news_sm",
+        "hindi": "hi_core_news_sm"
+      },
+      "language_detection": {
+        "enabled": true,
+        "confidence_threshold": 0.8,
+        "fallback_language": "english"
+      },
+      "sentiment_analysis": {
+        "enabled": true,
+        "model": "transformers",
+        "model_name": "bert-base-multilingual-uncased"
+      },
+      "intent_classification": {
+        "model": "bert",
+        "fine_tuned_model": "getit/intent-classifier",
+        "confidence_threshold": 0.7
+      },
+      "entity_extraction": {
+        "custom_entities": {
+          "bangladesh_locations": ["dhaka", "chittagong", "sylhet", "khulna", "rajshahi", "barisal", "rangpur", "mymensingh"],
+          "payment_methods": ["bkash", "nagad", "rocket", "ssl", "cod"],
+          "product_categories": ["electronics", "fashion", "home", "books", "sports"]
+        }
+      }
+    }
+
+  translation-service.json: |
+    {
+      "translation": {
+        "provider": "google_translate",
+        "api_key_env": "GOOGLE_TRANSLATE_API_KEY",
+        "supported_languages": {
+          "bn": "Bengali",
+          "en": "English",
+          "hi": "Hindi",
+          "ar": "Arabic"
+        },
+        "auto_detect": true,
+        "cache_translations": true,
+        "cache_ttl": 3600
+      },
+      "transliteration": {
+        "enabled": true,
+        "provider": "google_transliterate",
+        "languages": ["bn", "hi"],
+        "phonetic_keyboards": {
+          "bengali": "avro",
+          "hindi": "devanagari"
+        }
+      }
+    }

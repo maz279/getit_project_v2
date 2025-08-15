@@ -1,0 +1,256 @@
+{
+  "default_strategy": {
+    "type": "probabilistic",
+    "param": 0.1,
+    "max_traces_per_second": 100
+  },
+  "per_service_strategies": [
+    {
+      "service": "user-service",
+      "type": "probabilistic",
+      "param": 0.5,
+      "max_traces_per_second": 200,
+      "operation_strategies": [
+        {
+          "operation": "login",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "register",
+          "type": "probabilistic", 
+          "param": 1.0
+        },
+        {
+          "operation": "profile_update",
+          "type": "probabilistic",
+          "param": 0.8
+        }
+      ]
+    },
+    {
+      "service": "payment-service",
+      "type": "probabilistic",
+      "param": 1.0,
+      "max_traces_per_second": 500,
+      "operation_strategies": [
+        {
+          "operation": "process_payment",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "refund",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "bkash_payment",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "nagad_payment",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "order-service",
+      "type": "probabilistic",
+      "param": 0.8,
+      "max_traces_per_second": 300,
+      "operation_strategies": [
+        {
+          "operation": "create_order",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "update_order_status",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "cancel_order",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "product-service",
+      "type": "probabilistic",
+      "param": 0.3,
+      "max_traces_per_second": 150,
+      "operation_strategies": [
+        {
+          "operation": "search",
+          "type": "probabilistic",
+          "param": 0.1
+        },
+        {
+          "operation": "get_product_details",
+          "type": "probabilistic",
+          "param": 0.5
+        },
+        {
+          "operation": "update_inventory",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "cart-service",
+      "type": "probabilistic",
+      "param": 0.4,
+      "max_traces_per_second": 200,
+      "operation_strategies": [
+        {
+          "operation": "add_to_cart",
+          "type": "probabilistic",
+          "param": 0.8
+        },
+        {
+          "operation": "checkout",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "apply_coupon",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "search-service",
+      "type": "probabilistic",
+      "param": 0.2,
+      "max_traces_per_second": 100,
+      "operation_strategies": [
+        {
+          "operation": "elasticsearch_query",
+          "type": "probabilistic",
+          "param": 0.3
+        },
+        {
+          "operation": "ai_recommendations",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "notification-service",
+      "type": "probabilistic",
+      "param": 0.6,
+      "max_traces_per_second": 150,
+      "operation_strategies": [
+        {
+          "operation": "send_sms",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "send_email",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "push_notification",
+          "type": "probabilistic",
+          "param": 0.8
+        }
+      ]
+    },
+    {
+      "service": "review-service",
+      "type": "probabilistic",
+      "param": 0.7,
+      "max_traces_per_second": 100,
+      "operation_strategies": [
+        {
+          "operation": "submit_review",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "moderate_review",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "analytics-service",
+      "type": "probabilistic",
+      "param": 0.5,
+      "max_traces_per_second": 80,
+      "operation_strategies": [
+        {
+          "operation": "track_event",
+          "type": "probabilistic",
+          "param": 0.3
+        },
+        {
+          "operation": "generate_report",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    },
+    {
+      "service": "vendor-service",
+      "type": "probabilistic",
+      "param": 0.6,
+      "max_traces_per_second": 120,
+      "operation_strategies": [
+        {
+          "operation": "vendor_registration",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "product_upload",
+          "type": "probabilistic",
+          "param": 0.8
+        }
+      ]
+    },
+    {
+      "service": "kyc-service",
+      "type": "probabilistic",
+      "param": 1.0,
+      "max_traces_per_second": 50,
+      "operation_strategies": [
+        {
+          "operation": "identity_verification",
+          "type": "probabilistic",
+          "param": 1.0
+        },
+        {
+          "operation": "document_validation",
+          "type": "probabilistic",
+          "param": 1.0
+        }
+      ]
+    }
+  ],
+  "per_operation_strategies": [
+    {
+      "service": "*",
+      "operation": "health_check",
+      "type": "probabilistic",
+      "param": 0.01
+    },
+    {
+      "service": "*", 
+      "operation": "metrics",
+      "type": "probabilistic",
+      "param": 0.05
+    }
+  ]
+}

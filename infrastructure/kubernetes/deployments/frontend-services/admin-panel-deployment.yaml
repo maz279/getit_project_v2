@@ -1,0 +1,653 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-panel
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: frontend-service
+    platform: getit-bangladesh
+    tier: frontend
+    domain: admin
+  annotations:
+    description: "Admin Panel Application for GetIt Bangladesh"
+    contact: "frontend-team@getit.com.bd"
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: admin-panel
+  template:
+    metadata:
+      labels:
+        app: admin-panel
+        component: frontend-service
+        platform: getit-bangladesh
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: admin-panel
+        image: getit-bangladesh/admin-panel:2.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8081
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        # Application Configuration
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "8081"
+        - name: APP_NAME
+          value: "GetIt Bangladesh Admin"
+        - name: APP_VERSION
+          value: "2.0.0"
+        
+        # API Gateway Configuration
+        - name: API_BASE_URL
+          value: "https://admin-api.getit.com.bd"
+        - name: API_GATEWAY_URL
+          value: "http://api-gateway:3000"
+        - name: WEBSOCKET_URL
+          value: "wss://admin-api.getit.com.bd/ws"
+        
+        # Performance Configuration
+        - name: CACHE_TTL
+          value: "180"
+        - name: DASHBOARD_REFRESH_INTERVAL
+          value: "30"
+        - name: REAL_TIME_UPDATES
+          value: "true"
+        
+        # Feature Flags
+        - name: ENABLE_REAL_TIME_ANALYTICS
+          value: "true"
+        - name: ENABLE_ADVANCED_REPORTING
+          value: "true"
+        - name: ENABLE_BULK_OPERATIONS
+          value: "true"
+        - name: ENABLE_AUDIT_LOGS
+          value: "true"
+        - name: ENABLE_ROLE_BASED_ACCESS
+          value: "true"
+        - name: ENABLE_TWO_FACTOR_AUTH
+          value: "true"
+        - name: ENABLE_API_RATE_LIMITING
+          value: "true"
+        
+        # Bangladesh Configuration
+        - name: DEFAULT_CURRENCY
+          value: "BDT"
+        - name: DEFAULT_LANGUAGE
+          value: "en"
+        - name: SUPPORTED_LANGUAGES
+          value: "en,bn"
+        - name: DEFAULT_TIMEZONE
+          value: "Asia/Dhaka"
+        - name: COUNTRY_CODE
+          value: "BD"
+        
+        # Admin Features
+        - name: ENABLE_VENDOR_MANAGEMENT
+          value: "true"
+        - name: ENABLE_ORDER_MANAGEMENT
+          value: "true"
+        - name: ENABLE_PRODUCT_MANAGEMENT
+          value: "true"
+        - name: ENABLE_USER_MANAGEMENT
+          value: "true"
+        - name: ENABLE_FINANCIAL_REPORTS
+          value: "true"
+        - name: ENABLE_SYSTEM_MONITORING
+          value: "true"
+        - name: ENABLE_CONFIGURATION_MANAGEMENT
+          value: "true"
+        
+        # Bangladesh Compliance Features
+        - name: ENABLE_KYC_MANAGEMENT
+          value: "true"
+        - name: ENABLE_TAX_REPORTS
+          value: "true"
+        - name: ENABLE_REGULATORY_COMPLIANCE
+          value: "true"
+        - name: ENABLE_BANGLADESH_ANALYTICS
+          value: "true"
+        
+        # Security Configuration
+        - name: SESSION_TIMEOUT_MINUTES
+          value: "60"
+        - name: MAX_LOGIN_ATTEMPTS
+          value: "5"
+        - name: PASSWORD_COMPLEXITY_REQUIRED
+          value: "true"
+        - name: FORCE_HTTPS
+          value: "true"
+        
+        # Authentication
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: jwt-secret
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: session-secret
+        - name: ADMIN_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: admin-secret-key
+        
+        # Database Access (Read-only for analytics)
+        - name: DATABASE_READ_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-read-replica-url
+        
+        # External Service Monitoring
+        - name: PROMETHEUS_URL
+          value: "http://prometheus:9090"
+        - name: GRAFANA_URL
+          value: "http://grafana:3000"
+        - name: ELASTICSEARCH_URL
+          value: "http://elasticsearch:9200"
+        
+        # Email Configuration
+        - name: SMTP_HOST
+          valueFrom:
+            secretKeyRef:
+              name: email-secrets
+              key: smtp-host
+        - name: SMTP_USER
+          valueFrom:
+            secretKeyRef:
+              name: email-secrets
+              key: smtp-user
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: email-secrets
+              key: smtp-password
+        
+        # File Upload Configuration
+        - name: MAX_FILE_SIZE_MB
+          value: "50"
+        - name: ALLOWED_FILE_TYPES
+          value: "jpg,jpeg,png,pdf,csv,xlsx"
+        - name: UPLOAD_PATH
+          value: "/app/uploads/admin"
+        
+        # Backup & Export
+        - name: ENABLE_DATA_EXPORT
+          value: "true"
+        - name: EXPORT_FORMATS
+          value: "csv,xlsx,pdf,json"
+        - name: MAX_EXPORT_RECORDS
+          value: "100000"
+        
+        volumeMounts:
+        - name: admin-uploads
+          mountPath: /app/uploads/admin
+        - name: admin-exports
+          mountPath: /app/exports
+        - name: temp-storage
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        
+        resources:
+          requests:
+            memory: "600Mi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      
+      - name: nginx-sidecar
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+          name: nginx
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      
+      volumes:
+      - name: admin-uploads
+        persistentVolumeClaim:
+          claimName: admin-uploads-pvc
+      - name: admin-exports
+        persistentVolumeClaim:
+          claimName: admin-exports-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: nginx-cache
+        emptyDir:
+          sizeLimit: 200Mi
+      - name: nginx-config
+        configMap:
+          name: admin-panel-nginx-config
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: frontend
+      
+      tolerations:
+      - key: "frontend-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - admin-panel
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-panel
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: frontend-service
+    platform: getit-bangladesh
+  annotations:
+    description: "Admin Panel Service for GetIt Bangladesh"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: http
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: nginx
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: admin-panel
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-panel
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: frontend-service
+    platform: getit-bangladesh
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: admin-uploads-pvc
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-storage
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: admin-exports-pvc
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-storage
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: admin-panel-pdb
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: frontend-service
+    platform: getit-bangladesh
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: admin-panel
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-panel-nginx-config
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: frontend-service
+    platform: getit-bangladesh
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Logging
+        log_format admin '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'admin_session="$cookie_admin_session"';
+        access_log /var/log/nginx/access.log admin;
+        
+        # Performance
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 30;
+        client_max_body_size 50M;
+        
+        # Security Headers (Enhanced for Admin)
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none';" always;
+        
+        # Rate Limiting (Stricter for Admin)
+        limit_req_zone $binary_remote_addr zone=admin_api:10m rate=5r/s;
+        limit_req_zone $binary_remote_addr zone=admin_login:10m rate=3r/m;
+        limit_req_zone $binary_remote_addr zone=admin_export:10m rate=1r/m;
+        
+        # Admin IP Whitelist (commented out - configure as needed)
+        # geo $admin_allowed {
+        #     default 0;
+        #     10.0.0.0/8 1;
+        #     172.16.0.0/12 1;
+        #     192.168.0.0/16 1;
+        # }
+        
+        upstream admin_panel_backend {
+            server localhost:8081;
+        }
+        
+        server {
+            listen 80;
+            server_name localhost;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            # Security
+            server_tokens off;
+            
+            # Admin IP Check (uncomment if using whitelist)
+            # if ($admin_allowed = 0) {
+            #     return 403;
+            # }
+            
+            # Static Assets (with shorter cache for admin)
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1h;
+                add_header Cache-Control "public";
+                add_header X-Cache-Status "STATIC";
+            }
+            
+            # API Proxy with Rate Limiting
+            location /api/ {
+                limit_req zone=admin_api burst=10 nodelay;
+                proxy_pass http://admin_panel_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+                proxy_read_timeout 300s;
+                proxy_send_timeout 300s;
+            }
+            
+            # Login endpoint with strict rate limiting
+            location /api/auth/login {
+                limit_req zone=admin_login burst=5 nodelay;
+                proxy_pass http://admin_panel_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # Export endpoints with rate limiting
+            location /api/export/ {
+                limit_req zone=admin_export burst=3 nodelay;
+                proxy_pass http://admin_panel_backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 600s;
+                proxy_send_timeout 600s;
+            }
+            
+            # Health Check
+            location /health {
+                proxy_pass http://admin_panel_backend;
+                access_log off;
+            }
+            
+            # Root and SPA Routes
+            location / {
+                try_files $uri $uri/ /index.html;
+                add_header X-Cache-Status "SPA";
+                
+                # Additional security for admin routes
+                add_header Cache-Control "no-cache, no-store, must-revalidate";
+                add_header Pragma "no-cache";
+                add_header Expires "0";
+            }
+        }
+    }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-panel-network-policy
+  namespace: getit-production
+  labels:
+    app: admin-panel
+    component: security
+    platform: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: admin-panel
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    ports:
+    - protocol: TCP
+      port: 3000
+  - to:
+    - podSelector:
+        matchLabels:
+          component: core-service
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 3003
+    - protocol: TCP
+      port: 3004
+    - protocol: TCP
+      port: 3008
+    - protocol: TCP
+      port: 3009
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  - to:
+    - podSelector:
+        matchLabels:
+          app: grafana
+    ports:
+    - protocol: TCP
+      port: 3000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: elasticsearch
+    ports:
+    - protocol: TCP
+      port: 9200
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 587
+    - protocol: TCP
+      port: 465

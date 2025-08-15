@@ -1,0 +1,1 @@
+import{j as r}from"./index-BbFXQDnE.js";import{SubscriptionCenter as i}from"./SubscriptionCenter-C_Rs7mzz.js";import"./package-DaaEeyZO.js";function n(){return r.jsx("div",{className:"min-h-screen bg-gray-50",children:r.jsx(i,{})})}export{n as default};

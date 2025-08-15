@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're Offline - GetIt E-commerce</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #006A4E 0%, #DC143C 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+        }
+        
+        .icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .tips {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+            text-align: left;
+        }
+        
+        .tips h3 {
+            margin-top: 0;
+            color: #FFD700;
+        }
+        
+        .tips ul {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .tips li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .retry-button {
+            background: #FFD700;
+            color: #006A4E;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+        
+        .retry-button:hover {
+            background: #FFC107;
+            transform: translateY(-2px);
+        }
+        
+        .cultural-note {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-style: italic;
+            border-left: 4px solid #FFD700;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            p {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        <h1>You're Offline</h1>
+        <p>
+            আপনি অফলাইন আছেন। ইন্টারনেট সংযোগ পরীক্ষা করুন।<br>
+            You're currently offline. Please check your internet connection.
+        </p>
+        
+        <button class="retry-button" onclick="window.location.reload()">
+            🔄 Try Again / আবার চেষ্টা করুন
+        </button>
+        
+        <div class="tips">
+            <h3>💡 Connection Tips / সংযোগ টিপস:</h3>
+            <ul>
+                <li>Check your mobile data or WiFi connection / আপনার মোবাইল ডেটা বা WiFi সংযোগ পরীক্ষা করুন</li>
+                <li>Try switching between mobile data and WiFi / মোবাইল ডেটা এবং WiFi এর মধ্যে পরিবর্তন করে দেখুন</li>
+                <li>Move to an area with better signal / ভাল সিগন্যালের এলাকায় চলে যান</li>
+                <li>Restart your device if needed / প্রয়োজনে আপনার ডিভাইস পুনরায় চালু করুন</li>
+            </ul>
+        </div>
+        
+        <div class="cultural-note">
+            <p>🇧🇩 আমরা বুঝি যে বাংলাদেশে ইন্টারনেট সংযোগ কখনো কখনো ধীর হতে পারে। আমাদের অ্যাপ অফলাইন ব্যবহারের জন্য অনুকূলিত।</p>
+            <p>We understand that internet connectivity in Bangladesh can sometimes be slow. Our app is optimized for offline use.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-retry when online
+        window.addEventListener('online', () => {
+            window.location.reload();
+        });
+        
+        // Check connection status
+        function checkConnection() {
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        }
+        
+        // Check every 5 seconds
+        setInterval(checkConnection, 5000);
+    </script>
+</body>
+</html>

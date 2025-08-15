@@ -1,0 +1,7 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="24" fill="#0066CC"/>
+  <circle cx="96" cy="96" r="48" fill="white"/>
+  <path d="M72 84h48v12c-24 12-36 6-48 6V84z" fill="#0066CC"/>
+  <path d="M84 96h24v8H84v-8z" fill="#0066CC"/>
+  <text x="96" y="168" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">GetIt</text>
+</svg>

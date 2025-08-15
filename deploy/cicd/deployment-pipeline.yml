@@ -1,0 +1,67 @@
+# GetIt Bangladesh Production Deployment Pipeline
+# Complete CI/CD pipeline with Bangladesh optimization
+
+name: GetIt Production Deployment
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: registry.getit.com.bd
+  NODE_VERSION: '18'
+
+jobs:
+  # Quality Assurance
+  qa-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    - name: Install dependencies
+      run: npm ci
+    - name: Run tests
+      run: npm test
+    - name: TypeScript check
+      run: npm run type-check
+    - name: Security audit
+      run: npm audit
+
+  # Build Docker Images
+  build:
+    needs: qa-checks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build API Gateway
+      run: docker build -f deploy/docker/Dockerfile.api-gateway -t getit-api-gateway .
+    - name: Build Microservices
+      run: docker build -f deploy/docker/Dockerfile.microservice -t getit-microservice .
+    - name: Build Frontend
+      run: docker build -f deploy/docker/Dockerfile.frontend -t getit-frontend .
+
+  # Deploy to Production
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/production'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Deploy with Docker Compose
+      run: |
+        chmod +x deploy/scripts/deploy-production.sh
+        deploy/scripts/deploy-production.sh docker-compose
+    - name: Run Performance Tests
+      run: |
+        chmod +x deploy/scripts/performance-test.sh
+        deploy/scripts/performance-test.sh
+    - name: Health Check
+      run: |
+        curl -f http://localhost:8080/health
+        curl -f http://localhost:80/

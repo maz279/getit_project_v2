@@ -1,0 +1,427 @@
+# Pod Security Policies for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Container Security and Hardening
+
+# =============================================================================
+# RESTRICTED SECURITY POLICY (Most Secure)
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-restricted
+  labels:
+    project: getit-bangladesh
+    security-level: restricted
+  annotations:
+    # Kubernetes Pod Security Standards
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    # AppArmor profiles
+    container.apparmor.security.beta.kubernetes.io/nginx: runtime/default
+    container.apparmor.security.beta.kubernetes.io/node: runtime/default
+    # Seccomp profiles
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: runtime/default
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: runtime/default
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+  
+  # User and group controls
+  runAsUser:
+    rule: MustRunAsNonRoot
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  # File system controls
+  fsGroup:
+    rule: RunAsAny
+  readOnlyRootFilesystem: true
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+  
+  # Network controls
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts: []
+  
+  # SELinux
+  seLinux:
+    rule: RunAsAny
+  
+  # Allowed unsafe sysctls
+  allowedUnsafeSysctls: []
+  
+  # Forbidden sysctls
+  forbiddenSysctls:
+    - "*"
+---
+# =============================================================================
+# BASELINE SECURITY POLICY (Moderate Security)
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-baseline
+  labels:
+    project: getit-bangladesh
+    security-level: baseline
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+  
+  # User and group controls
+  runAsUser:
+    rule: RunAsAny
+  runAsGroup:
+    rule: RunAsAny
+  
+  # File system controls
+  fsGroup:
+    rule: RunAsAny
+  readOnlyRootFilesystem: false
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+    - hostPath
+  
+  # Host path restrictions
+  allowedHostPaths:
+    - pathPrefix: "/tmp"
+      readOnly: false
+    - pathPrefix: "/var/log"
+      readOnly: false
+  
+  # Network controls
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts:
+    - min: 8000
+      max: 8080
+---
+# =============================================================================
+# FRONTEND SECURITY POLICY
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-frontend
+  labels:
+    project: getit-bangladesh
+    tier: frontend
+    security-level: restricted
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE  # Allow binding to port 80/443
+  
+  # User and group controls
+  runAsUser:
+    rule: MustRunAs
+    ranges:
+      - min: 101  # nginx user
+        max: 101
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 101  # nginx group
+        max: 101
+  
+  # File system controls
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 101
+        max: 101
+  readOnlyRootFilesystem: true
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+  
+  # Network controls
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts: []
+  
+  # SELinux
+  seLinux:
+    rule: RunAsAny
+---
+# =============================================================================
+# BACKEND SECURITY POLICY
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-backend
+  labels:
+    project: getit-bangladesh
+    tier: backend
+    security-level: restricted
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+  
+  # User and group controls
+  runAsUser:
+    rule: MustRunAs
+    ranges:
+      - min: 1001  # appuser
+        max: 1001
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1001  # appgroup
+        max: 1001
+  
+  # File system controls
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1001
+        max: 1001
+  readOnlyRootFilesystem: true
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+  
+  # Network controls
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts: []
+---
+# =============================================================================
+# DATABASE SECURITY POLICY
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-database
+  labels:
+    project: getit-bangladesh
+    tier: database
+    security-level: baseline
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+  
+  # User and group controls
+  runAsUser:
+    rule: MustRunAs
+    ranges:
+      - min: 999  # postgres user
+        max: 999
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 999  # postgres group
+        max: 999
+  
+  # File system controls
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 999
+        max: 999
+  readOnlyRootFilesystem: false
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+  
+  # Network controls
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts: []
+---
+# =============================================================================
+# MONITORING SECURITY POLICY
+# =============================================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-monitoring
+  labels:
+    project: getit-bangladesh
+    tier: monitoring
+    security-level: baseline
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  
+  # Required security contexts
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+    - DAC_OVERRIDE
+  
+  # User and group controls
+  runAsUser:
+    rule: RunAsAny
+  runAsGroup:
+    rule: RunAsAny
+  
+  # File system controls
+  fsGroup:
+    rule: RunAsAny
+  readOnlyRootFilesystem: false
+  
+  # Volume restrictions
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+    - hostPath
+  
+  # Host path restrictions for monitoring
+  allowedHostPaths:
+    - pathPrefix: "/sys"
+      readOnly: true
+    - pathPrefix: "/proc"
+      readOnly: true
+    - pathPrefix: "/var/lib/docker"
+      readOnly: true
+    - pathPrefix: "/var/run"
+      readOnly: true
+  
+  # Network controls
+  hostNetwork: true  # Required for node monitoring
+  hostIPC: false
+  hostPID: true      # Required for process monitoring
+  hostPorts:
+    - min: 9100
+      max: 9100  # Node exporter
+---
+# =============================================================================
+# CLUSTER ROLE FOR PSP USAGE
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: getit-psp-user
+  labels:
+    project: getit-bangladesh
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - getit-restricted
+  - getit-baseline
+  - getit-frontend
+  - getit-backend
+  - getit-database
+  - getit-monitoring
+---
+# =============================================================================
+# CLUSTER ROLE BINDINGS
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: getit-psp-binding
+  labels:
+    project: getit-bangladesh
+roleRef:
+  kind: ClusterRole
+  name: getit-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: frontend-service-account
+  namespace: production
+- kind: ServiceAccount
+  name: backend-service-account
+  namespace: production
+- kind: ServiceAccount
+  name: database-service-account
+  namespace: production
+- kind: ServiceAccount
+  name: prometheus-service-account
+  namespace: monitoring
+- kind: ServiceAccount
+  name: grafana-service-account
+  namespace: monitoring

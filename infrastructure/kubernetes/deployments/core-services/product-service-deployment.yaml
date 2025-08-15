@@ -1,0 +1,417 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: core-service
+    platform: getit-bangladesh
+    tier: backend
+    domain: catalog
+  annotations:
+    description: "Product Catalog Service for GetIt Bangladesh"
+    contact: "backend-team@getit.com.bd"
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+        component: core-service
+        platform: getit-bangladesh
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: product-service
+        image: getit-bangladesh/product-service:2.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3002
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        # Database Configuration
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-url
+        - name: DATABASE_READ_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-read-replica-url
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: mongodb-url
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: elasticsearch-url
+        
+        # Redis Configuration
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: cache-secrets
+              key: redis-url
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cache-secrets
+              key: redis-password
+        
+        # Service Configuration
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3002"
+        - name: SERVICE_NAME
+          value: "product-service"
+        - name: SERVICE_VERSION
+          value: "2.0.0"
+        
+        # Performance Configuration
+        - name: MAX_CONNECTIONS
+          value: "200"
+        - name: POOL_SIZE
+          value: "20"
+        - name: CACHE_TTL
+          value: "3600"
+        - name: SEARCH_CACHE_TTL
+          value: "1800"
+        
+        # Feature Flags
+        - name: ENABLE_SEARCH_CACHE
+          value: "true"
+        - name: ENABLE_ELASTICSEARCH
+          value: "true"
+        - name: ENABLE_PRODUCT_RECOMMENDATIONS
+          value: "true"
+        - name: ENABLE_INVENTORY_SYNC
+          value: "true"
+        - name: ENABLE_PRICE_OPTIMIZATION
+          value: "true"
+        
+        # Bangladesh Configuration
+        - name: DEFAULT_CURRENCY
+          value: "BDT"
+        - name: DEFAULT_TIMEZONE
+          value: "Asia/Dhaka"
+        - name: SUPPORTED_LANGUAGES
+          value: "bn,en,hi,ar"
+        - name: VAT_RATE
+          value: "15"
+        
+        # External Service URLs
+        - name: USER_SERVICE_URL
+          value: "http://user-service:3000"
+        - name: INVENTORY_SERVICE_URL
+          value: "http://inventory-service:3005"
+        - name: VENDOR_SERVICE_URL
+          value: "http://vendor-service:3001"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service:3009"
+        - name: ML_SERVICE_URL
+          value: "http://ml-service:3010"
+        
+        # File Upload Configuration
+        - name: MAX_IMAGE_SIZE
+          value: "10485760"  # 10MB
+        - name: ALLOWED_IMAGE_TYPES
+          value: "image/jpeg,image/png,image/webp"
+        - name: IMAGES_PER_PRODUCT
+          value: "10"
+        
+        # Search Configuration
+        - name: SEARCH_RESULTS_PER_PAGE
+          value: "20"
+        - name: MAX_SEARCH_RESULTS
+          value: "1000"
+        - name: SEARCH_HIGHLIGHT_ENABLED
+          value: "true"
+        - name: SEARCH_SUGGESTIONS_ENABLED
+          value: "true"
+        
+        # Security Configuration
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: jwt-secret
+        - name: API_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: api-key-secret
+        
+        volumeMounts:
+        - name: product-images
+          mountPath: /app/uploads/products
+        - name: temp-storage
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+        
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3002
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3002
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 3002
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 30
+      
+      volumes:
+      - name: product-images
+        persistentVolumeClaim:
+          claimName: product-images-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 2Gi
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: compute
+      
+      tolerations:
+      - key: "compute-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - product-service
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - compute
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: core-service
+    platform: getit-bangladesh
+  annotations:
+    description: "Product Service for GetIt Bangladesh"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3002
+    targetPort: 3002
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: product-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product-service
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: core-service
+    platform: getit-bangladesh
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: product-images-pvc
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-storage
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: product-service-pdb
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: core-service
+    platform: getit-bangladesh
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: product-service
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: product-service-network-policy
+  namespace: getit-production
+  labels:
+    app: product-service
+    component: security
+    platform: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: product-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    - podSelector:
+        matchLabels:
+          app: customer-web
+    - podSelector:
+        matchLabels:
+          app: vendor-dashboard
+    - podSelector:
+        matchLabels:
+          app: admin-panel
+    ports:
+    - protocol: TCP
+      port: 3002
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mongodb
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: elasticsearch
+    ports:
+    - protocol: TCP
+      port: 9200
+  - to:
+    - podSelector:
+        matchLabels:
+          component: core-service
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3005
+    - protocol: TCP
+      port: 3009
+    - protocol: TCP
+      port: 3010
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

@@ -1,0 +1,20 @@
+🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:2018 🔧 DEBUG: Frontend received suggestions data: {success: true, data: Array(6), metadata: {…}}
+AISearchBar.tsx:2019 🔧 DEBUG: Navigation data: {success: true, data: {…}, metadata: {…}}
+AISearchBar.tsx:2025 🔧 DEBUG: Processing suggestions data array: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2032 🔧 DEBUG: Mapped suggestions: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2053 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(6), length: 6}
+AISearchBar.tsx:2057 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(6), filtered: Array(6), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(6), filtered: Array(0), showSuggestions: true}
+AISearchBar.tsx:2255 🎯 DEBUG: Google-style suggestion clicked: {text: 'shampoo for oily hair', type: 'completion', isTrusted: true}
+AISearchBar.tsx:2273 ✅ DEBUG: Navigating to search results for: shampoo for oily hair
+AISearchBar.tsx:2018 🔧 DEBUG: Frontend received suggestions data: {success: true, data: Array(6), metadata: {…}}
+AISearchBar.tsx:2019 🔧 DEBUG: Navigation data: {success: true, data: {…}, metadata: {…}}
+AISearchBar.tsx:2025 🔧 DEBUG: Processing suggestions data array: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2032 🔧 DEBUG: Mapped suggestions: (6) [{…}, {…}, {…}, {…}, {…}, {…}]
+AISearchBar.tsx:2053 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(6), length: 6}
+AISearchBar.tsx:2057 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(6), filtered: Array(6), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(6), filtered: Array(0), showSuggestions: true}

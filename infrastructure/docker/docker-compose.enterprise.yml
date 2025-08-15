@@ -1,0 +1,406 @@
+# Enterprise Docker Compose Configuration for Phase 1 Implementation
+# Amazon.com/Shopee.sg-Level Infrastructure Stack
+
+version: '3.8'
+
+networks:
+  getit-enterprise:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres-primary-data:
+  postgres-replica-data:
+  redis-cluster-data:
+  elasticsearch-data:
+  grafana-data:
+  prometheus-data:
+
+services:
+  # ====================================================================
+  # DATABASE TIER - PostgreSQL Aurora-style Cluster
+  # ====================================================================
+  
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: getit-postgres-primary
+    environment:
+      POSTGRES_DB: getit_enterprise
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-replicator}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data
+      - ./config/postgres/postgresql-primary.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ../database/schema-migrations.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    ports:
+      - "5432:5432"
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.1.10
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d getit_enterprise"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: getit-postgres-replica
+    environment:
+      POSTGRES_DB: getit_enterprise
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-replica-data:/var/lib/postgresql/data
+      - ./config/postgres/postgresql-replica.conf:/etc/postgresql/postgresql.conf:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    ports:
+      - "5433:5432"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.1.11
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d getit_enterprise"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # ====================================================================
+  # CACHING TIER - Redis Cluster
+  # ====================================================================
+  
+  redis-node-1:
+    image: redis:7-alpine
+    container_name: getit-redis-node-1
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 15000 --appendonly yes --port 6379
+    ports:
+      - "6379:6379"
+      - "16379:16379"
+    volumes:
+      - redis-cluster-data:/data
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.2.10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  redis-node-2:
+    image: redis:7-alpine
+    container_name: getit-redis-node-2
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 15000 --appendonly yes --port 6379
+    ports:
+      - "6380:6379"
+      - "16380:16379"
+    volumes:
+      - redis-cluster-data:/data
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.2.11
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  redis-node-3:
+    image: redis:7-alpine
+    container_name: getit-redis-node-3
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 15000 --appendonly yes --port 6379
+    ports:
+      - "6381:6379"
+      - "16381:16379"
+    volumes:
+      - redis-cluster-data:/data
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.2.12
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Redis Cluster Initialization
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: getit-redis-cluster-init
+    command: >
+      sh -c "
+        sleep 30 &&
+        redis-cli --cluster create 
+        172.20.2.10:6379 
+        172.20.2.11:6379 
+        172.20.2.12:6379 
+        --cluster-replicas 0 
+        --cluster-yes
+      "
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+    networks:
+      - getit-enterprise
+
+  # ====================================================================
+  # SEARCH TIER - Elasticsearch
+  # ====================================================================
+  
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: getit-elasticsearch
+    environment:
+      - node.name=getit-es-node
+      - cluster.name=getit-elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.3.10
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # ====================================================================
+  # MONITORING TIER
+  # ====================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: getit-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.4.10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: getit-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.4.11
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # ====================================================================
+  # APPLICATION SERVICES
+  # ====================================================================
+  
+  getit-backend:
+    build:
+      context: ../../
+      dockerfile: docker/Dockerfile.backend
+    container_name: getit-backend-enterprise
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@172.20.1.10:5432/getit_enterprise
+      - REDIS_CLUSTER=true
+      - REDIS_CLUSTER_NODES=172.20.2.10:6379,172.20.2.11:6379,172.20.2.12:6379
+      - ELASTICSEARCH_URL=http://172.20.3.10:9200
+      - ENTERPRISE_MODE=true
+      - PORT=5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis-node-1:
+        condition: service_started
+      redis-node-2:
+        condition: service_started
+      redis-node-3:
+        condition: service_started
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.5.10
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  getit-frontend:
+    build:
+      context: ../../
+      dockerfile: docker/Dockerfile.frontend
+    container_name: getit-frontend-enterprise
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://172.20.5.10:5000
+      - VITE_ENTERPRISE_MODE=true
+    ports:
+      - "3001:80"
+    depends_on:
+      - getit-backend
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.5.11
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # ====================================================================
+  # LOAD BALANCER
+  # ====================================================================
+  
+  nginx-lb:
+    image: nginx:alpine
+    container_name: getit-nginx-lb
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - getit-backend
+      - getit-frontend
+    networks:
+      getit-enterprise:
+        ipv4_address: 172.20.6.10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # ====================================================================
+  # SERVICE MESH CONTROL PLANE (Istio Proxy)
+  # ====================================================================
+  
+  istio-proxy:
+    image: istio/proxyv2:1.20.0
+    container_name: getit-istio-proxy
+    environment:
+      - PILOT_CERT_PROVIDER=istiod
+      - CA_ADDR=istiod.istio-system.svc:15010
+    volumes:
+      - ./config/istio:/etc/istio:ro
+    networks:
+      - getit-enterprise
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+# ====================================================================
+# HEALTH CHECK SERVICES
+# ====================================================================
+
+  health-monitor:
+    image: alpine:latest
+    container_name: getit-health-monitor
+    command: >
+      sh -c "
+        apk add --no-cache curl &&
+        while true; do
+          echo 'Health check at $(date)'
+          curl -f http://172.20.5.10:5000/api/v1/health || echo 'Backend unhealthy'
+          curl -f http://172.20.1.10:5432 || echo 'Database unhealthy'
+          curl -f http://172.20.2.10:6379 || echo 'Redis unhealthy'
+          curl -f http://172.20.3.10:9200/_cluster/health || echo 'Elasticsearch unhealthy'
+          sleep 60
+        done
+      "
+    depends_on:
+      - getit-backend
+      - postgres-primary
+      - redis-node-1
+      - elasticsearch
+    networks:
+      - getit-enterprise
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'

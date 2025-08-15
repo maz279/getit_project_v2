@@ -1,0 +1,587 @@
+# Real Time Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Real Time Service provides instant data synchronization, live updates, and real-time communication capabilities across the GetIt platform, enabling live features like real-time inventory updates, live chat, instant notifications, and synchronized shopping experiences.
+
+### 1.2 Core Responsibilities
+- **WebSocket Management**: Manage real-time connections and channels
+- **Event Broadcasting**: Distribute real-time events across services
+- **Live Data Sync**: Synchronize data changes across all connected clients
+- **Connection Management**: Handle user presence, connection states
+- **Rate Limiting**: Prevent abuse of real-time features
+- **Message Queuing**: Queue and deliver messages reliably
+
+### 1.3 Technology Stack
+```yaml
+Service: real-time-service
+Technology: Node.js + Socket.io + Express.js
+Database: Redis + MongoDB
+Message Queue: Apache Kafka + Redis Pub/Sub
+WebSocket: Socket.io
+Load Balancer: nginx with sticky sessions
+```
+
+## 2. Database Design
+
+### 2.1 MongoDB Schema
+```javascript
+// Real-time connections collection
+{
+    _id: ObjectId,
+    user_id: "uuid",
+    socket_id: "socket_abc123",
+    session_id: "session_xyz789",
+    device_info: {
+        type: "mobile", // mobile, desktop, tablet
+        os: "Android",
+        browser: "Chrome",
+        app_version: "1.2.3"
+    },
+    connection_time: ISODate,
+    last_activity: ISODate,
+    channels: ["user:uuid", "product:uuid", "chat:room_id"],
+    location: {
+        country: "BD",
+        city: "Dhaka",
+        coordinates: [90.4125, 23.8103]
+    },
+    connection_quality: {
+        latency: 45, // milliseconds
+        packet_loss: 0.1, // percentage
+        bandwidth: "4g" // 2g, 3g, 4g, wifi
+    },
+    status: "active" // active, idle, disconnected
+}
+
+// Real-time events collection
+{
+    _id: ObjectId,
+    event_type: "product_price_change",
+    channel: "product:uuid",
+    data: {
+        product_id: "uuid",
+        old_price: 1000.00,
+        new_price: 950.00,
+        discount_percentage: 5
+    },
+    timestamp: ISODate,
+    sender_id: "uuid",
+    recipients: ["user:uuid1", "user:uuid2"],
+    delivery_status: {
+        total_recipients: 100,
+        delivered: 95,
+        failed: 5
+    },
+    ttl: ISODate, // Time to live
+    priority: "high" // low, medium, high, critical
+}
+
+// User presence collection
+{
+    _id: ObjectId,
+    user_id: "uuid",
+    status: "online", // online, away, busy, offline
+    last_seen: ISODate,
+    current_page: "/product/uuid",
+    shopping_activity: {
+        viewing_product: "uuid",
+        cart_items: 5,
+        in_checkout: false
+    },
+    device_count: 2, // Number of active devices
+    location: "product_page" // home, product_page, cart, checkout
+}
+
+// Chat rooms collection
+{
+    _id: ObjectId,
+    room_id: "uuid",
+    type: "customer_support", // customer_support, vendor_chat, group_chat
+    participants: [
+        {
+            user_id: "uuid",
+            role: "customer", // customer, vendor, support_agent
+            joined_at: ISODate,
+            last_read_at: ISODate
+        }
+    ],
+    created_by: "uuid",
+    created_at: ISODate,
+    last_activity: ISODate,
+    status: "active", // active, archived, closed
+    metadata: {
+        order_id: "uuid",
+        product_id: "uuid",
+        priority: "medium"
+    }
+}
+
+// Real-time notifications collection
+{
+    _id: ObjectId,
+    user_id: "uuid",
+    notification_type: "price_drop",
+    title: "Price Drop Alert!",
+    title_bn: "দাম কমেছে!",
+    message: "iPhone 14 Pro price dropped by 10%",
+    message_bn: "আইফোন ১৪ প্রো এর দাম ১০% কমেছে",
+    data: {
+        product_id: "uuid",
+        old_price: 1000.00,
+        new_price: 900.00,
+        action_url: "/product/uuid"
+    },
+    sent_at: ISODate,
+    read_at: null,
+    delivered_at: ISODate,
+    clicked_at: null,
+    status: "delivered", // sent, delivered, read, clicked
+    channel: "realtime" // realtime, push, email, sms
+}
+```
+
+### 2.2 Redis Schema
+```javascript
+// Active connections by user
+USER_CONNECTIONS:{user_id} = SET[socket_id1, socket_id2, ...]
+
+// Socket to user mapping
+SOCKET_USER:{socket_id} = user_id
+
+// Channel subscriptions
+CHANNEL:{channel_name} = SET[socket_id1, socket_id2, ...]
+
+// User presence
+USER_PRESENCE:{user_id} = {
+    status: "online",
+    last_activity: timestamp,
+    current_page: "/product/uuid",
+    device_count: 2
+}
+
+// Rate limiting
+RATE_LIMIT:{user_id}:{action} = {
+    count: 10,
+    window_start: timestamp,
+    window_size: 60 // seconds
+}
+
+// Message queue for offline users
+OFFLINE_QUEUE:{user_id} = LIST[message1, message2, ...]
+
+// Real-time analytics
+REALTIME_STATS = {
+    total_connections: 1500,
+    active_users: 1200,
+    messages_per_second: 45,
+    average_latency: 35
+}
+```
+
+## 3. Folder Structure
+
+```
+real-time-service/
+├── src/
+│   ├── controllers/
+│   │   ├── websocket-controller.js         # WebSocket connection management
+│   │   ├── presence-controller.js          # User presence management
+│   │   ├── chat-controller.js              # Real-time chat functionality
+│   │   ├── notification-controller.js      # Real-time notifications
+│   │   └── admin-controller.js             # Admin real-time monitoring
+│   ├── models/
+│   │   ├── Connection.js                   # WebSocket connection model
+│   │   ├── RealtimeEvent.js               # Real-time event model
+│   │   ├── UserPresence.js                # User presence model
+│   │   ├── ChatRoom.js                    # Chat room model
+│   │   └── RealtimeNotification.js        # Real-time notification model
+│   ├── routes/
+│   │   ├── realtime-routes.js             # Real-time API endpoints
+│   │   ├── presence-routes.js             # Presence API endpoints
+│   │   ├── chat-routes.js                 # Chat API endpoints
+│   │   └── admin-routes.js                # Admin monitoring endpoints
+│   ├── services/
+│   │   ├── websocket-service.js           # WebSocket service logic
+│   │   ├── event-broadcaster.js           # Event broadcasting service
+│   │   ├── presence-service.js            # User presence service
+│   │   ├── chat-service.js                # Chat service logic
+│   │   ├── notification-service.js        # Real-time notification service
+│   │   ├── connection-manager.js          # Connection lifecycle management
+│   │   └── message-queue-service.js       # Message queuing service
+│   ├── middleware/
+│   │   ├── socket-auth.js                 # Socket authentication
+│   │   ├── rate-limiting.js               # Real-time rate limiting
+│   │   ├── connection-validator.js        # Connection validation
+│   │   └── channel-access.js              # Channel access control
+│   ├── websocket/
+│   │   ├── socket-handler.js              # Main socket event handler
+│   │   ├── presence-handler.js            # Presence event handler
+│   │   ├── chat-handler.js                # Chat event handler
+│   │   ├── notification-handler.js        # Notification event handler
+│   │   ├── product-handler.js             # Product real-time events
+│   │   ├── order-handler.js               # Order real-time events
+│   │   └── auction-handler.js             # Auction real-time events
+│   ├── utils/
+│   │   ├── socket-utils.js                # Socket utility functions
+│   │   ├── channel-utils.js               # Channel management utilities
+│   │   ├── message-utils.js               # Message formatting utilities
+│   │   ├── presence-utils.js              # Presence utilities
+│   │   └── rate-limit-utils.js            # Rate limiting utilities
+│   ├── events/
+│   │   ├── event-emitter.js               # Central event emitter
+│   │   ├── event-handlers.js              # Event handler registry
+│   │   ├── kafka-consumer.js              # Kafka event consumer
+│   │   ├── redis-subscriber.js            # Redis pub/sub subscriber
+│   │   └── event-validator.js             # Event validation
+│   ├── config/
+│   │   ├── socket-config.js               # Socket.io configuration
+│   │   ├── redis-config.js                # Redis configuration
+│   │   ├── mongodb-config.js              # MongoDB configuration
+│   │   ├── kafka-config.js                # Kafka configuration
+│   │   └── realtime-config.js             # Real-time specific settings
+│   └── app.js                             # Express + Socket.io server setup
+├── bangladesh-features/                   # Bangladesh-specific features
+│   ├── local-language-handler.js          # Bangla real-time messages
+│   ├── mobile-optimization.js             # Mobile network optimization
+│   ├── offline-sync.js                    # Offline message sync
+│   ├── local-timezone-handler.js          # BD timezone for real-time events
+│   └── network-quality-adapter.js         # Adapt to poor network conditions
+├── monitoring/                            # Real-time monitoring
+│   ├── connection-monitor.js              # Monitor connection health
+│   ├── performance-monitor.js             # Monitor real-time performance
+│   ├── latency-monitor.js                 # Track message latency
+│   ├── error-tracker.js                   # Track real-time errors
+│   └── analytics-collector.js             # Collect real-time analytics
+├── scaling/                               # Horizontal scaling
+│   ├── load-balancer-config.js            # Load balancer configuration
+│   ├── sticky-session-handler.js          # Sticky session management
+│   ├── cluster-sync.js                    # Cross-cluster synchronization
+│   └── auto-scaler.js                     # Auto-scaling logic
+├── security/                              # Real-time security
+│   ├── ddos-protection.js                 # DDoS protection for WebSockets
+│   ├── message-sanitizer.js               # Sanitize real-time messages
+│   ├── spam-detector.js                   # Detect spam in real-time
+│   └── connection-limiter.js              # Limit connections per user
+├── tests/
+│   ├── unit/
+│   │   ├── websocket-service.test.js
+│   │   ├── event-broadcaster.test.js
+│   │   ├── presence-service.test.js
+│   │   └── rate-limiting.test.js
+│   ├── integration/
+│   │   ├── realtime-flow.test.js
+│   │   ├── chat-integration.test.js
+│   │   └── notification-integration.test.js
+│   └── load/
+│       ├── websocket-load.test.js
+│       ├── concurrent-connections.test.js
+│       └── message-throughput.test.js
+├── localization/                          # Multi-language support
+│   ├── en/
+│   │   ├── realtime-messages.json         # English real-time messages
+│   │   ├── presence-status.json           # English presence status
+│   │   └── notification-templates.json    # English notification templates
+│   └── bn/                               # Bangla translations
+│       ├── realtime-messages.json         # Bangla real-time messages
+│       ├── presence-status.json           # Bangla presence status
+│       └── notification-templates.json    # Bangla notification templates
+├── documentation/                         # Real-time service documentation
+│   ├── api-documentation/
+│   │   ├── websocket-apis.md
+│   │   ├── realtime-events.md
+│   │   └── presence-apis.md
+│   ├── integration-guides/
+│   │   ├── client-integration.md
+│   │   ├── service-integration.md
+│   │   └── mobile-integration.md
+│   └── best-practices/
+│       ├── connection-management.md
+│       ├── performance-optimization.md
+│       └── security-guidelines.md
+├── docker-compose.yml                     # Multi-service composition
+├── Dockerfile                            # Docker configuration
+├── package.json                          # Node.js dependencies
+└── README.md                             # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 WebSocket Connection APIs
+```javascript
+// Connect to WebSocket
+// Client establishes WebSocket connection
+const socket = io('wss://api.getit.com.bd/realtime', {
+    auth: {
+        token: 'jwt_token'
+    },
+    transports: ['websocket', 'polling']
+});
+
+// Connection events
+socket.on('connect', () => {
+    console.log('Connected to real-time service');
+});
+
+socket.on('authenticated', (data) => {
+    console.log('Authentication successful', data);
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Disconnected:', reason);
+});
+```
+
+### 4.2 Real-time Event APIs
+```javascript
+// Join specific channels
+socket.emit('join_channel', {
+    channels: ['user:uuid', 'product:uuid', 'chat:room_id']
+});
+
+// Leave channels
+socket.emit('leave_channel', {
+    channels: ['product:uuid']
+});
+
+// Send real-time message
+socket.emit('send_message', {
+    channel: 'chat:room_id',
+    message: 'Hello from customer support',
+    type: 'text',
+    metadata: {
+        order_id: 'uuid'
+    }
+});
+
+// Broadcast event to channel
+socket.emit('broadcast_event', {
+    channel: 'product:uuid',
+    event_type: 'price_change',
+    data: {
+        old_price: 1000.00,
+        new_price: 950.00
+    }
+});
+```
+
+### 4.3 Presence APIs
+```javascript
+// Update user presence
+PUT /api/v1/realtime/presence
+Body: {
+    status: "online", // online, away, busy, offline
+    current_page: "/product/uuid",
+    activity: {
+        viewing_product: "uuid",
+        in_checkout: false
+    }
+}
+
+// Get user presence
+GET /api/v1/realtime/presence/:user_id
+Response: {
+    user_id: "uuid",
+    status: "online",
+    last_seen: "2024-03-17T15:30:00Z",
+    current_page: "/product/uuid",
+    device_count: 2
+}
+
+// Get online users count
+GET /api/v1/realtime/online-users
+Response: {
+    total_online: 1250,
+    by_location: {
+        "Dhaka": 800,
+        "Chittagong": 200,
+        "Other": 250
+    }
+}
+```
+
+### 4.4 Chat APIs
+```javascript
+// Create chat room
+POST /api/v1/realtime/chat/rooms
+Body: {
+    type: "customer_support",
+    participants: ["user_uuid", "support_agent_uuid"],
+    metadata: {
+        order_id: "uuid",
+        priority: "high"
+    }
+}
+
+// Join chat room
+POST /api/v1/realtime/chat/rooms/:room_id/join
+Body: {
+    user_id: "uuid",
+    role: "customer"
+}
+
+// Get chat history
+GET /api/v1/realtime/chat/rooms/:room_id/messages
+Query: ?page=1&limit=50&before=timestamp
+
+// Send chat message
+POST /api/v1/realtime/chat/rooms/:room_id/messages
+Body: {
+    message: "I need help with my order",
+    type: "text",
+    metadata: {
+        order_id: "uuid"
+    }
+}
+```
+
+## 5. Real-time Events
+
+### 5.1 Product Events
+```javascript
+// Product price change
+{
+    event: 'product_price_change',
+    data: {
+        product_id: 'uuid',
+        old_price: 1000.00,
+        new_price: 950.00,
+        discount_percentage: 5,
+        vendor_id: 'uuid'
+    }
+}
+
+// Stock update
+{
+    event: 'product_stock_update',
+    data: {
+        product_id: 'uuid',
+        old_stock: 10,
+        new_stock: 5,
+        low_stock_alert: true
+    }
+}
+
+// New product added
+{
+    event: 'new_product_added',
+    data: {
+        product_id: 'uuid',
+        vendor_id: 'uuid',
+        category: 'electronics',
+        featured: true
+    }
+}
+```
+
+### 5.2 Order Events
+```javascript
+// Order status update
+{
+    event: 'order_status_update',
+    data: {
+        order_id: 'uuid',
+        customer_id: 'uuid',
+        old_status: 'processing',
+        new_status: 'shipped',
+        tracking_number: 'TRK123456'
+    }
+}
+
+// Payment status update
+{
+    event: 'payment_status_update',
+    data: {
+        order_id: 'uuid',
+        payment_id: 'uuid',
+        status: 'completed',
+        amount: 1500.00,
+        method: 'bkash'
+    }
+}
+```
+
+### 5.3 Notification Events
+```javascript
+// Real-time notification
+{
+    event: 'notification',
+    data: {
+        id: 'uuid',
+        type: 'price_drop',
+        title: 'Price Drop Alert!',
+        message: 'iPhone 14 Pro price dropped by 10%',
+        action_url: '/product/uuid',
+        priority: 'high'
+    }
+}
+
+// System announcement
+{
+    event: 'system_announcement',
+    data: {
+        title: 'Maintenance Notice',
+        message: 'Scheduled maintenance from 2-4 AM',
+        type: 'maintenance',
+        show_until: '2024-03-18T04:00:00Z'
+    }
+}
+```
+
+## 6. Bangladesh-Specific Features
+
+### 6.1 Network Optimization
+- **Mobile Network Adaptation**: Optimize for 2G/3G connections
+- **Bandwidth Detection**: Automatically adjust data transfer based on connection quality
+- **Offline Capability**: Store messages locally when connection is poor
+- **Connection Fallback**: Graceful degradation from WebSocket to polling
+
+### 6.2 Localization Features
+- **Bangla Real-time Messages**: All real-time messages in Bengali
+- **Local Time Display**: Show times in Bangladesh Standard Time
+- **Cultural Context**: Festival greetings and culturally relevant notifications
+- **Regional Presence**: Show online users by division/district
+
+### 6.3 Mobile-First Design
+- **Battery Optimization**: Reduce battery drain on mobile devices
+- **Data Usage Optimization**: Minimize data consumption for real-time features
+- **Background Sync**: Efficient background message synchronization
+- **Push Notification Integration**: Seamless integration with mobile push notifications
+
+## 7. Performance & Scaling
+
+### 7.1 Connection Management
+- **Connection Pooling**: Efficient connection pool management
+- **Load Balancing**: Distribute connections across multiple servers
+- **Sticky Sessions**: Maintain user sessions on specific servers
+- **Auto-scaling**: Automatically scale based on connection load
+
+### 7.2 Message Optimization
+- **Message Compression**: Compress large messages
+- **Batch Processing**: Batch multiple messages for efficiency
+- **Selective Broadcasting**: Only send relevant messages to users
+- **Message Prioritization**: Prioritize critical messages
+
+### 7.3 Monitoring Metrics
+- **Active Connections**: Real-time connection count monitoring
+- **Message Throughput**: Messages per second across all channels
+- **Latency Monitoring**: Track message delivery latency
+- **Error Rate**: Monitor connection and message errors
+- **Resource Usage**: CPU, memory, and network utilization
+
+## 8. Security Features
+
+### 8.1 Authentication & Authorization
+- **JWT Token Validation**: Validate user tokens for WebSocket connections
+- **Channel Access Control**: Restrict access to sensitive channels
+- **Rate Limiting**: Prevent abuse of real-time features
+- **Connection Limits**: Limit connections per user
+
+### 8.2 Message Security
+- **Message Sanitization**: Sanitize all real-time messages
+- **Spam Detection**: Detect and prevent spam messages
+- **DDoS Protection**: Protect against WebSocket-based DDoS attacks
+- **Encryption**: Encrypt sensitive real-time data
+
+This comprehensive real-time service provides instant communication, live updates, and synchronized experiences across the GetIt platform, optimized for Bangladesh's mobile-first market with robust performance and security features.

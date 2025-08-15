@@ -1,0 +1,173 @@
+{
+  "app": {
+    "name": "GetIt",
+    "tagline": "Bangladesh's Premier Online Shopping Destination",
+    "description": "Amazon.com/Shopee.sg level multi-vendor e-commerce platform"
+  },
+  "navigation": {
+    "home": "Home",
+    "categories": "Categories",
+    "vendors": "Vendors",
+    "cart": "Cart",
+    "profile": "Profile",
+    "orders": "Orders",
+    "wishlist": "Wishlist",
+    "help": "Help",
+    "contact": "Contact"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "verifyOTP": "Verify OTP"
+  },
+  "product": {
+    "search": "Search Products",
+    "addToCart": "Add to Cart",
+    "buyNow": "Buy Now",
+    "addToWishlist": "Add to Wishlist",
+    "compare": "Compare",
+    "share": "Share",
+    "viewDetails": "View Details",
+    "reviews": "Reviews",
+    "rating": "Rating",
+    "inStock": "In Stock",
+    "outOfStock": "Out of Stock",
+    "freeShipping": "Free Shipping"
+  },
+  "cart": {
+    "title": "Shopping Cart",
+    "empty": "Your cart is empty",
+    "quantity": "Quantity",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "tax": "VAT",
+    "total": "Total",
+    "checkout": "Checkout",
+    "continueShopping": "Continue Shopping",
+    "removeItem": "Remove Item",
+    "updateQuantity": "Update Quantity",
+    "coupon": "Coupon Code",
+    "applyCoupon": "Apply Coupon"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "shippingAddress": "Shipping Address",
+    "billingAddress": "Billing Address",
+    "paymentMethod": "Payment Method",
+    "orderReview": "Order Review",
+    "placeOrder": "Place Order",
+    "orderConfirmed": "Order Confirmed"
+  },
+  "payment": {
+    "bkash": "bKash",
+    "nagad": "Nagad",
+    "rocket": "Rocket",
+    "cashOnDelivery": "Cash on Delivery",
+    "cardPayment": "Card Payment",
+    "bankTransfer": "Bank Transfer",
+    "paymentFailed": "Payment Failed",
+    "paymentSuccess": "Payment Successful",
+    "processing": "Processing"
+  },
+  "address": {
+    "division": "Division",
+    "district": "District",
+    "upazila": "Upazila",
+    "area": "Area",
+    "fullAddress": "Full Address",
+    "postalCode": "Postal Code",
+    "phone": "Phone",
+    "email": "Email"
+  },
+  "vendor": {
+    "store": "Store",
+    "products": "Products",
+    "rating": "Rating",
+    "followers": "Followers",
+    "since": "Since",
+    "viewStore": "View Store",
+    "followVendor": "Follow",
+    "chatWithVendor": "Chat"
+  },
+  "order": {
+    "orderHistory": "Order History",
+    "orderDetails": "Order Details",
+    "trackOrder": "Track Order",
+    "cancelOrder": "Cancel Order",
+    "returnOrder": "Return Order",
+    "orderStatus": "Order Status",
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled",
+    "returned": "Returned"
+  },
+  "profile": {
+    "personalInfo": "Personal Information",
+    "security": "Security",
+    "addresses": "Addresses",
+    "paymentMethods": "Payment Methods",
+    "notifications": "Notifications",
+    "preferences": "Preferences",
+    "editProfile": "Edit Profile",
+    "changePassword": "Change Password"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset",
+    "clear": "Clear",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "share": "Share",
+    "copy": "Copy",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "cultural": {
+    "eidMubarak": "Eid Mubarak",
+    "poheleBoishakh": "Pohela Boishakh",
+    "victoryday": "Victory Day",
+    "independenceDay": "Independence Day",
+    "shaheedDibosh": "Shaheed Dibosh",
+    "banglaNewYear": "Bangla New Year",
+    "durga": "Durga Puja",
+    "kali": "Kali Puja"
+  },
+  "currency": {
+    "bdt": "৳",
+    "symbol": "৳",
+    "name": "Taka"
+  },
+  "time": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "now": "Now",
+    "ago": "ago",
+    "minutes": "minutes",
+    "hours": "hours",
+    "days": "days",
+    "weeks": "weeks",
+    "months": "months",
+    "years": "years"
+  }
+}

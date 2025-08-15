@@ -1,0 +1,928 @@
+# Support Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Support Service provides comprehensive customer support, vendor assistance, and technical help through multiple channels including live chat, voice calls, video calls, email, and AI-powered chatbots, with specialized support for Bangladesh's diverse customer base and local languages.
+
+### 1.2 Core Responsibilities
+- **Multi-Channel Support**: Chat, voice, video, email, and social media support
+- **Ticket Management**: Support ticket creation, routing, and resolution tracking
+- **Knowledge Base**: Self-service knowledge base with FAQs and guides
+- **AI Chatbot**: Intelligent chatbot with natural language processing
+- **Agent Management**: Support agent assignment, performance tracking
+- **Escalation Management**: Automated escalation based on priority and SLA
+
+### 1.3 Technology Stack
+```yaml
+Service: support-service
+Technology: Node.js + Express.js + Socket.io
+Database: PostgreSQL + MongoDB + Elasticsearch
+AI/NLP: OpenAI GPT + Custom NLP models
+Communication: Twilio + WebRTC + SendGrid
+Real-time: Socket.io + Redis
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- Support tickets table
+CREATE TABLE support_tickets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_number VARCHAR(20) UNIQUE NOT NULL,
+    customer_id UUID NOT NULL REFERENCES users(id),
+    vendor_id UUID REFERENCES vendors(id),
+    order_id UUID REFERENCES orders(id),
+    product_id UUID REFERENCES products(id),
+    category support_category NOT NULL,
+    subcategory VARCHAR(100),
+    priority ticket_priority DEFAULT 'medium',
+    status ticket_status DEFAULT 'open',
+    severity ticket_severity DEFAULT 'normal',
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    language language_code DEFAULT 'en',
+    channel support_channel NOT NULL,
+    source ticket_source DEFAULT 'web',
+    tags JSONB,
+    assigned_agent_id UUID REFERENCES support_agents(id),
+    assigned_at TIMESTAMP,
+    first_response_at TIMESTAMP,
+    resolved_at TIMESTAMP,
+    closed_at TIMESTAMP,
+    customer_satisfaction_rating INTEGER CHECK (customer_satisfaction_rating >= 1 AND customer_satisfaction_rating <= 5),
+    customer_feedback TEXT,
+    resolution_summary TEXT,
+    escalation_level INTEGER DEFAULT 0,
+    escalated_at TIMESTAMP,
+    escalated_by UUID REFERENCES support_agents(id),
+    escalation_reason TEXT,
+    sla_target_response TIMESTAMP,
+    sla_target_resolution TIMESTAMP,
+    is_breached BOOLEAN DEFAULT false,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Support agents table
+CREATE TABLE support_agents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    agent_code VARCHAR(20) UNIQUE NOT NULL,
+    department support_department NOT NULL,
+    specializations JSONB, -- Array of specialization areas
+    languages JSONB NOT NULL, -- Supported languages
+    skill_level agent_skill_level DEFAULT 'junior',
+    status agent_status DEFAULT 'available',
+    max_concurrent_tickets INTEGER DEFAULT 5,
+    current_ticket_count INTEGER DEFAULT 0,
+    shift_start TIME,
+    shift_end TIME,
+    working_days JSONB, -- Array of working days
+    timezone VARCHAR(50) DEFAULT 'Asia/Dhaka',
+    performance_metrics JSONB,
+    certification_info JSONB,
+    hire_date DATE NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Support conversations table
+CREATE TABLE support_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id),
+    sender_id UUID NOT NULL REFERENCES users(id),
+    sender_type conversation_sender_type NOT NULL,
+    message_type message_type DEFAULT 'text',
+    content TEXT,
+    attachments JSONB,
+    metadata JSONB,
+    is_internal BOOLEAN DEFAULT false,
+    read_by_customer BOOLEAN DEFAULT false,
+    read_by_agent BOOLEAN DEFAULT false,
+    translated_content JSONB, -- Translations in different languages
+    ai_generated BOOLEAN DEFAULT false,
+    sentiment_score DECIMAL(3,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Knowledge base articles table
+CREATE TABLE knowledge_base_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    title_bn VARCHAR(255), -- Bangla title
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    content_bn TEXT, -- Bangla content
+    summary TEXT,
+    category_id UUID NOT NULL REFERENCES kb_categories(id),
+    tags JSONB,
+    difficulty_level difficulty_level DEFAULT 'beginner',
+    target_audience audience_type DEFAULT 'customer',
+    view_count INTEGER DEFAULT 0,
+    helpful_count INTEGER DEFAULT 0,
+    not_helpful_count INTEGER DEFAULT 0,
+    author_id UUID NOT NULL REFERENCES users(id),
+    status article_status DEFAULT 'draft',
+    featured BOOLEAN DEFAULT false,
+    search_keywords JSONB,
+    related_articles JSONB, -- Array of related article IDs
+    last_reviewed_at TIMESTAMP,
+    reviewed_by UUID REFERENCES users(id),
+    published_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Knowledge base categories table
+CREATE TABLE kb_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    name_bn VARCHAR(100), -- Bangla name
+    description TEXT,
+    parent_id UUID REFERENCES kb_categories(id),
+    icon VARCHAR(100),
+    sort_order INTEGER DEFAULT 0,
+    article_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Support escalations table
+CREATE TABLE support_escalations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id),
+    escalation_type escalation_type NOT NULL,
+    from_agent_id UUID REFERENCES support_agents(id),
+    to_agent_id UUID REFERENCES support_agents(id),
+    from_level agent_skill_level,
+    to_level agent_skill_level,
+    reason TEXT NOT NULL,
+    escalated_by UUID NOT NULL REFERENCES users(id),
+    resolved BOOLEAN DEFAULT false,
+    resolution_notes TEXT,
+    escalated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
+);
+
+-- Support SLA configurations table
+CREATE TABLE support_sla_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category support_category NOT NULL,
+    priority ticket_priority NOT NULL,
+    channel support_channel,
+    customer_tier customer_tier DEFAULT 'standard',
+    first_response_time_minutes INTEGER NOT NULL,
+    resolution_time_hours INTEGER NOT NULL,
+    escalation_time_hours INTEGER,
+    business_hours_only BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(category, priority, channel, customer_tier)
+);
+
+-- Support feedback table
+CREATE TABLE support_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id),
+    customer_id UUID NOT NULL REFERENCES users(id),
+    agent_id UUID REFERENCES support_agents(id),
+    overall_rating INTEGER NOT NULL CHECK (overall_rating >= 1 AND overall_rating <= 5),
+    response_time_rating INTEGER CHECK (response_time_rating >= 1 AND response_time_rating <= 5),
+    solution_quality_rating INTEGER CHECK (solution_quality_rating >= 1 AND solution_quality_rating <= 5),
+    agent_helpfulness_rating INTEGER CHECK (agent_helpfulness_rating >= 1 AND agent_helpfulness_rating <= 5),
+    comments TEXT,
+    would_recommend BOOLEAN,
+    feedback_type feedback_type DEFAULT 'post_resolution',
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Chatbot conversations table
+CREATE TABLE chatbot_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id VARCHAR(255) NOT NULL,
+    user_id UUID REFERENCES users(id),
+    conversation_history JSONB NOT NULL,
+    intent VARCHAR(100),
+    confidence_score DECIMAL(3,2),
+    resolved_by_bot BOOLEAN DEFAULT false,
+    escalated_to_human BOOLEAN DEFAULT false,
+    language language_code DEFAULT 'en',
+    user_satisfaction INTEGER CHECK (user_satisfaction >= 1 AND user_satisfaction <= 5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create custom types
+CREATE TYPE support_category AS ENUM ('order_issue', 'payment_issue', 'product_inquiry', 'shipping_issue', 'refund_return', 'technical_issue', 'account_issue', 'vendor_inquiry', 'billing_issue', 'general_inquiry');
+CREATE TYPE ticket_priority AS ENUM ('low', 'medium', 'high', 'urgent', 'critical');
+CREATE TYPE ticket_status AS ENUM ('open', 'in_progress', 'pending_customer', 'escalated', 'resolved', 'closed', 'reopened');
+CREATE TYPE ticket_severity AS ENUM ('normal', 'major', 'critical');
+CREATE TYPE language_code AS ENUM ('en', 'bn');
+CREATE TYPE support_channel AS ENUM ('web_chat', 'mobile_chat', 'phone', 'email', 'video_call', 'social_media', 'whatsapp');
+CREATE TYPE ticket_source AS ENUM ('web', 'mobile_app', 'phone', 'email', 'social_media', 'chatbot');
+CREATE TYPE support_department AS ENUM ('customer_service', 'technical_support', 'billing', 'vendor_support', 'escalation');
+CREATE TYPE agent_skill_level AS ENUM ('junior', 'senior', 'expert', 'supervisor', 'manager');
+CREATE TYPE agent_status AS ENUM ('available', 'busy', 'away', 'break', 'offline');
+CREATE TYPE conversation_sender_type AS ENUM ('customer', 'agent', 'system', 'chatbot');
+CREATE TYPE message_type AS ENUM ('text', 'image', 'file', 'audio', 'video', 'system_note');
+CREATE TYPE difficulty_level AS ENUM ('beginner', 'intermediate', 'advanced');
+CREATE TYPE audience_type AS ENUM ('customer', 'vendor', 'agent', 'all');
+CREATE TYPE article_status AS ENUM ('draft', 'review', 'published', 'archived');
+CREATE TYPE escalation_type AS ENUM ('skill_based', 'time_based', 'priority_based', 'manual');
+CREATE TYPE customer_tier AS ENUM ('standard', 'premium', 'vip');
+CREATE TYPE feedback_type AS ENUM ('post_resolution', 'mid_conversation', 'follow_up');
+
+-- Create indexes
+CREATE INDEX idx_support_tickets_customer ON support_tickets(customer_id);
+CREATE INDEX idx_support_tickets_status ON support_tickets(status);
+CREATE INDEX idx_support_tickets_priority ON support_tickets(priority);
+CREATE INDEX idx_support_tickets_assigned_agent ON support_tickets(assigned_agent_id);
+CREATE INDEX idx_support_tickets_created_at ON support_tickets(created_at DESC);
+CREATE INDEX idx_support_conversations_ticket ON support_conversations(ticket_id);
+CREATE INDEX idx_knowledge_base_articles_category ON knowledge_base_articles(category_id);
+CREATE INDEX idx_knowledge_base_articles_status ON knowledge_base_articles(status);
+```
+
+### 2.2 MongoDB Collections
+```javascript
+// Real-time agent presence
+{
+    _id: ObjectId,
+    agent_id: "uuid",
+    status: "available", // available, busy, away, offline
+    current_tickets: ["ticket_uuid1", "ticket_uuid2"],
+    last_activity: ISODate,
+    connection_info: {
+        socket_id: "socket_abc123",
+        ip_address: "192.168.1.100",
+        user_agent: "Mozilla/5.0..."
+    },
+    performance_today: {
+        tickets_handled: 15,
+        average_response_time: 120, // seconds
+        customer_satisfaction: 4.2
+    }
+}
+
+// Chat sessions
+{
+    _id: ObjectId,
+    session_id: "session_uuid",
+    ticket_id: "uuid",
+    customer_id: "uuid",
+    agent_id: "uuid",
+    channel: "web_chat",
+    status: "active", // active, ended, transferred
+    messages: [
+        {
+            id: "msg_uuid",
+            sender_id: "uuid",
+            sender_type: "customer",
+            content: "I need help with my order",
+            timestamp: ISODate,
+            read: true,
+            translated: {
+                "bn": "আমার অর্ডারে সাহায্য দরকার"
+            }
+        }
+    ],
+    typing_indicators: {
+        customer: false,
+        agent: true
+    },
+    session_metadata: {
+        user_agent: "Mozilla/5.0...",
+        referrer: "https://getit.com.bd/orders",
+        location: "Dhaka, Bangladesh"
+    },
+    started_at: ISODate,
+    ended_at: null
+}
+
+// Support analytics
+{
+    _id: ObjectId,
+    date: ISODate,
+    department: "customer_service",
+    metrics: {
+        total_tickets: 245,
+        resolved_tickets: 198,
+        first_response_time_avg: 180, // seconds
+        resolution_time_avg: 3600, // seconds
+        customer_satisfaction_avg: 4.1,
+        sla_compliance_rate: 0.89,
+        escalation_rate: 0.12,
+        agent_utilization: 0.78
+    },
+    by_channel: {
+        web_chat: { tickets: 120, satisfaction: 4.2 },
+        phone: { tickets: 85, satisfaction: 4.0 },
+        email: { tickets: 40, satisfaction: 3.9 }
+    },
+    by_category: {
+        order_issue: { tickets: 95, resolution_time: 2400 },
+        payment_issue: { tickets: 70, resolution_time: 3200 },
+        shipping_issue: { tickets: 80, resolution_time: 4800 }
+    }
+}
+
+// Chatbot training data
+{
+    _id: ObjectId,
+    intent: "order_status_inquiry",
+    examples: [
+        {
+            text: "Where is my order?",
+            language: "en"
+        },
+        {
+            text: "আমার অর্ডার কোথায়?",
+            language: "bn"
+        }
+    ],
+    responses: [
+        {
+            text: "Let me check your order status for you.",
+            language: "en"
+        },
+        {
+            text: "আমি আপনার অর্ডারের অবস্থা চেক করে দেখছি।",
+            language: "bn"
+        }
+    ],
+    confidence_threshold: 0.8,
+    requires_authentication: true,
+    follow_up_actions: ["fetch_order_details", "show_tracking_info"]
+}
+```
+
+### 2.3 Elasticsearch Schema
+```javascript
+// Knowledge base search index
+{
+    "mappings": {
+        "properties": {
+            "title": {
+                "type": "text",
+                "analyzer": "standard",
+                "fields": {
+                    "keyword": { "type": "keyword" }
+                }
+            },
+            "title_bn": {
+                "type": "text",
+                "analyzer": "bengali"
+            },
+            "content": {
+                "type": "text",
+                "analyzer": "standard"
+            },
+            "content_bn": {
+                "type": "text",
+                "analyzer": "bengali"
+            },
+            "category": { "type": "keyword" },
+            "tags": { "type": "keyword" },
+            "difficulty_level": { "type": "keyword" },
+            "view_count": { "type": "integer" },
+            "helpful_count": { "type": "integer" },
+            "created_at": { "type": "date" }
+        }
+    }
+}
+
+// Support ticket search index
+{
+    "mappings": {
+        "properties": {
+            "ticket_number": { "type": "keyword" },
+            "title": { "type": "text" },
+            "description": { "type": "text" },
+            "category": { "type": "keyword" },
+            "status": { "type": "keyword" },
+            "priority": { "type": "keyword" },
+            "customer_email": { "type": "keyword" },
+            "agent_name": { "type": "keyword" },
+            "created_at": { "type": "date" },
+            "resolved_at": { "type": "date" }
+        }
+    }
+}
+```
+
+## 3. Folder Structure
+
+```
+support-service/
+├── src/
+│   ├── controllers/
+│   │   ├── ticket-controller.js            # Support ticket management
+│   │   ├── conversation-controller.js      # Support conversations
+│   │   ├── agent-controller.js             # Agent management
+│   │   ├── knowledge-base-controller.js    # Knowledge base management
+│   │   ├── chatbot-controller.js           # AI chatbot interactions
+│   │   ├── escalation-controller.js        # Escalation management
+│   │   ├── feedback-controller.js          # Customer feedback
+│   │   └── analytics-controller.js         # Support analytics
+│   ├── models/
+│   │   ├── SupportTicket.js                # Support ticket model
+│   │   ├── SupportAgent.js                 # Support agent model
+│   │   ├── SupportConversation.js          # Conversation model
+│   │   ├── KnowledgeBaseArticle.js         # KB article model
+│   │   ├── KBCategory.js                   # KB category model
+│   │   ├── SupportEscalation.js            # Escalation model
+│   │   ├── SupportFeedback.js              # Feedback model
+│   │   └── ChatbotConversation.js          # Chatbot conversation model
+│   ├── routes/
+│   │   ├── ticket-routes.js                # Ticket management endpoints
+│   │   ├── conversation-routes.js          # Conversation endpoints
+│   │   ├── agent-routes.js                 # Agent endpoints
+│   │   ├── knowledge-base-routes.js        # Knowledge base endpoints
+│   │   ├── chatbot-routes.js               # Chatbot endpoints
+│   │   ├── feedback-routes.js              # Feedback endpoints
+│   │   └── admin-routes.js                 # Admin endpoints
+│   ├── services/
+│   │   ├── ticket-service.js               # Ticket management logic
+│   │   ├── conversation-service.js         # Conversation management
+│   │   ├── agent-assignment-service.js     # Agent assignment logic
+│   │   ├── escalation-service.js           # Escalation logic
+│   │   ├── sla-service.js                  # SLA monitoring
+│   │   ├── knowledge-base-service.js       # Knowledge base logic
+│   │   ├── chatbot-service.js              # AI chatbot service
+│   │   ├── notification-service.js         # Support notifications
+│   │   ├── translation-service.js          # Multi-language support
+│   │   └── analytics-service.js            # Support analytics
+│   ├── middleware/
+│   │   ├── support-auth.js                 # Support authentication
+│   │   ├── agent-availability.js           # Agent availability check
+│   │   ├── ticket-validation.js            # Ticket validation
+│   │   ├── sla-tracking.js                 # SLA tracking middleware
+│   │   └── conversation-logging.js         # Conversation audit logging
+│   ├── utils/
+│   │   ├── ticket-utils.js                 # Ticket utilities
+│   │   ├── sla-calculator.js               # SLA calculation utilities
+│   │   ├── escalation-rules.js             # Escalation rule engine
+│   │   ├── sentiment-analyzer.js           # Conversation sentiment analysis
+│   │   ├── language-detector.js            # Language detection
+│   │   └── priority-calculator.js          # Priority calculation
+│   ├── ai/
+│   │   ├── chatbot-engine.js               # AI chatbot engine
+│   │   ├── intent-classifier.js            # Intent classification
+│   │   ├── nlp-processor.js                # Natural language processing
+│   │   ├── response-generator.js           # Automated response generation
+│   │   ├── sentiment-analysis.js           # Sentiment analysis
+│   │   └── knowledge-extraction.js         # Knowledge extraction from conversations
+│   ├── websocket/
+│   │   ├── chat-socket.js                  # Real-time chat WebSocket
+│   │   ├── agent-socket.js                 # Agent presence WebSocket
+│   │   ├── notification-socket.js          # Real-time notifications
+│   │   └── admin-socket.js                 # Admin monitoring WebSocket
+│   ├── integrations/
+│   │   ├── twilio-integration.js           # Voice and SMS integration
+│   │   ├── webrtc-integration.js           # Video call integration
+│   │   ├── email-integration.js            # Email support integration
+│   │   ├── social-media-integration.js     # Social media support
+│   │   └── whatsapp-business-integration.js # WhatsApp Business integration
+│   ├── config/
+│   │   ├── database.js                     # Database configuration
+│   │   ├── ai-config.js                    # AI/ML configuration
+│   │   ├── communication-config.js         # Communication settings
+│   │   ├── sla-config.js                   # SLA configurations
+│   │   └── escalation-config.js            # Escalation rules configuration
+│   └── app.js                              # Express application setup
+├── bangladesh-support/                     # Bangladesh-specific support
+│   ├── local-language-support.js          # Bengali language support
+│   ├── cultural-training-data.js           # Cultural context for AI
+│   ├── local-business-hours.js             # Bangladesh business hours
+│   ├── local-holidays-calendar.js          # Bangladesh holidays
+│   ├── regional-escalation-rules.js        # Regional escalation preferences
+│   └── local-compliance-handlers.js        # Local compliance requirements
+├── ai-training/                            # AI training data and models
+│   ├── intent-training-data/
+│   │   ├── english-intents.json            # English intent training data
+│   │   ├── bengali-intents.json            # Bengali intent training data
+│   │   └── mixed-language-intents.json     # Mixed language training data
+│   ├── response-templates/
+│   │   ├── standard-responses.json         # Standard response templates
+│   │   ├── escalation-responses.json       # Escalation response templates
+│   │   └── cultural-responses.json         # Culturally appropriate responses
+│   ├── models/
+│   │   ├── intent-classifier-model.pkl     # Intent classification model
+│   │   ├── sentiment-analysis-model.pkl    # Sentiment analysis model
+│   │   └── language-detection-model.pkl    # Language detection model
+│   └── training-scripts/
+│       ├── train-intent-classifier.py      # Intent classifier training
+│       ├── train-sentiment-model.py        # Sentiment model training
+│       └── evaluate-models.py              # Model evaluation scripts
+├── communication/                          # Communication channels
+│   ├── voice-calling/
+│   │   ├── call-handler.js                 # Voice call handling
+│   │   ├── call-routing.js                 # Call routing logic
+│   │   ├── ivr-system.js                   # Interactive voice response
+│   │   └── call-recording.js               # Call recording management
+│   ├── video-calling/
+│   │   ├── video-session-manager.js        # Video session management
+│   │   ├── screen-sharing.js               # Screen sharing functionality
+│   │   ├── recording-manager.js            # Video recording management
+│   │   └── quality-monitor.js              # Video quality monitoring
+│   ├── email-support/
+│   │   ├── email-parser.js                 # Email parsing and categorization
+│   │   ├── auto-responder.js               # Automated email responses
+│   │   ├── email-templates.js              # Email templates
+│   │   └── attachment-handler.js           # Email attachment handling
+│   └── social-media/
+│       ├── facebook-handler.js             # Facebook support integration
+│       ├── twitter-handler.js              # Twitter support integration
+│       ├── instagram-handler.js            # Instagram support integration
+│       └── social-monitoring.js            # Social media monitoring
+├── analytics/                             # Support analytics
+│   ├── ticket-analytics.js                # Ticket performance analytics
+│   ├── agent-performance.js               # Agent performance analytics
+│   ├── sla-monitoring.js                  # SLA compliance monitoring
+│   ├── customer-satisfaction.js           # Customer satisfaction analytics
+│   ├── knowledge-base-analytics.js        # KB usage analytics
+│   └── cost-analysis.js                   # Support cost analysis
+├── automation/                            # Support automation
+│   ├── auto-assignment.js                 # Automatic ticket assignment
+│   ├── auto-escalation.js                 # Automatic escalation
+│   ├── auto-response.js                   # Automated responses
+│   ├── workflow-automation.js             # Support workflow automation
+│   └── follow-up-automation.js            # Automated follow-ups
+├── tests/
+│   ├── unit/
+│   │   ├── ticket-service.test.js
+│   │   ├── agent-assignment.test.js
+│   │   ├── chatbot-service.test.js
+│   │   ├── sla-calculator.test.js
+│   │   └── escalation-rules.test.js
+│   ├── integration/
+│   │   ├── support-flow.test.js
+│   │   ├── multi-channel-support.test.js
+│   │   └── ai-chatbot-integration.test.js
+│   └── e2e/
+│       ├── complete-support-journey.test.js
+│       └── escalation-flow.test.js
+├── localization/                          # Multi-language support
+│   ├── en/
+│   │   ├── support-messages.json          # English support messages
+│   │   ├── chatbot-responses.json         # English chatbot responses
+│   │   ├── email-templates.json           # English email templates
+│   │   └── sms-templates.json             # English SMS templates
+│   └── bn/                               # Bangla translations
+│       ├── support-messages.json          # Bangla support messages
+│       ├── chatbot-responses.json         # Bangla chatbot responses
+│       ├── email-templates.json           # Bangla email templates
+│       └── sms-templates.json             # Bangla SMS templates
+├── documentation/                         # Support service documentation
+│   ├── api-documentation/
+│   │   ├── support-apis.md
+│   │   ├── chatbot-apis.md
+│   │   └── agent-apis.md
+│   ├── integration-guides/
+│   │   ├── communication-channel-setup.md
+│   │   ├── ai-chatbot-setup.md
+│   │   └── agent-dashboard-integration.md
+│   ├── training-materials/
+│   │   ├── agent-training-guide.md
+│   │   ├── escalation-procedures.md
+│   │   └── cultural-sensitivity-guide.md
+│   └── operational-guides/
+│       ├── sla-management.md
+│       ├── performance-monitoring.md
+│       └── quality-assurance.md
+├── docker-compose.yml                     # Multi-service composition
+├── Dockerfile                            # Docker configuration
+├── requirements.txt                       # Python dependencies (for AI)
+├── package.json                          # Node.js dependencies
+└── README.md                             # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 Support Ticket APIs
+```javascript
+// Create support ticket
+POST /api/v1/support/tickets
+Body: {
+    category: "order_issue",
+    subcategory: "missing_items",
+    priority: "medium",
+    title: "Missing items in my order",
+    description: "I received my order but 2 items are missing",
+    order_id: "uuid",
+    language: "en",
+    channel: "web_chat",
+    attachments: ["file_url1", "file_url2"]
+}
+
+// Get ticket details
+GET /api/v1/support/tickets/:ticket_id
+Response: {
+    id: "uuid",
+    ticket_number: "TKT-2024-001234",
+    status: "in_progress",
+    priority: "medium",
+    assigned_agent: {
+        name: "Sarah Khan",
+        department: "customer_service"
+    },
+    sla_status: {
+        first_response_due: "2024-03-17T11:00:00Z",
+        resolution_due: "2024-03-17T17:00:00Z",
+        is_breached: false
+    },
+    conversation_count: 5,
+    last_activity: "2024-03-17T10:30:00Z"
+}
+
+// Update ticket
+PUT /api/v1/support/tickets/:ticket_id
+Body: {
+    status: "resolved",
+    resolution_summary: "Missing items have been shipped separately"
+}
+
+// Get customer tickets
+GET /api/v1/support/tickets
+Query: ?status=open&page=1&limit=20&sort=created_at_desc
+
+// Add conversation message
+POST /api/v1/support/tickets/:ticket_id/messages
+Body: {
+    content: "Thank you for contacting support. I'll help you with your missing items.",
+    message_type: "text",
+    attachments: []
+}
+```
+
+### 4.2 Agent APIs
+```javascript
+// Get agent dashboard
+GET /api/v1/support/agents/dashboard
+Response: {
+    agent_info: {
+        id: "uuid",
+        name: "Sarah Khan",
+        department: "customer_service",
+        status: "available"
+    },
+    current_tickets: {
+        assigned: 8,
+        max_concurrent: 10,
+        tickets: [...]
+    },
+    performance_today: {
+        tickets_handled: 15,
+        avg_response_time: 120,
+        customer_satisfaction: 4.2
+    },
+    pending_actions: [
+        {
+            type: "sla_breach_warning",
+            ticket_id: "uuid",
+            due_in_minutes: 15
+        }
+    ]
+}
+
+// Update agent status
+PUT /api/v1/support/agents/status
+Body: {
+    status: "busy", // available, busy, away, break, offline
+    status_message: "On a call with customer"
+}
+
+// Get assigned tickets
+GET /api/v1/support/agents/tickets
+Query: ?status=open&priority=high&sort=sla_due_asc
+
+// Transfer ticket
+POST /api/v1/support/tickets/:ticket_id/transfer
+Body: {
+    to_agent_id: "uuid",
+    reason: "Requires technical expertise",
+    transfer_notes: "Customer needs help with payment gateway issue"
+}
+
+// Escalate ticket
+POST /api/v1/support/tickets/:ticket_id/escalate
+Body: {
+    escalation_type: "skill_based",
+    reason: "Complex technical issue requiring expert attention",
+    escalation_notes: "Customer has API integration problem"
+}
+```
+
+### 4.3 Chatbot APIs
+```javascript
+// Start chatbot conversation
+POST /api/v1/support/chatbot/conversation
+Body: {
+    user_id: "uuid",
+    initial_message: "I need help with my order",
+    language: "en",
+    context: {
+        page: "order_history",
+        order_id: "uuid"
+    }
+}
+
+// Send message to chatbot
+POST /api/v1/support/chatbot/message
+Body: {
+    session_id: "session_uuid",
+    message: "Where is my order?",
+    context: {
+        order_id: "uuid"
+    }
+}
+
+// Escalate to human agent
+POST /api/v1/support/chatbot/escalate
+Body: {
+    session_id: "session_uuid",
+    reason: "complex_query",
+    conversation_history: [...],
+    preferred_channel: "chat"
+}
+
+// Get chatbot analytics
+GET /api/v1/support/chatbot/analytics
+Query: ?start_date=2024-03-01&end_date=2024-03-17
+Response: {
+    total_conversations: 1250,
+    resolved_by_bot: 875,
+    escalated_to_human: 375,
+    avg_conversation_length: 4.2,
+    top_intents: [
+        { intent: "order_status", count: 425 },
+        { intent: "payment_issue", count: 320 }
+    ],
+    satisfaction_rating: 3.8
+}
+```
+
+### 4.4 Knowledge Base APIs
+```javascript
+// Search knowledge base
+GET /api/v1/support/kb/search
+Query: ?q=order+tracking&language=en&category=shipping
+Response: {
+    articles: [
+        {
+            id: "uuid",
+            title: "How to track your order",
+            summary: "Learn how to track your order status",
+            url: "/kb/how-to-track-order",
+            relevance_score: 0.95,
+            helpful_count: 245
+        }
+    ],
+    total_results: 15,
+    search_suggestions: ["order status", "delivery tracking"]
+}
+
+// Get knowledge base article
+GET /api/v1/support/kb/articles/:article_id
+Response: {
+    id: "uuid",
+    title: "How to track your order",
+    content: "To track your order, follow these steps...",
+    category: "Shipping",
+    difficulty_level: "beginner",
+    helpful_count: 245,
+    not_helpful_count: 12,
+    related_articles: [...],
+    last_updated: "2024-03-15T10:00:00Z"
+}
+
+// Rate knowledge base article
+POST /api/v1/support/kb/articles/:article_id/feedback
+Body: {
+    helpful: true,
+    comments: "This article helped me track my order successfully"
+}
+
+// Get knowledge base categories
+GET /api/v1/support/kb/categories
+Response: {
+    categories: [
+        {
+            id: "uuid",
+            name: "Orders & Shipping",
+            name_bn: "অর্ডার ও শিপিং",
+            article_count: 25,
+            subcategories: [...]
+        }
+    ]
+}
+```
+
+### 4.5 Real-time Chat APIs
+```javascript
+// WebSocket connection for real-time chat
+const socket = io('/support-chat', {
+    auth: { token: 'jwt_token' }
+});
+
+// Join chat room
+socket.emit('join_chat', {
+    ticket_id: 'uuid',
+    user_type: 'customer' // customer, agent
+});
+
+// Send message
+socket.emit('send_message', {
+    ticket_id: 'uuid',
+    content: 'I need help with my order',
+    message_type: 'text'
+});
+
+// Receive messages
+socket.on('new_message', (data) => {
+    console.log('New message:', data);
+});
+
+// Typing indicators
+socket.emit('typing_start', { ticket_id: 'uuid' });
+socket.emit('typing_stop', { ticket_id: 'uuid' });
+
+// Agent availability
+socket.on('agent_assigned', (data) => {
+    console.log('Agent assigned:', data.agent_name);
+});
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local Language Support
+- **Bengali Interface**: Complete Bengali language support for customer portal
+- **Bilingual Agents**: Agents fluent in both Bengali and English
+- **Cultural Context**: AI trained on Bengali cultural context and expressions
+- **Mixed Language Support**: Handle conversations mixing Bengali and English
+- **Voice Support**: Bengali voice recognition and text-to-speech
+
+### 5.2 Local Business Practices
+- **Business Hours**: Support hours aligned with Bangladesh timezone
+- **Holiday Calendar**: Local holidays and festival consideration
+- **Payment Method Support**: Specialized support for bKash, Nagad, Rocket
+- **Mobile-First Support**: Optimized for mobile device users
+- **Rural Customer Support**: Special considerations for rural customers
+
+### 5.3 Cultural Sensitivity
+- **Religious Considerations**: Respectful handling of religious concerns
+- **Gender-Sensitive Support**: Female agents available for conservative customers
+- **Social Context**: Understanding of local social dynamics and customs
+- **Economic Sensitivity**: Understanding of local economic conditions
+- **Educational Support**: Patient assistance for customers with limited digital literacy
+
+## 6. AI Chatbot Capabilities
+
+### 6.1 Natural Language Understanding
+- **Intent Recognition**: Identify customer intent from natural language
+- **Entity Extraction**: Extract relevant information (order numbers, product names)
+- **Context Awareness**: Maintain conversation context across multiple turns
+- **Sentiment Analysis**: Detect customer emotion and adjust responses
+- **Language Detection**: Automatically detect Bengali or English
+
+### 6.2 Automated Resolution
+- **FAQ Responses**: Instant answers to frequently asked questions
+- **Order Status**: Automatic order status checking and updates
+- **Account Information**: Retrieve and display account information
+- **Basic Troubleshooting**: Guide customers through common issues
+- **Escalation Triggers**: Smart escalation to human agents when needed
+
+### 6.3 Learning and Improvement
+- **Conversation Analysis**: Learn from successful human agent conversations
+- **Performance Monitoring**: Track bot performance and accuracy
+- **Continuous Training**: Regular model updates with new data
+- **A/B Testing**: Test different response strategies
+- **Feedback Integration**: Incorporate customer feedback into training
+
+## 7. Performance Metrics & SLA
+
+### 7.1 Response Time SLAs
+- **Critical Issues**: First response within 15 minutes
+- **High Priority**: First response within 1 hour
+- **Medium Priority**: First response within 4 hours
+- **Low Priority**: First response within 24 hours
+
+### 7.2 Resolution Time SLAs
+- **Critical Issues**: Resolution within 4 hours
+- **High Priority**: Resolution within 24 hours
+- **Medium Priority**: Resolution within 48 hours
+- **Low Priority**: Resolution within 72 hours
+
+### 7.3 Quality Metrics
+- **Customer Satisfaction**: Target 4.0+ out of 5.0
+- **First Contact Resolution**: Target 75%+
+- **SLA Compliance**: Target 90%+
+- **Agent Utilization**: Target 70-80%
+- **Escalation Rate**: Target <15%
+
+This comprehensive support service provides multi-channel, AI-enhanced customer support with strong cultural awareness and local language support specifically designed for Bangladesh's diverse customer base.

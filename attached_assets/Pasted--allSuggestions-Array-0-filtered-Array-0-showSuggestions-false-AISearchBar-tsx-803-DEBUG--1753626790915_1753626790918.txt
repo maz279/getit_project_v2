@@ -1,0 +1,20 @@
+{allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:1983 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(3), length: 3}
+AISearchBar.tsx:1987 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(3), filtered: Array(3), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(3), filtered: Array(0), showSuggestions: true}
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:1983 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(4), length: 4}
+AISearchBar.tsx:1987 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(4), filtered: Array(3), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(4), filtered: Array(1), showSuggestions: true}
+AISearchBar.tsx:1983 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(4), length: 4}
+AISearchBar.tsx:1987 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(4), filtered: Array(3), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(4), filtered: Array(1), showSuggestions: true}
+AISearchBar.tsx:1564 🔥 DEBUG: performSearch called with: {searchQuery: 'help me to find good sahmpoo', searchType: 'text'}
+Header.tsx:541 Legacy search callback: help me to find good sahmpoo []
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}

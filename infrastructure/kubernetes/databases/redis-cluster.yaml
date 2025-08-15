@@ -1,0 +1,491 @@
+# Redis Cluster Configuration for Enterprise Caching
+# Amazon.com/Shopee.sg-Level Caching Infrastructure
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-cache
+  labels:
+    istio-injection: enabled
+---
+# Redis Cluster StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: getit-cache
+  labels:
+    app: redis
+    role: cluster
+spec:
+  serviceName: redis-cluster
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis
+      role: cluster
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: cluster
+        version: "7"
+    spec:
+      serviceAccountName: redis-service-account
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: ["redis"]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+              name: client
+            - containerPort: 16379
+              name: gossip
+          env:
+            - name: REDIS_CLUSTER_ANNOUNCE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          command:
+            - /bin/sh
+            - -c
+            - |
+              redis-server /etc/redis/redis.conf \
+                --cluster-enabled yes \
+                --cluster-require-full-coverage no \
+                --cluster-node-timeout 15000 \
+                --cluster-config-file /data/nodes.conf \
+                --cluster-migration-barrier 1 \
+                --appendonly yes \
+                --appendfsync everysec \
+                --save 900 1 \
+                --save 300 10 \
+                --save 60 10000 \
+                --tcp-keepalive 60 \
+                --maxmemory 1gb \
+                --maxmemory-policy allkeys-lru \
+                --bind 0.0.0.0 \
+                --protected-mode no \
+                --port 6379 \
+                --cluster-announce-port 6379 \
+                --cluster-announce-bus-port 16379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: redis-config
+              mountPath: /etc/redis
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "fast-ssd"
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Redis Sentinel for High Availability
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-sentinel
+  namespace: getit-cache
+  labels:
+    app: redis-sentinel
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+        version: "7"
+    spec:
+      serviceAccountName: redis-service-account
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: sentinel
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          command:
+            - redis-sentinel
+            - /etc/redis/sentinel.conf
+          volumeMounts:
+            - name: sentinel-config
+              mountPath: /etc/redis
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: sentinel-config
+          configMap:
+            name: redis-sentinel-config
+---
+# Redis Cluster Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: getit-cache
+  labels:
+    app: redis
+    role: cluster
+spec:
+  selector:
+    app: redis
+    role: cluster
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: client
+    - port: 16379
+      targetPort: 16379
+      name: gossip
+  clusterIP: None
+---
+# Redis Sentinel Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: getit-cache
+  labels:
+    app: redis-sentinel
+spec:
+  selector:
+    app: redis-sentinel
+  ports:
+    - port: 26379
+      targetPort: 26379
+      name: sentinel
+  type: ClusterIP
+---
+# Redis External Access Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-external
+  namespace: getit-cache
+  labels:
+    app: redis
+spec:
+  selector:
+    app: redis
+    role: cluster
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: client
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+---
+# Redis Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: getit-cache
+data:
+  redis.conf: |
+    # Redis Cluster Configuration for Enterprise Use
+    
+    # Network
+    bind 0.0.0.0
+    port 6379
+    protected-mode no
+    tcp-keepalive 60
+    tcp-backlog 511
+    timeout 0
+    
+    # Cluster
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 15000
+    cluster-require-full-coverage no
+    cluster-migration-barrier 1
+    
+    # Persistence
+    appendonly yes
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+    aof-use-rdb-preamble yes
+    
+    # Snapshotting
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    
+    # Memory Management
+    maxmemory 1gb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # Logging
+    loglevel notice
+    logfile ""
+    syslog-enabled no
+    
+    # Performance
+    lazyfree-lazy-eviction no
+    lazyfree-lazy-expire no
+    lazyfree-lazy-server-del no
+    replica-lazy-flush no
+    
+    # Security
+    # requirepass your-password-here
+    
+    # Clients
+    maxclients 10000
+    
+    # Modules
+    # loadmodule /path/to/module.so
+---
+# Redis Sentinel Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-config
+  namespace: getit-cache
+data:
+  sentinel.conf: |
+    # Redis Sentinel Configuration
+    
+    port 26379
+    bind 0.0.0.0
+    
+    # Monitor master
+    sentinel monitor mymaster redis-cluster-0.redis-cluster.getit-cache.svc.cluster.local 6379 2
+    sentinel down-after-milliseconds mymaster 30000
+    sentinel parallel-syncs mymaster 1
+    sentinel failover-timeout mymaster 180000
+    
+    # Security
+    # sentinel auth-pass mymaster your-password-here
+    
+    # Notification scripts
+    # sentinel notification-script mymaster /var/redis/notify.sh
+    # sentinel client-reconfig-script mymaster /var/redis/reconfig.sh
+    
+    # Logging
+    logfile ""
+    loglevel notice
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redis-service-account
+  namespace: getit-cache
+---
+# Fast SSD Storage Class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Redis Cluster Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+  namespace: getit-cache
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: redis-cluster-init
+          image: redis:7-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for Redis pods to be ready..."
+              sleep 60
+              
+              echo "Creating Redis cluster..."
+              redis-cli --cluster create \
+                redis-cluster-0.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                redis-cluster-1.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                redis-cluster-2.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                redis-cluster-3.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                redis-cluster-4.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                redis-cluster-5.redis-cluster.getit-cache.svc.cluster.local:6379 \
+                --cluster-replicas 1 \
+                --cluster-yes
+              
+              echo "Redis cluster initialization completed"
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: redis-cluster-hpa
+  namespace: getit-cache
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: redis-cluster
+  minReplicas: 6
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-cluster-pdb
+  namespace: getit-cache
+spec:
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app: redis
+      role: cluster
+---
+# Network Policy for Redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: getit-cache
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: getit-production
+        - namespaceSelector:
+            matchLabels:
+              name: getit-cache
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 16379
+        - protocol: TCP
+          port: 26379
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: getit-cache
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 16379
+        - protocol: TCP
+          port: 26379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

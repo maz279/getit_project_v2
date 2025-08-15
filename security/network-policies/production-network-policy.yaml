@@ -1,0 +1,433 @@
+# Network Policies for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Network Security and Micro-segmentation
+
+# =============================================================================
+# FRONTEND NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: production
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+      tier: frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow traffic from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HTTPS traffic to external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow communication to backend
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+# =============================================================================
+# BACKEND NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: production
+  labels:
+    app: backend
+    tier: backend
+    project: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      tier: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from frontend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+          tier: frontend
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow traffic from ingress for API endpoints
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow monitoring traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow health checks from load balancer
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow communication to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+          tier: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow communication to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+          tier: cache
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow communication to Elasticsearch
+  - to:
+    - podSelector:
+        matchLabels:
+          app: elasticsearch
+          tier: search
+    ports:
+    - protocol: TCP
+      port: 9200
+  # Allow HTTPS traffic to external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow HTTP traffic to external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow communication to message queues
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 5672  # RabbitMQ
+    - protocol: TCP
+      port: 9092  # Kafka
+---
+# =============================================================================
+# DATABASE NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-network-policy
+  namespace: production
+  labels:
+    app: postgres
+    tier: database
+    project: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+      tier: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from backend services
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow traffic from backup jobs
+  - from:
+    - podSelector:
+        matchLabels:
+          app: postgres-backup
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow monitoring traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 9187  # Postgres exporter
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow backup uploads to S3
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# =============================================================================
+# REDIS NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: production
+  labels:
+    app: redis
+    tier: cache
+    project: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+      tier: cache
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from backend services
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow monitoring traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9121  # Redis exporter
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+---
+# =============================================================================
+# MONITORING NAMESPACE NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: monitoring
+  labels:
+    project: getit-bangladesh
+    tier: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from ingress for Grafana/Prometheus UI
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000  # Grafana
+    - protocol: TCP
+      port: 9090  # Prometheus
+    - protocol: TCP
+      port: 9093  # Alertmanager
+  # Allow internal monitoring traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow scraping production services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+  # Allow external alert notifications
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 587  # SMTP
+---
+# =============================================================================
+# INGRESS CONTROLLER NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-nginx-network-policy
+  namespace: ingress-nginx
+  labels:
+    project: getit-bangladesh
+    tier: ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow all incoming traffic (external users)
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 10254  # Nginx metrics
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow communication to all namespaces for routing
+  - to:
+    - namespaceSelector: {}
+  # Allow certificate validation
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# =============================================================================
+# DEFAULT DENY ALL POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+  labels:
+    project: getit-bangladesh
+    security: baseline
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# =============================================================================
+# BANGLADESH PAYMENT SERVICES NETWORK POLICY
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bangladesh-payment-network-policy
+  namespace: production
+  labels:
+    project: getit-bangladesh
+    region: bangladesh
+    service: payment
+spec:
+  podSelector:
+    matchLabels:
+      service: payment
+      region: bangladesh
+  policyTypes:
+  - Egress
+  egress:
+  # Allow communication to bKash API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow communication to Nagad API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow communication to Rocket API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53

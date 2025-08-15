@@ -1,0 +1,45 @@
+
+export const casualSareeProducts = [
+  {
+    id: 'casual-saree-1',
+    name: 'Daily Wear Cotton Saree - Comfortable',
+    nameBn: 'দৈনন্দিন সুতি শাড়ি - আরামদায়ক',
+    price: 1500,
+    originalPrice: 2000,
+    rating: 4.3,
+    reviews: 345,
+    vendor: 'Daily Wear Collection',
+    image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=400&fit=crop',
+    discount: 25,
+    freeShipping: false,
+    location: 'Sylhet',
+    verified: true,
+    quickDelivery: false,
+    sold: 234,
+    category: 'Casual Saree',
+    stock: { status: 'in_stock', quantity: 67 },
+    delivery: { estimatedDays: 4, express: false, cod: true, freeShipping: false },
+    features: { trending: false, festival: false, priceHistory: false, emi: false }
+  },
+  {
+    id: 'casual-saree-2',
+    name: 'Office Wear Saree - Professional Look',
+    nameBn: 'অফিস পরিধানের শাড়ি - পেশাদার চেহারা',
+    price: 2200,
+    originalPrice: 2800,
+    rating: 4.4,
+    reviews: 189,
+    vendor: 'Professional Wear',
+    image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=400&fit=crop',
+    discount: 21,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 167,
+    category: 'Casual Saree',
+    stock: { status: 'in_stock', quantity: 45 },
+    delivery: { estimatedDays: 2, express: true, cod: true, freeShipping: true },
+    features: { trending: false, festival: false, priceHistory: false, emi: true }
+  }
+];

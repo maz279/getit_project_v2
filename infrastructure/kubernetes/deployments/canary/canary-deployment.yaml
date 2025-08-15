@@ -1,0 +1,250 @@
+# Canary Deployment Configuration
+# Amazon.com/Shopee.sg-Level Canary Release Strategy
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: getit-backend-canary
+  namespace: getit-production
+  labels:
+    app: getit-backend
+    version: canary
+    deployment-strategy: canary
+spec:
+  replicas: 1  # Start with single replica
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: getit-backend
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: getit-backend
+        version: canary
+        deployment-strategy: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/api/v1/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: getit-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: getit-backend
+        image: ${REGISTRY}/${IMAGE_NAME}:${CANARY_IMAGE_TAG}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: ENTERPRISE_MODE
+          value: "true"
+        - name: DEPLOYMENT_VERSION
+          value: "canary"
+        - name: CANARY_ENABLED
+          value: "true"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: getit-database-secret
+              key: url
+        - name: REDIS_CLUSTER_NODES
+          valueFrom:
+            configMapKeyRef:
+              name: getit-redis-config
+              key: cluster-nodes
+        - name: ELASTICSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: getit-elasticsearch-config
+              key: url
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: getit-app-secret
+              key: session-secret
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: getit-app-secret
+              key: jwt-secret
+        # Canary-specific configuration
+        - name: FEATURE_FLAGS
+          value: "canary-features-enabled"
+        - name: CANARY_TRAFFIC_PERCENTAGE
+          value: "10"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+            httpHeaders:
+            - name: X-Canary-Health-Check
+              value: "true"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health/ready
+            port: 5000
+            httpHeaders:
+            - name: X-Canary-Health-Check
+              value: "true"
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+        volumeMounts:
+        - name: app-config
+          mountPath: /app/config
+          readOnly: true
+        - name: canary-config
+          mountPath: /app/config/canary
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: app-config
+        configMap:
+          name: getit-app-config
+      - name: canary-config
+        configMap:
+          name: getit-canary-config
+      - name: tmp
+        emptyDir: {}
+      nodeSelector:
+        node-type: application
+      tolerations:
+      - key: "application-only"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - getit-backend
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: getit-backend-canary
+  namespace: getit-production
+  labels:
+    app: getit-backend
+    version: canary
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: getit-backend
+    version: canary
+---
+# Canary Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: getit-canary-config
+  namespace: getit-production
+data:
+  canary.json: |
+    {
+      "enabled": true,
+      "trafficPercentage": 10,
+      "features": {
+        "newProductRecommendation": true,
+        "enhancedSearch": true,
+        "improvedCheckout": true
+      },
+      "monitoring": {
+        "errorRateThreshold": 0.01,
+        "latencyThreshold": 500,
+        "successRateThreshold": 0.99
+      },
+      "rollbackTriggers": {
+        "errorRate": 0.05,
+        "responseTime": 1000,
+        "successRate": 0.95
+      }
+    }
+---
+# Horizontal Pod Autoscaler for Canary
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-backend-canary-hpa
+  namespace: getit-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-backend-canary
+  minReplicas: 1
+  maxReplicas: 3  # Limited scaling for canary
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60

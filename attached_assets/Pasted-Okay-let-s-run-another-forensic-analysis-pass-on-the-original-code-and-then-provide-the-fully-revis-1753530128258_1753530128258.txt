@@ -1,0 +1,757 @@
+Okay, let's run another forensic analysis pass on the original code and then provide the fully revised version.
+
+**Second Forensic Analysis Pass:**
+
+1.  **Interface Property Typing (`InternetSearchResponse.data`)**:
+    *   **Issue:** The `data` property in `InternetSearchResponse` is typed as an object literal with `any` types for its properties (`results: any[]`, `summary: any`, etc.). This provides no type safety for the structure of the returned data.
+    *   **Location:** Lines defining `data?: { ... };` within `InternetSearchResponse`.
+    *   **Severity:** Medium (Type Safety)
+
+2.  **Interface Property Typing (`SearchResult.price`, `SearchResult.rating`)**:
+    *   **Issue:** `price` and `rating` are optional. While this reflects real data, the code (e.g., in `generatePriceComparison`) uses non-null assertion operators (`!`) after filtering, assuming they exist. This is generally okay *after* filtering but makes the interface itself less strict.
+    *   **Location:** Lines defining `price?: { ... };` and `rating?: { ... };` within `SearchResult`.
+    *   **Severity:** Low-Medium (Potential Runtime Risk if filtering logic is flawed)
+
+3.  **Method Return Type (`performShoppingSearch`, `performSpecificationSearch`, etc.)**:
+    *   **Issue:** Private methods like `performShoppingSearch` have their return type implicitly set to `any`. This reduces clarity and type safety.
+    *   **Location:** Lines defining `private async performShoppingSearch(...)`, etc.
+    *   **Severity:** Medium (Code Clarity, Maintainability)
+
+4.  **Hardcoded Mock Data:**
+    *   **Issue:** Methods like `searchBangladeshEcommerce`, `searchInternationalSources`, etc., return hardcoded mock data. Expected for a mock.
+    *   **Location:** Throughout the `private` methods implementing the search logic.
+    *   **Severity:** Contextual (Functional Limitation)
+
+5.  **Incomplete Search Provider Usage:**
+    *   **Issue:** `searchProviders` map is initialized but not used for actual API calls.
+    *   **Location:** `initializeSearchProviders` and the `perform*Search` methods.
+    *   **Severity:** Contextual (Incomplete Integration)
+
+6.  **Potential Division by Zero (`generatePriceComparison`)**:
+    *   **Issue:** **CONFIRMED.** If the `results` array passed to `generatePriceComparison` contains no items with a `price`, the `prices` array will be empty. `prices.reduce((sum, p) => sum + p.amount, 0) / prices.length` will be `0 / 0`, resulting in `NaN`. `Math.round(NaN)` is `NaN`. This `NaN` will propagate to `averagePrice` and potentially other calculations.
+    *   **Location:** Line calculating `average` within `generatePriceComparison`.
+    *   **Severity:** High (Runtime Error leading to `NaN`)
+
+7.  **Incomplete Helper Logic (`getBestValueRecommendation`)**:
+    *   **Issue:** **CONFIRMED.** If the `prices` array is empty, `prices[0]` will return `undefined`. While `prices.find(...)` would also return `undefined`, explicitly handling the empty array case is safer.
+    *   **Location:** `getBestValueRecommendation` function.
+    *   **Severity:** Medium (Potential for `undefined` result if input is empty)
+
+8.  **Incomplete Helper Logic (`getFastestDeliveryOption`)**:
+    *   **Issue:** **CONFIRMED.** `results.find(...)` returns `undefined` if no match is found. Caller must handle.
+    *   **Location:** `getFastestDeliveryOption` function.
+    *   **Severity:** Medium (Potential for `undefined` result)
+
+9.  **Incomplete Helper Logic (`getMostTrustedSeller`)**:
+    *   **Issue:** **CONFIRMED CRITICAL.** If the `results` array is empty, `results.reduce(...)` will throw a `TypeError`: "Reduce of empty array with no initial value".
+    *   **Location:** `getMostTrustedSeller` function.
+    *   **Severity:** High (Guaranteed Runtime Error if `results` is empty)
+
+10. **Incomplete Helper Logic (`getAvailabilityStatus`)**:
+    *   **Issue:** **CONFIRMED.** If `results` is empty, `total` is 0. The calculation `available / total` is `0 / 0`, resulting in `NaN`. Comparisons `NaN > 0.8` and `NaN > 0.5` are `false`, leading to the default `'Limited Availability'`. While it doesn't crash, it's a specific edge case.
+    *   **Location:** `getAvailabilityStatus` function.
+    *   **Severity:** Medium (Edge case handling, potential `NaN`)
+
+11. **Incorrect Logic (`generateCompetitorAnalysis`)**:
+    *   **Issue:** **CONFIRMED.** The line `Math.max(...competitorData.map((comp: any) => comp.marketShare))` correctly finds the maximum market share. However, `competitorData.find((c: any) => c.marketShare === ...)` tries to find an object where `marketShare` *strictly equals* the maximum value. If `marketShare` values are numbers, this comparison should work. However, if there are floating-point precision issues or if `marketShare` could somehow be non-numeric, it might fail to find the leader. More importantly, if `competitorData` is empty, `Math.max` on an empty array returns `-Infinity`, and `find` will return `undefined`. The primary concern is robustness for empty input.
+    *   **Location:** `generateCompetitorAnalysis` function.
+    *   **Severity:** Medium (Edge case for empty input)
+
+12. **Missing Error Handling for Edge Cases:** Several methods don't explicitly handle edge cases like empty input arrays, which can lead to unexpected behavior or errors (as seen in points 6, 7, 8, 9, 10, 11).
+
+**Revised Code with All Identified Errors Corrected:**
+
+This version addresses all the confirmed and high/medium severity issues found, improving type safety, preventing runtime errors, and making the code more robust.
+
+```typescript
+/**
+ * Internet Search Service - Phase 3 Implementation
+ * External data integration for competitive analysis and real-time market intelligence
+ * Implementation Date: July 20, 2025
+ * Forensic Analysis Corrections Applied:
+ * - Improved interface typing for data structures (InternetSearchData)
+ * - Added explicit return types for private methods
+ * - Added checks for empty arrays to prevent division by zero and reduce errors
+ * - Improved robustness of helper functions
+ * - Fixed logic in generateCompetitorAnalysis for empty input
+ * Note: Mock data remains for simulation purposes.
+ */
+
+// --- Interfaces ---
+interface InternetSearchRequest {
+  query: string;
+  searchType: 'shopping' | 'specifications' | 'reviews' | 'competitive';
+  context?: {
+    productCategory?: string;
+    priceRange?: {
+      min: number;
+      max: number;
+    };
+    location?: string;
+  };
+}
+
+// Define the structure of the data returned by the main search method
+interface InternetSearchData {
+  results: SearchResult[];
+  summary: any;
+  priceComparison: any;
+  competitorAnalysis: any;
+  specifications: any;
+  reviews: any;
+  trends: any;
+  processingTime: number;
+}
+
+interface InternetSearchResponse {
+  success: boolean;
+  data?: InternetSearchData; // Use the defined interface instead of object literal with any
+  error?: string;
+}
+
+interface SearchResult {
+  title: string;
+  url: string;
+  description: string;
+  // Keep price and rating optional as they might be missing in real data
+  price?: {
+    amount: number;
+    currency: string;
+    source: string;
+  };
+  rating?: {
+    score: number;
+    reviews: number;
+    source: string;
+  };
+  availability: string;
+  seller: string;
+  trustScore: number;
+}
+
+// --- Return Types for Private Methods ---
+interface ShoppingSearchResult {
+  results: SearchResult[];
+  priceComparison: any;
+  summary: any;
+}
+
+interface SpecificationSearchResult {
+  specifications: any;
+  results: SearchResult[]; // Assuming sources found are SearchResult[]
+}
+
+interface ReviewSearchResult {
+  reviews: any;
+  summary: any;
+}
+
+interface CompetitiveAnalysisResult {
+  competitorAnalysis: any;
+  priceComparison: any;
+  trends: any;
+}
+
+// --- Main Class ---
+export default class InternetSearchService {
+  private static instance: InternetSearchService;
+  private searchProviders: Map<string, any>;
+  private priceComparisonSources: Map<string, any>;
+  private reviewAggregators: Map<string, any>;
+  private specificationDatabases: Map<string, any>;
+
+  private constructor() {
+    this.initializeSearchProviders();
+  }
+
+  public static getInstance(): InternetSearchService {
+    if (!InternetSearchService.instance) {
+      InternetSearchService.instance = new InternetSearchService();
+    }
+    return InternetSearchService.instance;
+  }
+
+  private initializeSearchProviders(): void {
+    console.log('🌐 Initializing Internet Search Service...');
+    // Search Providers Configuration
+    this.searchProviders = new Map([
+      ['google-shopping', {
+        name: 'Google Shopping API',
+        endpoint: 'https://www.googleapis.com/customsearch/v1',
+        features: ['product-search', 'price-comparison', 'seller-info'],
+        coverage: 'global',
+        reliability: 9.5,
+        rateLimit: { requests: 100, period: 'day' },
+        authentication: 'api-key'
+      }],
+      ['bing-shopping', {
+        name: 'Bing Shopping API',
+        endpoint: 'https://api.bing.microsoft.com/v7.0/search',
+        features: ['product-search', 'reviews', 'specifications'],
+        coverage: 'global',
+        reliability: 8.5,
+        rateLimit: { requests: 1000, period: 'month' },
+        authentication: 'subscription-key'
+      }],
+      ['local-aggregators', {
+        name: 'Bangladesh E-commerce Aggregators',
+        sources: ['daraz.com.bd', 'pickaboo.com', 'othoba.com', 'bagdoom.com'],
+        features: ['local-pricing', 'delivery-info', 'local-reviews'],
+        coverage: 'bangladesh',
+        reliability: 9.0,
+        specialization: 'bangladesh-market'
+      }]
+    ]);
+    // Price Comparison Sources
+    this.priceComparisonSources = new Map([
+      ['bangladesh-local', {
+        sources: [
+          { name: 'Daraz', baseUrl: 'daraz.com.bd', coverage: 'nationwide', trustScore: 9.2 },
+          { name: 'Pickaboo', baseUrl: 'pickaboo.com', coverage: 'major-cities', trustScore: 8.8 },
+          { name: 'Othoba', baseUrl: 'othoba.com', coverage: 'dhaka-chittagong', trustScore: 8.5 },
+          { name: 'Bagdoom', baseUrl: 'bagdoom.com', coverage: 'dhaka', trustScore: 8.0 }
+        ],
+        features: ['real-time-pricing', 'delivery-costs', 'local-availability'],
+        updateFrequency: 'hourly'
+      }],
+      ['international', {
+        sources: [
+          { name: 'Amazon', baseUrl: 'amazon.com', coverage: 'global', trustScore: 9.8 },
+          { name: 'AliExpress', baseUrl: 'aliexpress.com', coverage: 'global', trustScore: 8.5 },
+          { name: 'eBay', baseUrl: 'ebay.com', coverage: 'global', trustScore: 8.7 }
+        ],
+        features: ['global-pricing', 'import-costs', 'shipping-estimates'],
+        updateFrequency: 'daily'
+      }]
+    ]);
+    // Review Aggregators
+    this.reviewAggregators = new Map([
+      ['bangladesh-reviews', {
+        sources: ['google-reviews', 'facebook-reviews', 'local-forums'],
+        languages: ['bengali', 'english'],
+        sentiment: 'available',
+        trustVerification: 'manual-validation'
+      }],
+      ['global-reviews', {
+        sources: ['trustpilot', 'amazon-reviews', 'google-reviews'],
+        languages: ['english'],
+        sentiment: 'ai-powered',
+        trustVerification: 'automated'
+      }]
+    ]);
+    // Specification Databases
+    this.specificationDatabases = new Map([
+      ['electronics', {
+        sources: ['gsmarena', 'notebookcheck', 'techspecs'],
+        categories: ['smartphones', 'laptops', 'tablets', 'appliances'],
+        accuracy: 'high',
+        updateFrequency: 'weekly'
+      }],
+      ['fashion', {
+        sources: ['size-charts', 'material-databases', 'brand-specs'],
+        categories: ['clothing', 'shoes', 'accessories'],
+        accuracy: 'medium',
+        updateFrequency: 'monthly'
+      }]
+    ]);
+    console.log('✅ Internet Search Service initialized');
+  }
+
+  async search(request: InternetSearchRequest): Promise<InternetSearchResponse> {
+    const startTime = Date.now();
+    try {
+      console.log(`🔍 Internet search: ${request.query} (${request.searchType})`);
+      let results: SearchResult[] = [];
+      let summary: any = {};
+      let priceComparison: any = {};
+      let competitorAnalysis: any = {};
+      let specifications: any = {};
+      let reviews: any = {};
+      let trends: any = {};
+
+      switch (request.searchType) {
+        case 'shopping':
+          ({ results, priceComparison, summary } = await this.performShoppingSearch(request));
+          break;
+        case 'specifications':
+          ({ specifications, results } = await this.performSpecificationSearch(request));
+          break;
+        case 'reviews':
+          ({ reviews, summary } = await this.performReviewSearch(request));
+          break;
+        case 'competitive':
+          ({ competitorAnalysis, priceComparison, trends } = await this.performCompetitiveAnalysis(request));
+          break;
+      }
+
+      const processingTime = Date.now() - startTime;
+      return {
+        success: true,
+        data: {
+          results,
+          summary,
+          priceComparison,
+          competitorAnalysis,
+          specifications,
+          reviews,
+          trends,
+          processingTime
+        }
+      };
+    } catch (error) {
+      console.error('Internet search error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to perform internet search'
+      };
+    }
+  }
+
+  // Explicit return types added
+  private async performShoppingSearch(request: InternetSearchRequest): Promise<ShoppingSearchResult> {
+    console.log(`🛒 Performing shopping search for: ${request.query}`);
+    const bangladeshResults = await this.searchBangladeshEcommerce(request.query, request.context);
+    const internationalResults = await this.searchInternationalSources(request.query, request.context);
+    const results: SearchResult[] = [...bangladeshResults, ...internationalResults];
+    const priceComparison = this.generatePriceComparison(results);
+    const summary = this.generateSearchSummary(results, request);
+    return { results, priceComparison, summary };
+  }
+
+  private async performSpecificationSearch(request: InternetSearchRequest): Promise<SpecificationSearchResult> {
+    console.log(`📋 Performing specification search for: ${request.query}`);
+    const category = this.detectProductCategory(request.query);
+    const specifications = await this.getDetailedSpecifications(request.query, category);
+    const results = await this.findSpecificationSources(request.query, category);
+    return { specifications, results };
+  }
+
+  private async performReviewSearch(request: InternetSearchRequest): Promise<ReviewSearchResult> {
+    console.log(`⭐ Performing review search for: ${request.query}`);
+    const bangladeshReviews = await this.getBangladeshReviews(request.query);
+    const globalReviews = await this.getGlobalReviews(request.query);
+    const reviews = this.aggregateReviews(bangladeshReviews, globalReviews);
+    const summary = this.generateReviewSummary(reviews);
+    return { reviews, summary };
+  }
+
+  private async performCompetitiveAnalysis(request: InternetSearchRequest): Promise<CompetitiveAnalysisResult> {
+    console.log(`📊 Performing competitive analysis for: ${request.query}`);
+    const competitorData = await this.getCompetitorData(request.query);
+    const priceComparison = await this.getCompetitivePricing(request.query);
+    const trends = await this.getMarketTrends(request.query);
+    const competitorAnalysis = this.generateCompetitorAnalysis(competitorData);
+    return { competitorAnalysis, priceComparison, trends };
+  }
+
+  // --- Mock Search Implementations (Logic remains largely unchanged) ---
+
+  private async searchBangladeshEcommerce(query: string, context?: any): Promise<SearchResult[]> {
+    const mockResults: SearchResult[] = [
+      {
+        title: `${query} - Premium Quality`,
+        url: 'https://daraz.com.bd/products/...',
+        description: `High-quality ${query} with fast delivery in Bangladesh`,
+        price: { amount: 2500, currency: 'BDT', source: 'Daraz' },
+        rating: { score: 4.5, reviews: 156, source: 'Daraz' },
+        availability: 'In Stock - Dhaka',
+        seller: 'Daraz Mall',
+        trustScore: 9.2
+      },
+      {
+        title: `${query} - Best Price`,
+        url: 'https://pickaboo.com/products/...',
+        description: `Authentic ${query} with warranty and EMI facility`,
+        price: { amount: 2300, currency: 'BDT', source: 'Pickaboo' },
+        rating: { score: 4.3, reviews: 89, source: 'Pickaboo' },
+        availability: 'In Stock - Major Cities',
+        seller: 'Pickaboo Official',
+        trustScore: 8.8
+      },
+      {
+        title: `${query} - Local Seller`,
+        url: 'https://othoba.com/products/...',
+        description: `Genuine ${query} with local customer support`,
+        price: { amount: 2600, currency: 'BDT', source: 'Othoba' },
+        rating: { score: 4.1, reviews: 45, source: 'Othoba' },
+        availability: 'Limited Stock - Dhaka',
+        seller: 'Othoba Store',
+        trustScore: 8.5
+      }
+    ];
+
+    if (context?.priceRange) {
+      return mockResults.filter(result =>
+        result.price &&
+        result.price.amount >= context.priceRange!.min &&
+        result.price.amount <= context.priceRange!.max
+      );
+    }
+    return mockResults;
+  }
+
+  private async searchInternationalSources(query: string, context?: any): Promise<SearchResult[]> {
+    const mockResults: SearchResult[] = [
+      {
+        title: `${query} - Amazon Global`,
+        url: 'https://amazon.com/dp/...',
+        description: `International ${query} with global shipping`,
+        price: { amount: 1800, currency: 'BDT', source: 'Amazon (converted)' },
+        rating: { score: 4.6, reviews: 2156, source: 'Amazon' },
+        availability: 'Ships to Bangladesh (7-14 days)',
+        seller: 'Amazon',
+        trustScore: 9.8
+      },
+      {
+        title: `${query} - AliExpress`,
+        url: 'https://aliexpress.com/item/...',
+        description: `Budget-friendly ${query} with free shipping`,
+        price: { amount: 1200, currency: 'BDT', source: 'AliExpress (converted)' },
+        rating: { score: 4.2, reviews: 567, source: 'AliExpress' },
+        availability: 'Ships to Bangladesh (15-30 days)',
+        seller: 'AliExpress Seller',
+        trustScore: 8.5
+      }
+    ];
+    return mockResults;
+  }
+
+  // --- Helper & Processing Methods (Corrected for robustness) ---
+
+  private generatePriceComparison(results: SearchResult[]): any {
+    // Filter results with prices first
+    const pricedResults = results.filter(r => r.price);
+
+    if (pricedResults.length === 0) {
+       // Handle case with no priced results
+       return {
+         lowestPrice: null,
+         highestPrice: null,
+         averagePrice: 0,
+         totalSources: 0,
+         priceRange: {
+           min: 0,
+           max: 0,
+           savings: 0
+         },
+         recommendations: {
+           bestValue: null,
+           fastestDelivery: null,
+           mostTrusted: null
+         }
+       };
+    }
+
+    const prices = pricedResults
+      .map(r => ({
+        source: r.price!.source,
+        amount: r.price!.amount,
+        seller: r.seller,
+        trustScore: r.trustScore
+      }))
+      .sort((a, b) => a.amount - b.amount);
+
+    const lowest = prices[0];
+    const highest = prices[prices.length - 1];
+    const totalAmount = prices.reduce((sum, p) => sum + p.amount, 0);
+    const average = prices.length > 0 ? totalAmount / prices.length : 0; // Extra check, though length > 0 now
+
+    return {
+      lowestPrice: lowest,
+      highestPrice: highest,
+      averagePrice: Math.round(average),
+      totalSources: prices.length,
+      priceRange: {
+        min: lowest?.amount || 0,
+        max: highest?.amount || 0,
+        savings: highest && lowest ? highest.amount - lowest.amount : 0
+      },
+      recommendations: {
+        bestValue: this.getBestValueRecommendation(prices),
+        fastestDelivery: this.getFastestDeliveryOption(results),
+        mostTrusted: this.getMostTrustedSeller(results) // Pass original results
+      }
+    };
+  }
+
+  private generateSearchSummary(results: SearchResult[], request: InternetSearchRequest): any {
+    return {
+      query: request.query,
+      totalResults: results.length,
+      localResults: results.filter(r => r.url.includes('.bd')).length,
+      internationalResults: results.filter(r => !r.url.includes('.bd')).length,
+      averageRating: this.calculateAverageRating(results),
+      availabilityStatus: this.getAvailabilityStatus(results),
+      insights: {
+        marketAvailability: 'Good availability across multiple platforms',
+        priceRange: 'Competitive pricing with local and international options',
+        qualityIndicators: 'High ratings and positive reviews overall',
+        deliveryOptions: 'Same-day to international shipping available'
+      }
+    };
+  }
+
+  private detectProductCategory(query: string): string {
+    const electronics = ['phone', 'laptop', 'tablet', 'tv', 'camera', 'smartphone'];
+    const fashion = ['shirt', 'dress', 'shoe', 'bag', 'watch', 'saree', 'punjabi'];
+    const home = ['furniture', 'kitchen', 'bed', 'sofa', 'table'];
+    const queryLower = query.toLowerCase();
+    if (electronics.some(item => queryLower.includes(item))) return 'electronics';
+    if (fashion.some(item => queryLower.includes(item))) return 'fashion';
+    if (home.some(item => queryLower.includes(item))) return 'home';
+    return 'general';
+  }
+
+  private async getDetailedSpecifications(query: string, category: string): Promise<any> {
+    const mockSpecs: { [key: string]: any } = {
+      electronics: {
+        technical: {
+          processor: 'Snapdragon 888',
+          memory: '8GB RAM, 128GB Storage',
+          display: '6.7" AMOLED, 120Hz',
+          camera: '108MP + 12MP + 5MP',
+          battery: '4500mAh with fast charging'
+        },
+        features: ['5G Ready', 'Wireless Charging', 'Water Resistant', 'Dual SIM'],
+        compatibility: 'Works with all Bangladesh networks',
+        warranty: '1 year international + 1 year local'
+      },
+      fashion: {
+        materials: {
+          fabric: '100% Cotton',
+          care: 'Machine washable',
+          origin: 'Made in Bangladesh'
+        },
+        sizes: ['S', 'M', 'L', 'XL', 'XXL'],
+        colors: ['Black', 'Navy', 'White', 'Red'],
+        features: ['Wrinkle resistant', 'Color fast', 'Pre-shrunk']
+      }
+    };
+    return mockSpecs[category] || { note: 'Specifications will be gathered from reliable sources' };
+  }
+
+  private async findSpecificationSources(query: string, category: string): Promise<SearchResult[]> {
+    const mockSources: SearchResult[] = [
+      {
+        title: `${query} - Technical Specifications`,
+        url: 'https://gsmarena.com/...',
+        description: 'Detailed technical specifications and reviews',
+        availability: 'Available',
+        seller: 'GSMArena',
+        trustScore: 9.5
+      }
+    ];
+    return mockSources;
+  }
+
+  private async getBangladeshReviews(query: string): Promise<any> {
+    return {
+      sources: ['Google Reviews BD', 'Facebook Groups', 'Local Forums'],
+      totalReviews: 245,
+      averageRating: 4.3,
+      sentiment: {
+        positive: 78,
+        neutral: 15,
+        negative: 7
+      },
+      commonPraises: ['Good quality', 'Fast delivery', 'Reasonable price'],
+      commonCriticisms: ['Package quality', 'Customer service response time'],
+      language: 'Bengali & English'
+    };
+  }
+
+  private async getGlobalReviews(query: string): Promise<any> {
+    return {
+      sources: ['Amazon Reviews', 'Trustpilot', 'Google Reviews'],
+      totalReviews: 1567,
+      averageRating: 4.5,
+      sentiment: {
+        positive: 82,
+        neutral: 12,
+        negative: 6
+      },
+      commonPraises: ['Excellent build quality', 'Great performance', 'Value for money'],
+      commonCriticisms: ['Shipping time', 'Customer support'],
+      language: 'English'
+    };
+  }
+
+  private aggregateReviews(bangladeshReviews: any, globalReviews: any): any {
+    const totalReviews = (bangladeshReviews?.totalReviews || 0) + (globalReviews?.totalReviews || 0);
+    let combinedAverageRating = 0;
+    if (totalReviews > 0) {
+      const bdWeighted = (bangladeshReviews?.averageRating || 0) * (bangladeshReviews?.totalReviews || 0);
+      const globalWeighted = (globalReviews?.averageRating || 0) * (globalReviews?.totalReviews || 0);
+      combinedAverageRating = (bdWeighted + globalWeighted) / totalReviews;
+    }
+    return {
+      combined: {
+        totalReviews: totalReviews,
+        averageRating: combinedAverageRating,
+        localInsights: bangladeshReviews,
+        globalInsights: globalReviews
+      },
+      trustScore: 8.7,
+      recommendation: 'Highly recommended based on local and global reviews'
+    };
+  }
+
+  private generateReviewSummary(reviews: any): any {
+    return {
+      overallRating: reviews?.combined?.averageRating || 0,
+      totalReviews: reviews?.combined?.totalReviews || 0,
+      trustLevel: 'High',
+      keyInsights: [
+        'Strong positive feedback from both local and international users',
+        'Minor concerns about shipping times for international orders',
+        'Excellent value for money according to reviewers',
+        'Good customer support response from local sellers'
+      ],
+      recommendation: reviews?.recommendation || ''
+    };
+  }
+
+  private async getCompetitorData(query: string): Promise<any> {
+    return [
+      {
+        competitor: 'Daraz',
+        marketShare: 35,
+        pricing: 'competitive',
+        strengths: ['wide selection', 'fast delivery', 'trust'],
+        weaknesses: ['higher prices sometimes']
+      },
+      {
+        competitor: 'Pickaboo',
+        marketShare: 20,
+        pricing: 'premium',
+        strengths: ['authentic products', 'warranty'],
+        weaknesses: ['limited selection']
+      },
+      {
+        competitor: 'Amazon Global',
+        marketShare: 15,
+        pricing: 'variable',
+        strengths: ['huge selection', 'reviews'],
+        weaknesses: ['shipping time', 'import duties']
+      }
+    ];
+  }
+
+  private async getCompetitivePricing(query: string): Promise<any> {
+    return {
+      priceLeader: 'AliExpress',
+      premiumOption: 'Amazon',
+      localBest: 'Pickaboo',
+      priceTrends: {
+        last30Days: 'stable',
+        seasonality: 'increases during festivals',
+        prediction: 'slight increase expected'
+      }
+    };
+  }
+
+  private async getMarketTrends(query: string): Promise<any> {
+    return {
+      demandTrend: 'increasing',
+      popularFeatures: ['fast delivery', 'authentic products', 'competitive pricing'],
+      emergingTrends: ['mobile payment integration', 'same-day delivery', 'local seller preference'],
+      seasonalPatterns: {
+        eid: 'high demand',
+        winter: 'moderate demand',
+        monsoon: 'delivery challenges'
+      }
+    };
+  }
+
+  private generateCompetitorAnalysis(competitorData: any): any {
+    // Handle empty or invalid input
+    if (!Array.isArray(competitorData) || competitorData.length === 0) {
+        return {
+            marketLeader: null,
+            competitiveAdvantages: [],
+            marketGaps: [],
+            recommendations: []
+        };
+    }
+
+    // Find the competitor with the maximum market share
+    let maxShare = -Infinity;
+    let marketLeader = null;
+    for (const competitor of competitorData) {
+        const share = competitor?.marketShare ?? -Infinity;
+        if (share > maxShare) {
+            maxShare = share;
+            marketLeader = competitor;
+        }
+    }
+
+    // If no valid market share was found, marketLeader remains null
+    // The rest of the structure remains as per the original logic
+    return {
+      marketLeader: marketLeader,
+      competitiveAdvantages: [
+        'Local Bangladesh presence',
+        'Cultural understanding',
+        'Bengali language support',
+        'Local payment methods'
+      ],
+      marketGaps: [
+        'Better customer service',
+        'Faster delivery in remote areas',
+        'More local brand partnerships'
+      ],
+      recommendations: [
+        'Focus on customer service excellence',
+        'Expand delivery network',
+        'Partner with more local brands',
+        'Improve mobile app experience'
+      ]
+    };
+  }
+
+  // --- Corrected Helper Methods ---
+
+  private getBestValueRecommendation(prices: any[]): any {
+    if (prices.length === 0) return null; // Handle empty input
+    const bestValue = prices.find(p => p.trustScore > 8.5);
+    return bestValue !== undefined ? bestValue : prices[0]; // Return first if none meet criteria
+  }
+
+  private getFastestDeliveryOption(results: SearchResult[]): any {
+    if (results.length === 0) return null; // Handle empty input
+    // Improve logic if needed, e.g., prioritize 'same-day' over 'Stock - Dhaka'
+    return results.find(r => r.availability.includes('same-day')) ||
+           results.find(r => r.availability.includes('Stock - Dhaka')) ||
+           null; // Return null if none found
+  }
+
+  private getMostTrustedSeller(results: SearchResult[]): any {
+    if (results.length === 0) return null; // Prevent reduce error on empty array
+    return results.reduce((prev, current) =>
+      (prev.trustScore !== undefined ? prev.trustScore : -Infinity) >
+      (current.trustScore !== undefined ? current.trustScore : -Infinity) ? prev : current
+    );
+  }
+
+  private calculateAverageRating(results: SearchResult[]): number {
+    const validResults = results.filter(r => r.rating?.score !== undefined);
+    if (validResults.length === 0) return 0; // Handle no ratings
+    const totalRating = validResults.reduce((sum, r) => sum + (r.rating?.score ?? 0), 0);
+    return totalRating / validResults.length;
+  }
+
+  private getAvailabilityStatus(results: SearchResult[]): string {
+     if (results.length === 0) return 'No Results'; // Handle empty input
+     const availableCount = results.filter(r => r.availability.includes('Stock')).length;
+     const total = results.length;
+     if (total === 0) return 'No Results'; // Extra check
+     const ratio = availableCount / total;
+     if (ratio > 0.8) return 'Widely Available';
+     if (ratio > 0.5) return 'Moderately Available';
+     return 'Limited Availability';
+   }
+
+}
+```
+
+This revised code should now be free of the major errors and robustness issues identified in the forensic analyses. It maintains the mock data structure while significantly improving type safety and preventing runtime exceptions.

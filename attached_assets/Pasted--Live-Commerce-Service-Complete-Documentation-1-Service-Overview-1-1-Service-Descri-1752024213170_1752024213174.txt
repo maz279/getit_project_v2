@@ -1,0 +1,981 @@
+# Live Commerce Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Live Commerce Service enables real-time interactive shopping experiences through live streaming, allowing vendors to showcase products, interact with customers, and conduct sales in real-time. Features include live video streaming, real-time chat, instant purchasing, live auctions, and flash sales optimized for Bangladesh's mobile-first market.
+
+### 1.2 Core Responsibilities
+- **Live Streaming**: Host live product demonstrations and sales events
+- **Real-time Interaction**: Live chat, Q&A, and customer engagement
+- **Instant Purchasing**: Seamless purchasing during live streams
+- **Stream Management**: Stream scheduling, recording, and analytics
+- **Interactive Features**: Polls, quizzes, and gamification during streams
+- **Multi-platform Broadcasting**: Simultaneous streaming to multiple platforms
+
+### 1.3 Technology Stack
+```yaml
+Service: live-commerce-service
+Technology: Node.js + Express.js + Socket.io
+Streaming: WebRTC + RTMP + HLS
+Database: PostgreSQL + MongoDB + Redis
+CDN: AWS CloudFront + Adaptive Bitrate Streaming
+Real-time: Socket.io + Redis Pub/Sub
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- Live streams table
+CREATE TABLE live_streams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    stream_key VARCHAR(255) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    title_bn VARCHAR(255), -- Bangla title
+    description TEXT,
+    description_bn TEXT, -- Bangla description
+    stream_type stream_type NOT NULL,
+    category VARCHAR(100),
+    thumbnail_url VARCHAR(500),
+    cover_image_url VARCHAR(500),
+    status stream_status DEFAULT 'scheduled',
+    scheduled_start_time TIMESTAMP,
+    actual_start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration_seconds INTEGER DEFAULT 0,
+    max_viewers INTEGER DEFAULT 1000,
+    current_viewers INTEGER DEFAULT 0,
+    total_unique_viewers INTEGER DEFAULT 0,
+    peak_concurrent_viewers INTEGER DEFAULT 0,
+    is_recorded BOOLEAN DEFAULT true,
+    recording_url VARCHAR(500),
+    is_public BOOLEAN DEFAULT true,
+    is_featured BOOLEAN DEFAULT false,
+    language language_code DEFAULT 'bn',
+    tags JSONB,
+    stream_settings JSONB,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Live stream products table
+CREATE TABLE live_stream_products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    display_order INTEGER DEFAULT 0,
+    featured_timestamp TIMESTAMP,
+    special_price DECIMAL(10,2),
+    discount_percentage DECIMAL(5,2),
+    limited_quantity INTEGER,
+    sold_quantity INTEGER DEFAULT 0,
+    is_flash_sale BOOLEAN DEFAULT false,
+    flash_sale_end_time TIMESTAMP,
+    presentation_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Live stream viewers table
+CREATE TABLE live_stream_viewers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    user_id UUID REFERENCES users(id),
+    viewer_session_id VARCHAR(255) NOT NULL,
+    join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    leave_time TIMESTAMP,
+    watch_duration_seconds INTEGER DEFAULT 0,
+    device_type device_type,
+    location JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    interactions_count INTEGER DEFAULT 0,
+    purchases_made INTEGER DEFAULT 0,
+    total_spent DECIMAL(10,2) DEFAULT 0
+);
+
+-- Live stream interactions table
+CREATE TABLE live_stream_interactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    user_id UUID REFERENCES users(id),
+    interaction_type interaction_type NOT NULL,
+    content TEXT,
+    metadata JSONB,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_highlighted BOOLEAN DEFAULT false,
+    moderator_approved BOOLEAN DEFAULT true
+);
+
+-- Live stream purchases table
+CREATE TABLE live_stream_purchases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    discount_applied DECIMAL(10,2) DEFAULT 0,
+    order_id UUID REFERENCES orders(id),
+    purchase_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    payment_status payment_status DEFAULT 'pending'
+);
+
+-- Live commerce hosts table
+CREATE TABLE live_commerce_hosts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    vendor_id UUID REFERENCES vendors(id),
+    host_name VARCHAR(255) NOT NULL,
+    bio TEXT,
+    bio_bn TEXT, -- Bangla bio
+    profile_image_url VARCHAR(500),
+    specializations JSONB,
+    languages JSONB NOT NULL,
+    experience_level host_experience DEFAULT 'beginner',
+    rating DECIMAL(3,2) DEFAULT 0,
+    total_streams INTEGER DEFAULT 0,
+    total_viewers INTEGER DEFAULT 0,
+    total_sales DECIMAL(12,2) DEFAULT 0,
+    verification_status verification_status DEFAULT 'pending',
+    is_active BOOLEAN DEFAULT true,
+    commission_rate DECIMAL(5,2) DEFAULT 5.00,
+    performance_metrics JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Live stream analytics table
+CREATE TABLE live_stream_analytics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    metrics JSONB NOT NULL,
+    engagement_metrics JSONB,
+    sales_metrics JSONB,
+    audience_metrics JSONB,
+    technical_metrics JSONB,
+    calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Live stream moderators table
+CREATE TABLE live_stream_moderators (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    moderator_id UUID NOT NULL REFERENCES users(id),
+    permissions JSONB NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(stream_id, moderator_id)
+);
+
+-- Live stream notifications table
+CREATE TABLE live_stream_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    notification_type notification_type NOT NULL,
+    recipient_type recipient_type NOT NULL,
+    recipients JSONB,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    sent_at TIMESTAMP,
+    delivery_status delivery_status DEFAULT 'pending',
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Live stream recordings table
+CREATE TABLE live_stream_recordings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID NOT NULL REFERENCES live_streams(id),
+    recording_url VARCHAR(500) NOT NULL,
+    duration_seconds INTEGER NOT NULL,
+    file_size_bytes BIGINT,
+    quality_levels JSONB,
+    thumbnail_url VARCHAR(500),
+    is_processed BOOLEAN DEFAULT false,
+    is_public BOOLEAN DEFAULT true,
+    view_count INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Flash sales table
+CREATE TABLE flash_sales (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id UUID REFERENCES live_streams(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    sale_name VARCHAR(255) NOT NULL,
+    original_price DECIMAL(10,2) NOT NULL,
+    flash_price DECIMAL(10,2) NOT NULL,
+    discount_percentage DECIMAL(5,2) NOT NULL,
+    available_quantity INTEGER NOT NULL,
+    sold_quantity INTEGER DEFAULT 0,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    status flash_sale_status DEFAULT 'scheduled',
+    notification_sent BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create custom types
+CREATE TYPE stream_type AS ENUM ('product_demo', 'flash_sale', 'auction', 'tutorial', 'q_and_a', 'behind_scenes');
+CREATE TYPE stream_status AS ENUM ('scheduled', 'live', 'ended', 'cancelled', 'processing');
+CREATE TYPE language_code AS ENUM ('en', 'bn', 'mixed');
+CREATE TYPE device_type AS ENUM ('mobile', 'desktop', 'tablet', 'smart_tv');
+CREATE TYPE interaction_type AS ENUM ('message', 'like', 'heart', 'question', 'purchase_intent', 'poll_response');
+CREATE TYPE payment_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'refunded');
+CREATE TYPE host_experience AS ENUM ('beginner', 'intermediate', 'expert', 'celebrity');
+CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'rejected');
+CREATE TYPE notification_type AS ENUM ('stream_starting', 'stream_reminder', 'flash_sale_alert', 'product_available');
+CREATE TYPE recipient_type AS ENUM ('followers', 'subscribers', 'all_users', 'targeted_audience');
+CREATE TYPE delivery_status AS ENUM ('pending', 'sent', 'delivered', 'failed');
+CREATE TYPE flash_sale_status AS ENUM ('scheduled', 'active', 'ended', 'sold_out', 'cancelled');
+
+-- Create indexes
+CREATE INDEX idx_live_streams_vendor ON live_streams(vendor_id);
+CREATE INDEX idx_live_streams_status ON live_streams(status);
+CREATE INDEX idx_live_streams_scheduled_start ON live_streams(scheduled_start_time);
+CREATE INDEX idx_live_stream_viewers_stream ON live_stream_viewers(stream_id);
+CREATE INDEX idx_live_stream_interactions_stream ON live_stream_interactions(stream_id);
+CREATE INDEX idx_live_stream_purchases_stream ON live_stream_purchases(stream_id);
+CREATE INDEX idx_flash_sales_start_time ON flash_sales(start_time);
+CREATE INDEX idx_flash_sales_status ON flash_sales(status);
+```
+
+### 2.2 MongoDB Collections
+```javascript
+// Real-time stream data
+{
+    _id: ObjectId,
+    stream_id: "uuid",
+    current_metrics: {
+        viewers: 245,
+        likes: 1250,
+        messages: 89,
+        purchases: 23,
+        revenue: 15000.00
+    },
+    viewer_locations: {
+        "Dhaka": 150,
+        "Chittagong": 60,
+        "Sylhet": 35
+    },
+    engagement_timeline: [
+        {
+            timestamp: ISODate,
+            metric: "viewer_count",
+            value: 245
+        }
+    ],
+    hot_products: [
+        {
+            product_id: "uuid",
+            mentions: 15,
+            purchase_intent: 8,
+            actual_purchases: 5
+        }
+    ],
+    chat_sentiment: {
+        positive: 0.7,
+        neutral: 0.2,
+        negative: 0.1
+    },
+    updated_at: ISODate
+}
+
+// Live chat messages
+{
+    _id: ObjectId,
+    stream_id: "uuid",
+    user_id: "uuid",
+    username: "john_doe",
+    message: "When will the iPhone be available?",
+    message_type: "text", // text, emoji, sticker, product_inquiry
+    timestamp: ISODate,
+    is_highlighted: false,
+    moderator_approved: true,
+    replies: [
+        {
+            user_id: "host_uuid",
+            username: "host_sarah",
+            message: "iPhone will be featured in 5 minutes!",
+            timestamp: ISODate
+        }
+    ],
+    sentiment_score: 0.8,
+    language: "en"
+}
+
+// Stream quality metrics
+{
+    _id: ObjectId,
+    stream_id: "uuid",
+    timestamp: ISODate,
+    quality_metrics: {
+        bitrate: 2500, // kbps
+        fps: 30,
+        resolution: "1280x720",
+        latency: 2.5, // seconds
+        packet_loss: 0.1, // percentage
+        buffering_events: 3
+    },
+    viewer_quality_stats: {
+        "1080p": 45, // viewer count
+        "720p": 120,
+        "480p": 80
+    },
+    network_stats: {
+        bandwidth_usage: 850, // MB
+        cdn_cache_hit_ratio: 0.92
+    }
+}
+
+// Product interaction tracking
+{
+    _id: ObjectId,
+    stream_id: "uuid",
+    product_id: "uuid",
+    interactions: [
+        {
+            user_id: "uuid",
+            type: "view",
+            timestamp: ISODate,
+            context: "featured_in_stream"
+        },
+        {
+            user_id: "uuid",
+            type: "add_to_cart",
+            timestamp: ISODate,
+            quantity: 2
+        }
+    ],
+    conversion_funnel: {
+        views: 150,
+        add_to_cart: 45,
+        purchases: 23,
+        conversion_rate: 0.15
+    }
+}
+```
+
+### 2.3 Redis Schema
+```javascript
+// Real-time viewer count
+STREAM_VIEWERS:{stream_id} = SET[user_id1, user_id2, ...]
+
+// Live chat room
+STREAM_CHAT:{stream_id} = LIST[message1, message2, ...]
+
+// Stream status
+STREAM_STATUS:{stream_id} = {
+    status: "live",
+    viewers: 245,
+    start_time: timestamp,
+    featured_product: "product_uuid"
+}
+
+// Real-time metrics
+STREAM_METRICS:{stream_id} = {
+    total_viewers: 1250,
+    current_viewers: 245,
+    likes: 890,
+    messages: 445,
+    purchases: 67,
+    revenue: 25000.00
+}
+
+// Flash sale countdown
+FLASH_SALE:{sale_id} = {
+    end_time: timestamp,
+    remaining_quantity: 15,
+    current_price: 1200.00
+}
+
+// Trending streams
+TRENDING_STREAMS = SORTED_SET[stream_id:engagement_score]
+
+// Host availability
+HOST_STATUS:{host_id} = {
+    status: "live", // available, live, offline
+    current_stream: "stream_uuid",
+    next_scheduled: timestamp
+}
+```
+
+## 3. Folder Structure
+
+```
+live-commerce-service/
+├── src/
+│   ├── controllers/
+│   │   ├── live-stream-controller.js       # Live stream management
+│   │   ├── stream-interaction-controller.js # Real-time interactions
+│   │   ├── live-purchase-controller.js     # Live commerce transactions
+│   │   ├── host-controller.js              # Host management
+│   │   ├── flash-sale-controller.js        # Flash sale management
+│   │   ├── stream-analytics-controller.js  # Stream analytics
+│   │   └── admin-controller.js             # Admin stream management
+│   ├── models/
+│   │   ├── LiveStream.js                   # Live stream model
+│   │   ├── LiveStreamProduct.js            # Stream product model
+│   │   ├── LiveStreamViewer.js             # Viewer model
+│   │   ├── LiveStreamInteraction.js        # Interaction model
+│   │   ├── LiveCommercePurchase.js         # Live purchase model
+│   │   ├── LiveCommerceHost.js             # Host model
+│   │   ├── FlashSale.js                    # Flash sale model
+│   │   └── StreamRecording.js              # Recording model
+│   ├── routes/
+│   │   ├── live-stream-routes.js           # Stream management endpoints
+│   │   ├── stream-viewer-routes.js         # Viewer endpoints
+│   │   ├── live-purchase-routes.js         # Live purchase endpoints
+│   │   ├── host-routes.js                  # Host management endpoints
+│   │   ├── flash-sale-routes.js            # Flash sale endpoints
+│   │   └── admin-routes.js                 # Admin endpoints
+│   ├── services/
+│   │   ├── live-stream-service.js          # Stream lifecycle management
+│   │   ├── streaming-service.js            # Video streaming service
+│   │   ├── chat-service.js                 # Real-time chat service
+│   │   ├── live-purchase-service.js        # Live purchase processing
+│   │   ├── host-service.js                 # Host management service
+│   │   ├── flash-sale-service.js           # Flash sale service
+│   │   ├── content-moderation-service.js   # Live content moderation
+│   │   ├── analytics-service.js            # Live analytics service
+│   │   └── notification-service.js         # Live notifications
+│   ├── middleware/
+│   │   ├── stream-auth.js                  # Stream authentication
+│   │   ├── host-verification.js            # Host verification
+│   │   ├── stream-access.js                # Stream access control
+│   │   ├── rate-limiting.js                # Interaction rate limiting
+│   │   └── content-filtering.js            # Real-time content filtering
+│   ├── websocket/
+│   │   ├── stream-socket.js                # Main stream WebSocket handler
+│   │   ├── chat-socket.js                  # Live chat WebSocket
+│   │   ├── viewer-socket.js                # Viewer interaction WebSocket
+│   │   ├── host-socket.js                  # Host control WebSocket
+│   │   └── admin-socket.js                 # Admin monitoring WebSocket
+│   ├── streaming/
+│   │   ├── rtmp-server.js                  # RTMP streaming server
+│   │   ├── webrtc-handler.js               # WebRTC peer connections
+│   │   ├── hls-processor.js                # HLS stream processing
+│   │   ├── stream-transcoder.js            # Video transcoding
+│   │   ├── adaptive-bitrate.js             # Adaptive bitrate streaming
+│   │   └── cdn-integration.js              # CDN integration
+│   ├── utils/
+│   │   ├── stream-utils.js                 # Stream utility functions
+│   │   ├── video-processing.js             # Video processing utilities
+│   │   ├── engagement-calculator.js        # Engagement metrics calculation
+│   │   ├── recommendation-engine.js        # Stream recommendation engine
+│   │   └── time-utils.js                   # Time zone utilities
+│   ├── ai/
+│   │   ├── auto-highlight-generator.js     # Auto-generate stream highlights
+│   │   ├── product-recommendation-ai.js    # AI product recommendations
+│   │   ├── engagement-optimizer.js         # AI engagement optimization
+│   │   ├── chat-sentiment-analyzer.js      # Real-time chat sentiment
+│   │   └── fraud-detection.js              # Live commerce fraud detection
+│   ├── config/
+│   │   ├── streaming-config.js             # Streaming configuration
+│   │   ├── webrtc-config.js                # WebRTC configuration
+│   │   ├── cdn-config.js                   # CDN configuration
+│   │   ├── moderation-config.js            # Content moderation settings
+│   │   └── analytics-config.js             # Analytics configuration
+│   └── app.js                              # Express + Socket.io setup
+├── bangladesh-features/                    # Bangladesh-specific features
+│   ├── local-language-streaming.js        # Bengali live streaming
+│   ├── cultural-product-categories.js     # Cultural product showcases
+│   ├── festival-themed-streams.js         # Festival-specific live events
+│   ├── mobile-optimized-streaming.js      # Mobile-first streaming optimization
+│   └── local-payment-integration.js       # bKash, Nagad live payments
+├── streaming-infrastructure/               # Streaming infrastructure
+│   ├── load-balancer/
+│   │   ├── stream-load-balancer.js         # Stream load balancing
+│   │   ├── geographic-routing.js           # Geographic stream routing
+│   │   └── failover-handler.js             # Stream failover handling
+│   ├── encoding/
+│   │   ├── video-encoder.js                # Video encoding pipeline
+│   │   ├── audio-encoder.js                # Audio encoding pipeline
+│   │   ├── quality-optimizer.js            # Quality optimization
+│   │   └── bandwidth-adapter.js            # Bandwidth adaptive streaming
+│   ├── recording/
+│   │   ├── stream-recorder.js              # Stream recording service
+│   │   ├── highlight-extractor.js          # Auto-extract highlights
+│   │   ├── thumbnail-generator.js          # Thumbnail generation
+│   │   └── video-editor.js                 # Basic video editing
+│   └── monitoring/
+│       ├── stream-health-monitor.js        # Stream health monitoring
+│       ├── quality-monitor.js              # Video quality monitoring
+│       ├── latency-monitor.js              # Latency monitoring
+│       └── viewer-experience-monitor.js    # Viewer experience tracking
+├── commerce-integration/                   # Commerce integration
+│   ├── live-cart-manager.js               # Live shopping cart management
+│   ├── instant-checkout.js                # One-click checkout during streams
+│   ├── inventory-coordinator.js           # Real-time inventory coordination
+│   ├── payment-processor.js               # Live payment processing
+│   ├── order-fulfillment.js               # Instant order fulfillment
+│   └── return-refund-handler.js            # Live commerce returns/refunds
+├── gamification/                           # Live stream gamification
+│   ├── live-polls.js                       # Live polls and voting
+│   ├── quiz-system.js                      # Interactive quizzes
+│   ├── loyalty-points.js                   # Live loyalty point earning
+│   ├── virtual-gifts.js                    # Virtual gift system
+│   └── leaderboards.js                     # Viewer leaderboards
+├── moderation/                             # Live content moderation
+│   ├── automated-moderation.js            # AI-powered moderation
+│   ├── real-time-filtering.js             # Real-time content filtering
+│   ├── moderator-tools.js                 # Moderator dashboard tools
+│   ├── spam-detection.js                  # Live spam detection
+│   └── community-guidelines.js            # Community guidelines enforcement
+├── analytics/                             # Live stream analytics
+│   ├── real-time-analytics.js             # Real-time engagement analytics
+│   ├── viewer-behavior-analytics.js       # Viewer behavior analysis
+│   ├── conversion-analytics.js            # Live commerce conversion tracking
+│   ├── content-performance.js             # Content performance metrics
+│   └── roi-calculator.js                  # Live commerce ROI calculation
+├── tests/
+│   ├── unit/
+│   │   ├── live-stream-service.test.js
+│   │   ├── streaming-service.test.js
+│   │   ├── chat-service.test.js
+│   │   ├── live-purchase.test.js
+│   │   └── flash-sale.test.js
+│   ├── integration/
+│   │   ├── live-commerce-flow.test.js
+│   │   ├── streaming-integration.test.js
+│   │   └── real-time-interaction.test.js
+│   └── load/
+│       ├── concurrent-viewers.test.js
+│       ├── chat-load.test.js
+│       └── streaming-performance.test.js
+├── localization/                           # Multi-language support
+│   ├── en/
+│   │   ├── live-stream-messages.json       # English live stream messages
+│   │   ├── chat-moderation.json            # English moderation messages
+│   │   └── commerce-messages.json          # English commerce messages
+│   └── bn/                                # Bangla translations
+│       ├── live-stream-messages.json       # Bangla live stream messages
+│       ├── chat-moderation.json            # Bangla moderation messages
+│       └── commerce-messages.json          # Bangla commerce messages
+├── documentation/                          # Live commerce documentation
+│   ├── api-documentation/
+│   │   ├── live-stream-apis.md
+│   │   ├── real-time-apis.md
+│   │   └── commerce-apis.md
+│   ├── integration-guides/
+│   │   ├── streaming-setup.md
+│   │   ├── host-onboarding.md
+│   │   └── commerce-integration.md
+│   └── best-practices/
+│       ├── live-streaming-guide.md
+│       ├── engagement-strategies.md
+│       └── technical-requirements.md
+├── docker-compose.yml                      # Multi-service composition
+├── Dockerfile                             # Docker configuration
+├── package.json                           # Node.js dependencies
+└── README.md                              # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 Live Stream Management APIs
+```javascript
+// Create live stream
+POST /api/v1/live-commerce/streams
+Body: {
+    title: "iPhone 14 Pro Flash Sale",
+    title_bn: "আইফোন ১৪ প্রো ফ্ল্যাশ সেল",
+    description: "Exclusive flash sale with 20% discount",
+    stream_type: "flash_sale",
+    category: "electronics",
+    scheduled_start_time: "2024-03-17T19:00:00Z",
+    products: [
+        {
+            product_id: "uuid",
+            special_price: 95000.00,
+            limited_quantity: 50
+        }
+    ],
+    is_public: true,
+    language: "bn"
+}
+
+// Get live streams
+GET /api/v1/live-commerce/streams
+Query: ?status=live&category=electronics&page=1&limit=20
+Response: {
+    streams: [
+        {
+            id: "uuid",
+            title: "iPhone 14 Pro Flash Sale",
+            host: {
+                name: "Sarah Khan",
+                profile_image_url: "..."
+            },
+            status: "live",
+            current_viewers: 245,
+            thumbnail_url: "...",
+            started_at: "2024-03-17T19:00:00Z",
+            featured_products: [...]
+        }
+    ],
+    total_count: 15,
+    trending_streams: [...],
+    featured_streams: [...]
+}
+
+// Start live stream
+POST /api/v1/live-commerce/streams/:stream_id/start
+Response: {
+    stream_key: "live_abc123xyz",
+    rtmp_url: "rtmp://live.getit.com.bd/live",
+    stream_url: "https://live.getit.com.bd/stream/abc123xyz",
+    chat_room_id: "chat_uuid"
+}
+
+// End live stream
+POST /api/v1/live-commerce/streams/:stream_id/end
+Body: {
+    summary: "Great stream! Sold 45 out of 50 iPhones.",
+    auto_generate_highlights: true
+}
+
+// Get stream details
+GET /api/v1/live-commerce/streams/:stream_id
+Response: {
+    id: "uuid",
+    title: "iPhone 14 Pro Flash Sale",
+    host: {...},
+    status: "live",
+    viewer_stats: {
+        current_viewers: 245,
+        peak_viewers: 320,
+        total_unique_viewers: 850
+    },
+    engagement_stats: {
+        total_likes: 1250,
+        total_messages: 445,
+        average_watch_time: 12.5 // minutes
+    },
+    sales_stats: {
+        total_purchases: 45,
+        total_revenue: 4275000.00,
+        conversion_rate: 0.053
+    }
+}
+```
+
+### 4.2 Real-time Interaction APIs
+```javascript
+// WebSocket connection for live stream
+const socket = io('/live-stream', {
+    auth: { token: 'jwt_token' }
+});
+
+// Join stream
+socket.emit('join_stream', {
+    stream_id: 'uuid',
+    viewer_info: {
+        device_type: 'mobile',
+        location: 'Dhaka'
+    }
+});
+
+// Send chat message
+socket.emit('send_message', {
+    stream_id: 'uuid',
+    message: 'When will the iPhone be available?',
+    message_type: 'text'
+});
+
+// React to stream (like, heart, etc.)
+socket.emit('react', {
+    stream_id: 'uuid',
+    reaction_type: 'like'
+});
+
+// Express purchase intent
+socket.emit('purchase_intent', {
+    stream_id: 'uuid',
+    product_id: 'uuid',
+    quantity: 1
+});
+
+// Real-time events received
+socket.on('new_message', (data) => {
+    console.log('New chat message:', data);
+});
+
+socket.on('viewer_count_update', (data) => {
+    console.log('Current viewers:', data.count);
+});
+
+socket.on('product_featured', (data) => {
+    console.log('Product now featured:', data.product);
+});
+
+socket.on('flash_sale_started', (data) => {
+    console.log('Flash sale started:', data);
+});
+```
+
+### 4.3 Live Commerce APIs
+```javascript
+// Add product to live cart during stream
+POST /api/v1/live-commerce/cart/add
+Body: {
+    stream_id: "uuid",
+    product_id: "uuid",
+    quantity: 2,
+    special_price: 47500.00
+}
+
+// Instant checkout during live stream
+POST /api/v1/live-commerce/checkout/instant
+Body: {
+    stream_id: "uuid",
+    cart_items: [
+        {
+            product_id: "uuid",
+            quantity: 1,
+            price: 95000.00
+        }
+    ],
+    payment_method: "bkash",
+    shipping_address: {...},
+    live_discount_code: "LIVE20"
+}
+
+// Get live stream exclusive deals
+GET /api/v1/live-commerce/streams/:stream_id/deals
+Response: {
+    active_deals: [
+        {
+            product_id: "uuid",
+            product_name: "iPhone 14 Pro",
+            original_price: 120000.00,
+            live_price: 95000.00,
+            discount_percentage: 20.83,
+            available_quantity: 5,
+            sale_end_time: "2024-03-17T20:30:00Z"
+        }
+    ],
+    upcoming_deals: [...],
+    expired_deals: [...]
+}
+
+// Create flash sale during stream
+POST /api/v1/live-commerce/flash-sales
+Body: {
+    stream_id: "uuid",
+    product_id: "uuid",
+    flash_price: 85000.00,
+    available_quantity: 20,
+    duration_minutes: 30,
+    announcement_message: "Flash Sale: iPhone 14 Pro for 85,000 BDT!"
+}
+```
+
+### 4.4 Host Management APIs
+```javascript
+// Apply to become live commerce host
+POST /api/v1/live-commerce/hosts/apply
+Body: {
+    host_name: "Sarah Khan",
+    bio: "Tech enthusiast and product reviewer",
+    bio_bn: "প্রযুক্তি উৎসাহী এবং পণ্য পর্যালোচনাকারী",
+    specializations: ["electronics", "fashion", "beauty"],
+    languages: ["bn", "en"],
+    experience_level: "intermediate",
+    portfolio_links: ["https://youtube.com/sarahtech"],
+    sample_videos: ["video_url1", "video_url2"]
+}
+
+// Get host dashboard
+GET /api/v1/live-commerce/hosts/dashboard
+Response: {
+    host_info: {...},
+    performance_summary: {
+        total_streams: 25,
+        total_viewers: 15000,
+        total_sales: 250000.00,
+        average_rating: 4.6,
+        conversion_rate: 0.045
+    },
+    upcoming_streams: [...],
+    pending_approvals: [...],
+    earnings_summary: {
+        this_month: 12500.00,
+        last_month: 11200.00,
+        total_earnings: 75000.00
+    }
+}
+
+// Schedule new stream
+POST /api/v1/live-commerce/hosts/schedule-stream
+Body: {
+    title: "Weekly Tech Reviews",
+    scheduled_start_time: "2024-03-20T19:00:00Z",
+    estimated_duration: 60, // minutes
+    products_to_feature: ["product_uuid1", "product_uuid2"],
+    stream_type: "product_demo"
+}
+
+// Update host availability
+PUT /api/v1/live-commerce/hosts/availability
+Body: {
+    status: "available", // available, busy, offline
+    next_available: "2024-03-18T10:00:00Z",
+    weekly_schedule: {
+        "monday": ["19:00", "21:00"],
+        "wednesday": ["20:00", "22:00"],
+        "saturday": ["15:00", "17:00"]
+    }
+}
+```
+
+### 4.5 Analytics APIs
+```javascript
+// Get stream analytics
+GET /api/v1/live-commerce/streams/:stream_id/analytics
+Response: {
+    overview: {
+        total_viewers: 850,
+        peak_concurrent: 320,
+        average_watch_time: 12.5, // minutes
+        total_engagement: 1695, // likes + messages
+        total_purchases: 45,
+        revenue: 4275000.00
+    },
+    viewer_demographics: {
+        by_location: {
+            "Dhaka": 450,
+            "Chittagong": 200,
+            "Sylhet": 120,
+            "Other": 80
+        },
+        by_age_group: {
+            "18-24": 0.35,
+            "25-34": 0.45,
+            "35-44": 0.20
+        },
+        by_device: {
+            "mobile": 0.75,
+            "desktop": 0.20,
+            "tablet": 0.05
+        }
+    },
+    engagement_timeline: [
+        {
+            timestamp: "2024-03-17T19:00:00Z",
+            viewers: 50,
+            interactions: 15
+        }
+    ],
+    sales_analytics: {
+        conversion_funnel: {
+            viewers: 850,
+            product_views: 425,
+            cart_adds: 120,
+            purchases: 45
+        },
+        revenue_by_product: [...],
+        average_order_value: 95000.00
+    }
+}
+
+// Get host performance analytics
+GET /api/v1/live-commerce/hosts/:host_id/analytics
+Query: ?period=30d&metrics=all
+Response: {
+    performance_metrics: {
+        total_streams: 8,
+        total_watch_time: 2400, // minutes
+        average_viewers_per_stream: 185,
+        engagement_rate: 0.24,
+        conversion_rate: 0.048,
+        revenue_generated: 380000.00
+    },
+    growth_metrics: {
+        follower_growth: 0.15, // 15% growth
+        viewership_growth: 0.22,
+        revenue_growth: 0.18
+    },
+    top_performing_streams: [...],
+    improvement_suggestions: [
+        "Try streaming during peak hours (7-9 PM)",
+        "Increase product interaction time",
+        "Use more engaging titles"
+    ]
+}
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local Language Support
+- **Bengali Live Streaming**: Native Bengali commentary and interaction
+- **Bilingual Chat**: Support both Bengali and English in chat
+- **Cultural Context**: Understanding of local cultural references
+- **Regional Accents**: Support for different regional Bengali accents
+- **Mixed Language**: Handle code-switching between Bengali and English
+
+### 5.2 Mobile-First Optimization
+- **Low-Bandwidth Streaming**: Optimized for 2G/3G networks
+- **Adaptive Quality**: Automatic quality adjustment based on connection
+- **Vertical Video Support**: Portrait mode streaming for mobile viewers
+- **Touch-Optimized Controls**: Mobile-friendly interaction controls
+- **Offline Viewing**: Download highlights for offline viewing
+
+### 5.3 Cultural Commerce Features
+- **Festival-Themed Streams**: Special streams during Eid, Durga Puja
+- **Traditional Product Showcases**: Dedicated streams for traditional items
+- **Religious Considerations**: Respectful handling of religious products
+- **Local Celebrity Hosts**: Integration with local influencers and celebrities
+- **Community Events**: Group viewing events for special occasions
+
+### 5.4 Payment Integration
+- **Mobile Banking**: Instant payments via bKash, Nagad, Rocket during streams
+- **Cash on Delivery**: COD options for live commerce purchases
+- **Installment Options**: EMI options for high-value items
+- **Group Buying**: Coordinate group purchases during streams
+- **Live Payment Confirmations**: Real-time payment confirmation in chat
+
+## 6. Technical Features
+
+### 6.1 Streaming Technology
+- **Adaptive Bitrate Streaming**: Multiple quality levels based on bandwidth
+- **Low Latency**: Sub-2 second latency for real-time interaction
+- **Global CDN**: Fast delivery across Bangladesh and internationally
+- **Multi-Protocol Support**: RTMP, WebRTC, HLS support
+- **Auto-Scaling**: Automatic scaling for high viewer counts
+
+### 6.2 Real-time Features
+- **Live Chat**: Real-time chat with moderation
+- **Live Reactions**: Instant likes, hearts, and emoji reactions
+- **Live Polls**: Interactive polls during streams
+- **Real-time Analytics**: Live viewer and engagement metrics
+- **Push Notifications**: Instant notifications for stream events
+
+### 6.3 Commerce Integration
+- **One-Click Purchase**: Instant buying during streams
+- **Live Inventory**: Real-time inventory updates
+- **Dynamic Pricing**: Live price changes and flash sales
+- **Cart Abandonment Recovery**: Real-time cart reminder notifications
+- **Live Customer Support**: Instant support during shopping
+
+## 7. Monetization Features
+
+### 7.1 Revenue Streams
+- **Commission on Sales**: Percentage of live commerce sales
+- **Host Revenue Sharing**: Revenue sharing with hosts
+- **Premium Streaming**: Paid premium streams with exclusive content
+- **Virtual Gifts**: Virtual gift system for viewer engagement
+- **Sponsored Streams**: Sponsored content and product placements
+
+### 7.2 Analytics & Insights
+- **Revenue Tracking**: Real-time revenue monitoring
+- **ROI Calculation**: Return on investment for live commerce
+- **Customer Lifetime Value**: CLV tracking for live commerce customers
+- **Host Performance**: Host-specific performance and earnings tracking
+- **Product Performance**: Product-wise sales and engagement analytics
+
+This comprehensive live commerce service enables engaging, interactive shopping experiences through live streaming, optimized for Bangladesh's mobile-first market with strong cultural awareness and local payment integration.

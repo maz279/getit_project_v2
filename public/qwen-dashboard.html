@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen 3 Coder - AI Coding Assistant Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Reset and base styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; }
+        
+        /* Utility classes */
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .bg-gray-50 { background-color: #f9fafb; }
+        .bg-white { background-color: #ffffff; }
+        .bg-blue-600 { background-color: #2563eb; }
+        .bg-green-600 { background-color: #16a34a; }
+        .bg-red-600 { background-color: #dc2626; }
+        .bg-purple-600 { background-color: #9333ea; }
+        .bg-yellow-600 { background-color: #ca8a04; }
+        .bg-indigo-600 { background-color: #4f46e5; }
+        .bg-blue-100 { background-color: #dbeafe; }
+        .bg-green-100 { background-color: #dcfce7; }
+        .bg-red-100 { background-color: #fee2e2; }
+        .bg-purple-100 { background-color: #f3e8ff; }
+        .bg-yellow-100 { background-color: #fef3c7; }
+        .bg-indigo-100 { background-color: #e0e7ff; }
+        .bg-gray-100 { background-color: #f3f4f6; }
+        
+        .text-white { color: #ffffff; }
+        .text-gray-800 { color: #1f2937; }
+        .text-gray-600 { color: #4b5563; }
+        .text-gray-700 { color: #374151; }
+        .text-blue-600 { color: #2563eb; }
+        .text-green-600 { color: #16a34a; }
+        .text-red-600 { color: #dc2626; }
+        .text-purple-600 { color: #9333ea; }
+        .text-yellow-600 { color: #ca8a04; }
+        .text-indigo-600 { color: #4f46e5; }
+        .text-blue-100 { color: #dbeafe; }
+        .text-green-800 { color: #166534; }
+        
+        /* Layout */
+        .min-h-screen { min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-full { border-radius: 9999px; }
+        
+        /* Spacing */
+        .p-1 { padding: 0.25rem; } .p-2 { padding: 0.5rem; } .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; } .p-6 { padding: 1.5rem; } .p-8 { padding: 2rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .m-0 { margin: 0; } .mb-2 { margin-bottom: 0.5rem; } .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; } .mb-6 { margin-bottom: 1.5rem; } .mb-8 { margin-bottom: 2rem; }
+        .mt-6 { margin-top: 1.5rem; } .mt-8 { margin-top: 2rem; } .mr-2 { margin-right: 0.5rem; }
+        
+        /* Flexbox */
+        .flex { display: flex; } .inline-flex { display: inline-flex; }
+        .items-center { align-items: center; } .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; } .space-x-2 > * + * { margin-left: 0.5rem; }
+        .space-x-3 > * + * { margin-left: 0.75rem; } .space-x-4 > * + * { margin-left: 1rem; }
+        .space-y-4 > * + * { margin-top: 1rem; }
+        
+        /* Grid */
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .gap-4 { gap: 1rem; } .gap-6 { gap: 1.5rem; }
+        
+        /* Typography */
+        .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; }
+        .text-base { font-size: 1rem; } .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; } .text-2xl { font-size: 1.5rem; }
+        .text-3xl { font-size: 1.875rem; }
+        .font-medium { font-weight: 500; } .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        
+        /* Sizing */
+        .w-12 { width: 3rem; } .h-12 { height: 3rem; } .w-full { width: 100%; }
+        .h-8 { height: 2rem; } .w-8 { width: 2rem; }
+        
+        /* Positioning */
+        .fixed { position: fixed; } .relative { position: relative; }
+        .top-16 { top: 4rem; } .left-4 { left: 1rem; }
+        
+        /* Border */
+        .border { border: 1px solid #d1d5db; } .border-gray-300 { border-color: #d1d5db; }
+        
+        /* Animations and transitions */
+        .transition { transition: all 0.15s ease-in-out; }
+        .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* Interactive states */
+        .hover\\:bg-blue-700:hover { background-color: #1d4ed8; }
+        .hover\\:bg-green-700:hover { background-color: #15803d; }
+        .hover\\:bg-red-700:hover { background-color: #b91c1c; }
+        .hover\\:bg-purple-700:hover { background-color: #7c3aed; }
+        .hover\\:bg-yellow-700:hover { background-color: #a16207; }
+        .hover\\:bg-indigo-700:hover { background-color: #3730a3; }
+        .hover\\:text-gray-700:hover { color: #374151; }
+        .hover\\:text-blue-800:hover { color: #1e40af; }
+        .focus\\:ring-2:focus { outline: 2px solid transparent; box-shadow: 0 0 0 2px #3b82f6; }
+        .focus\\:border-transparent:focus { border-color: transparent; }
+        
+        /* Utility */
+        .loading { display: none; }
+        .result-container { max-height: 400px; overflow-y: auto; }
+        .whitespace-pre-wrap { white-space: pre-wrap; }
+        .text-center { text-align: center; }
+        .cursor-pointer { cursor: pointer; }
+        .overflow-y-auto { overflow-y: auto; }
+        
+        /* Additional missing styles */
+        .bg-green-500 { background-color: #22c55e; }
+        .bg-gray-200 { background-color: #e5e7eb; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .md\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1024px) {
+            .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .lg\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-robot text-3xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Qwen 3 Coder AI Assistant</h1>
+                        <p class="text-blue-100">GetIt Bangladesh Platform • 256K Context Window</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="px-3 py-1 bg-green-500 rounded-full text-sm">✅ Connected</span>
+                    <a href="/" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition">← Back to App</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- Quick Actions Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            
+            <!-- Codebase Analysis -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-search text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Analyze Codebase</h3>
+                        <p class="text-gray-600 text-sm">Full repository analysis</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Comprehensive analysis of your entire GetIt Bangladesh platform with architectural insights.</p>
+                <button onclick="analyzeCodebase()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium">
+                    <i class="fas fa-analytics mr-2"></i>Start Analysis
+                </button>
+            </div>
+
+            <!-- Code Generation -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-code text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Generate Code</h3>
+                        <p class="text-gray-600 text-sm">AI-powered code creation</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Generate components, functions, and features following your project patterns.</p>
+                <button onclick="showCodeGenerator()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-medium">
+                    <i class="fas fa-magic mr-2"></i>Generate Code
+                </button>
+            </div>
+
+            <!-- Bug Detection -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-bug text-red-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Find Bugs</h3>
+                        <p class="text-gray-600 text-sm">Automated bug detection</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Identify potential issues, security vulnerabilities, and performance problems.</p>
+                <button onclick="findBugs()" class="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-medium">
+                    <i class="fas fa-shield-alt mr-2"></i>Scan for Bugs
+                </button>
+            </div>
+
+            <!-- Architecture Review -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-sitemap text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Architecture Review</h3>
+                        <p class="text-gray-600 text-sm">System design analysis</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Get recommendations for scalability, performance, and maintainability.</p>
+                <button onclick="reviewArchitecture()" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition font-medium">
+                    <i class="fas fa-chart-line mr-2"></i>Review Architecture
+                </button>
+            </div>
+
+            <!-- File Review -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-file-code text-yellow-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Review File</h3>
+                        <p class="text-gray-600 text-sm">Specific file analysis</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Deep dive into specific files for detailed code review and suggestions.</p>
+                <button onclick="showFileReview()" class="w-full bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition font-medium">
+                    <i class="fas fa-magnifying-glass mr-2"></i>Review File
+                </button>
+            </div>
+
+            <!-- Interactive Q&A -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-comments text-indigo-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Ask Questions</h3>
+                        <p class="text-gray-600 text-sm">Interactive chat assistance</p>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">Ask specific questions about your codebase, get explanations, and receive guidance.</p>
+                <button onclick="showQnA()" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-medium">
+                    <i class="fas fa-question-circle mr-2"></i>Start Chat
+                </button>
+            </div>
+        </div>
+
+        <!-- Interactive Panel -->
+        <div id="interactivePanel" class="bg-white rounded-xl shadow-lg p-6" style="display: none;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="panelTitle" class="text-xl font-semibold text-gray-800"></h3>
+                <button onclick="closePanel()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Code Generator Form -->
+            <div id="codeGeneratorForm" style="display: none;">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Describe what you want to generate:</label>
+                        <textarea id="codePrompt" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="e.g., Create a product comparison component with rating stars"></textarea>
+                    </div>
+                    <button onclick="generateCode()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-magic mr-2"></i>Generate Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- File Review Form -->
+            <div id="fileReviewForm" style="display: none;">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">File path to review:</label>
+                        <input type="text" id="filePath" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-transparent" placeholder="e.g., client/src/app/App.tsx">
+                    </div>
+                    <button onclick="reviewFile()" class="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition">
+                        <i class="fas fa-magnifying-glass mr-2"></i>Review File
+                    </button>
+                </div>
+            </div>
+
+            <!-- Q&A Form -->
+            <div id="qnaForm" style="display: none;">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Ask a question about your codebase:</label>
+                        <textarea id="question" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="e.g., How can I optimize the search performance?"></textarea>
+                    </div>
+                    <button onclick="askQuestion()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                        <i class="fas fa-question-circle mr-2"></i>Ask Question
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="loading" class="loading text-center py-8">
+                <div class="inline-flex items-center space-x-2">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span class="text-gray-600">Processing with Qwen 3 Coder...</span>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="results" class="result-container mt-6" style="display: none;">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i class="fas fa-robot text-blue-600"></i>
+                        <span class="font-medium text-gray-800">Qwen 3 Coder Response:</span>
+                    </div>
+                    <div id="responseText" class="text-gray-700 whitespace-pre-wrap"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mt-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">🔗 Quick Access Links</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <a href="/qwen-coder.html" target="_blank" class="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition">
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Original Interface</span>
+                </a>
+                <a href="#" onclick="window.open('https://modelstudio.console.alibabacloud.com/', '_blank')" class="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition">
+                    <i class="fas fa-cloud"></i>
+                    <span>Alibaba Cloud Console</span>
+                </a>
+                <a href="#" onclick="openReplit()" class="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition">
+                    <i class="fas fa-code"></i>
+                    <span>Replit Editor</span>
+                </a>
+                <a href="/api/qwen-coder/health" target="_blank" class="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition">
+                    <i class="fas fa-heartbeat"></i>
+                    <span>API Status</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Usage Stats -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mt-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">📊 Session Stats</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600" id="analysisCount">0</div>
+                    <div class="text-gray-600 text-sm">Analyses</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600" id="generationCount">0</div>
+                    <div class="text-gray-600 text-sm">Code Generated</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-red-600" id="bugCount">0</div>
+                    <div class="text-gray-600 text-sm">Bug Scans</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-purple-600" id="questionCount">0</div>
+                    <div class="text-gray-600 text-sm">Questions Asked</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stats = { analysis: 0, generation: 0, bugs: 0, questions: 0 };
+
+        function updateStats() {
+            document.getElementById('analysisCount').textContent = stats.analysis;
+            document.getElementById('generationCount').textContent = stats.generation;
+            document.getElementById('bugCount').textContent = stats.bugs;
+            document.getElementById('questionCount').textContent = stats.questions;
+        }
+
+        function showPanel(title) {
+            document.getElementById('panelTitle').textContent = title;
+            document.getElementById('interactivePanel').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function closePanel() {
+            document.getElementById('interactivePanel').style.display = 'none';
+            hideAllForms();
+        }
+
+        function hideAllForms() {
+            document.getElementById('codeGeneratorForm').style.display = 'none';
+            document.getElementById('fileReviewForm').style.display = 'none';
+            document.getElementById('qnaForm').style.display = 'none';
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function showResults(text) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('responseText').textContent = text;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        async function makeAPICall(endpoint, data = {}) {
+            try {
+                const response = await fetch(`/api/qwen-coder/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                // Handle different response structures based on endpoint
+                if (result.success === false) {
+                    throw new Error(result.error || 'API call failed');
+                }
+                
+                // Extract the actual content based on endpoint response structure
+                if (result.message) return result.message; // health endpoint
+                if (result.code) return result.code; // generate endpoint
+                if (result.analysis) return result.analysis; // analyze endpoint
+                if (result.answer) return result.answer; // ask endpoint
+                if (result.review) return result.review; // review endpoint
+                if (result.suggestions) return result.suggestions; // architecture endpoint
+                if (result.bugs) {
+                    // Format bugs response for better display
+                    return result.bugs.map(bug => 
+                        `File: ${bug.file}\n\nAnalysis:\n${bug.analysis}`
+                    ).join('\n\n---\n\n');
+                }
+                
+                // Fallback
+                return result.data || JSON.stringify(result, null, 2);
+                
+            } catch (error) {
+                return `Error: ${error.message}`;
+            }
+        }
+
+        async function analyzeCodebase() {
+            showPanel('🔍 Codebase Analysis');
+            showLoading();
+            const result = await makeAPICall('analyze');
+            showResults(result);
+            stats.analysis++;
+            updateStats();
+        }
+
+        function showCodeGenerator() {
+            showPanel('🎨 Code Generator');
+            hideAllForms();
+            document.getElementById('codeGeneratorForm').style.display = 'block';
+        }
+
+        async function generateCode() {
+            const prompt = document.getElementById('codePrompt').value;
+            if (!prompt) return alert('Please describe what you want to generate');
+            
+            showLoading();
+            const result = await makeAPICall('generate', { prompt });
+            showResults(result);
+            stats.generation++;
+            updateStats();
+        }
+
+        async function findBugs() {
+            showPanel('🐛 Bug Detection');
+            showLoading();
+            const result = await makeAPICall('bugs');
+            showResults(result);
+            stats.bugs++;
+            updateStats();
+        }
+
+        async function reviewArchitecture() {
+            showPanel('🏗️ Architecture Review');
+            showLoading();
+            const result = await makeAPICall('architecture');
+            showResults(result);
+            stats.analysis++;
+            updateStats();
+        }
+
+        function showFileReview() {
+            showPanel('📄 File Review');
+            hideAllForms();
+            document.getElementById('fileReviewForm').style.display = 'block';
+        }
+
+        async function reviewFile() {
+            const filePath = document.getElementById('filePath').value;
+            if (!filePath) return alert('Please enter a file path');
+            
+            showLoading();
+            const result = await makeAPICall('review', { filePath });
+            showResults(result);
+            stats.analysis++;
+            updateStats();
+        }
+
+        function showQnA() {
+            showPanel('💬 Ask Questions');
+            hideAllForms();
+            document.getElementById('qnaForm').style.display = 'block';
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('question').value;
+            if (!question) return alert('Please enter a question');
+            
+            showLoading();
+            const result = await makeAPICall('ask', { question });
+            showResults(result);
+            stats.questions++;
+            updateStats();
+        }
+
+        function openReplit() {
+            // This would open the Replit editor in a new tab
+            window.open(window.location.origin, '_blank');
+        }
+
+        // Initialize stats on page load
+        updateStats();
+    </script>
+</body>
+</html>

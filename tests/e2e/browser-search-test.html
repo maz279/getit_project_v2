@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Test - GetIt AI Platform</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container { 
+            background: rgba(255,255,255,0.1); 
+            padding: 20px; 
+            border-radius: 15px; 
+            backdrop-filter: blur(10px);
+            max-width: 800px;
+        }
+        .test-result { 
+            margin: 10px 0; 
+            padding: 10px; 
+            border-radius: 8px; 
+            background: rgba(255,255,255,0.1);
+        }
+        .pass { background: rgba(34,197,94,0.3) !important; }
+        .fail { background: rgba(239,68,68,0.3) !important; }
+        button { 
+            background: linear-gradient(45deg, #4f46e5, #7c3aed);
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { transform: translateY(-2px); }
+        .api-test { margin: 15px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+        pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🚀 GetIt AI Search Functionality Test</h1>
+        <p>Testing comprehensive AI-powered search capabilities</p>
+        
+        <button onclick="runAllTests()">🔬 Run All Tests</button>
+        <button onclick="testAPIEndpoints()">📡 Test APIs</button>
+        <button onclick="testSearchSpeed()">⚡ Speed Test</button>
+        <button onclick="clearResults()">🧹 Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let testResults = {};
+        
+        function addResult(test, status, details) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${status}`;
+            resultDiv.innerHTML = `
+                <strong>${test}</strong>: <span style="text-transform: uppercase">${status}</span>
+                <div style="margin-top: 5px; font-size: 14px; opacity: 0.9">${details}</div>
+            `;
+            document.getElementById('results').appendChild(resultDiv);
+            testResults[test] = { status, details };
+        }
+        
+        async function testAPIEndpoints() {
+            addResult('API Testing', 'running', 'Testing search API endpoints...');
+            
+            try {
+                // Test 1: Search Suggestions
+                const startTime1 = Date.now();
+                const suggestionsResponse = await fetch('/api/search/suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query: 'gaming laptop', 
+                        language: 'en', 
+                        limit: 6 
+                    })
+                });
+                const time1 = Date.now() - startTime1;
+                
+                if (suggestionsResponse.ok) {
+                    const data = await suggestionsResponse.json();
+                    const suggestionCount = data.data?.suggestions?.length || 0;
+                    const aiPowered = data.data?.aiPowered || false;
+                    
+                    addResult('Search Suggestions', 'pass', 
+                        `${suggestionCount} suggestions in ${time1}ms | AI: ${aiPowered ? 'Enabled' : 'Disabled'}`);
+                    
+                    if (data.data?.suggestions?.[0]) {
+                        addResult('Sample Suggestion', 'pass', 
+                            `"${data.data.suggestions[0].text}" (${data.data.suggestions[0].type})`);
+                    }
+                } else {
+                    addResult('Search Suggestions', 'fail', 
+                        `HTTP ${suggestionsResponse.status} in ${time1}ms`);
+                }
+                
+                // Test 2: Enhanced Search  
+                const startTime2 = Date.now();
+                const enhancedResponse = await fetch('/api/search/enhanced', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query: 'smartphone deals', 
+                        language: 'en' 
+                    })
+                });
+                const time2 = Date.now() - startTime2;
+                
+                if (enhancedResponse.ok) {
+                    const data = await enhancedResponse.json();
+                    const resultCount = data.data?.results?.length || 0;
+                    
+                    addResult('Enhanced Search', 'pass', 
+                        `${resultCount} results in ${time2}ms`);
+                        
+                    if (data.data?.results?.[0]) {
+                        addResult('Sample Product', 'pass', 
+                            `"${data.data.results[0].title}" - ${data.data.results[0].price}`);
+                    }
+                } else {
+                    addResult('Enhanced Search', 'fail', 
+                        `HTTP ${enhancedResponse.status} in ${time2}ms`);
+                }
+                
+                // Test 3: Trending Search
+                const startTime3 = Date.now();
+                const trendingResponse = await fetch('/api/search/trending');
+                const time3 = Date.now() - startTime3;
+                
+                if (trendingResponse.ok) {
+                    const data = await trendingResponse.json();
+                    const trendingCount = data.data?.length || 0;
+                    
+                    addResult('Trending Search', 'pass', 
+                        `${trendingCount} trending items in ${time3}ms`);
+                } else {
+                    addResult('Trending Search', 'fail', 
+                        `HTTP ${trendingResponse.status} in ${time3}ms`);
+                }
+                
+            } catch (error) {
+                addResult('API Testing', 'fail', `Error: ${error.message}`);
+            }
+        }
+        
+        async function testSearchSpeed() {
+            addResult('Speed Testing', 'running', 'Testing multiple search queries...');
+            
+            const queries = ['laptop', 'smartphone', 'headphones', 'gaming', 'books'];
+            let totalTime = 0;
+            let successCount = 0;
+            
+            for (const query of queries) {
+                const startTime = Date.now();
+                
+                try {
+                    const response = await fetch('/api/search/suggestions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query, language: 'en', limit: 3 })
+                    });
+                    
+                    const responseTime = Date.now() - startTime;
+                    totalTime += responseTime;
+                    
+                    if (response.ok) {
+                        successCount++;
+                        addResult(`Query "${query}"`, 'pass', `${responseTime}ms response time`);
+                    } else {
+                        addResult(`Query "${query}"`, 'fail', `HTTP ${response.status} in ${responseTime}ms`);
+                    }
+                } catch (error) {
+                    addResult(`Query "${query}"`, 'fail', `Network error: ${error.message}`);
+                }
+            }
+            
+            const avgTime = totalTime / queries.length;
+            const successRate = (successCount / queries.length) * 100;
+            
+            addResult('Speed Summary', successRate >= 80 ? 'pass' : 'fail', 
+                `Average: ${avgTime.toFixed(0)}ms | Success: ${successCount}/${queries.length} (${successRate.toFixed(0)}%)`);
+        }
+        
+        async function runAllTests() {
+            clearResults();
+            addResult('Test Suite', 'running', 'Starting comprehensive search functionality test...');
+            
+            await testAPIEndpoints();
+            await testSearchSpeed();
+            
+            // Calculate overall results
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r.status === 'pass').length;
+            const overallScore = (passedTests / totalTests) * 100;
+            
+            addResult('Overall Results', overallScore >= 70 ? 'pass' : 'fail', 
+                `${passedTests}/${totalTests} tests passed (${overallScore.toFixed(0)}%)`);
+                
+            if (overallScore >= 90) {
+                addResult('Status', 'pass', '🚀 Search functionality is EXCELLENT');
+            } else if (overallScore >= 70) {
+                addResult('Status', 'pass', '✅ Search functionality is OPERATIONAL');
+            } else if (overallScore >= 50) {
+                addResult('Status', 'fail', '⚠️ Search functionality is PARTIALLY WORKING');
+            } else {
+                addResult('Status', 'fail', '❌ Search functionality NEEDS FIXES');
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            testResults = {};
+        }
+        
+        // Auto-run tests when page loads
+        setTimeout(runAllTests, 1000);
+        
+        console.log('🔬 Search functionality test page loaded');
+        console.log('Available functions: runAllTests(), testAPIEndpoints(), testSearchSpeed()');
+    </script>
+</body>
+</html>

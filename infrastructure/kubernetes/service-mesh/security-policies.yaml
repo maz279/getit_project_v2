@@ -1,0 +1,340 @@
+# Enterprise Security Policies for GetIt Service Mesh
+# Amazon.com/Shopee.sg-Level Security Implementation
+---
+# Namespace for Security Components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-security
+  labels:
+    istio-injection: enabled
+    security.istio.io/tlsMode: istio
+---
+# Strict mTLS for All Services
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-strict-mtls
+  namespace: getit-production
+spec:
+  mtls:
+    mode: STRICT
+---
+# Permissive mTLS for Development
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: development-permissive-mtls
+  namespace: getit-development
+spec:
+  mtls:
+    mode: PERMISSIVE
+---
+# Authorization Policies for Microservices
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: user-service-authz
+  namespace: getit-production
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/api-gateway"]
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/frontend-web"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "PATCH"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: product-service-authz
+  namespace: getit-production
+spec:
+  selector:
+    matchLabels:
+      app: product-service
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/api-gateway"]
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/frontend-web"]
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/search-service"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: payment-service-authz
+  namespace: getit-production
+spec:
+  selector:
+    matchLabels:
+      app: payment-service
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/order-service"]
+        - source:
+            principals: ["cluster.local/ns/getit-production/sa/api-gateway"]
+      to:
+        - operation:
+            methods: ["POST", "GET", "PUT"]
+      when:
+        - key: request.headers[x-user-id]
+          values: ["*"]
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+---
+# Rate Limiting Policy
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: rate-limit-policy
+  namespace: getit-production
+spec:
+  rules:
+    - from:
+        - source:
+            remoteIpBlocks: ["0.0.0.0/0"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "DELETE"]
+      when:
+        - key: source.ip
+          notValues: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+---
+# JWT Authentication Policy
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: jwt-auth
+  namespace: getit-production
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  jwtRules:
+    - issuer: "https://auth.getit.com.bd"
+      audiences:
+        - "getit-api"
+      jwksUri: "https://auth.getit.com.bd/.well-known/jwks.json"
+      forwardOriginalToken: true
+---
+# Network Security Policies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: getit-network-policy
+  namespace: getit-production
+spec:
+  podSelector:
+    matchLabels:
+      app: getit
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: getit-production
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 15090
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: getit-monitoring
+      ports:
+        - protocol: TCP
+          port: 15090
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: getit-production
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+# Security Context Constraints
+apiVersion: v1
+kind: SecurityContextConstraints
+metadata:
+  name: getit-scc
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivileged: false
+allowPrivilegeEscalation: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+  ranges:
+    - min: 1000
+    - max: 65535
+readOnlyRootFilesystem: true
+requiredDropCapabilities:
+  - ALL
+runAsUser:
+  type: MustRunAsNonRoot
+seLinuxContext:
+  type: MustRunAs
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - projected
+  - secret
+---
+# Pod Security Policy
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: getit-psp
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+---
+# RBAC for Service Accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: getit-service-account
+  namespace: getit-production
+  labels:
+    account: getit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: getit-role
+  namespace: getit-production
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: getit-role-binding
+  namespace: getit-production
+subjects:
+  - kind: ServiceAccount
+    name: getit-service-account
+    namespace: getit-production
+roleRef:
+  kind: Role
+  name: getit-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Secret Management
+apiVersion: v1
+kind: Secret
+metadata:
+  name: getit-tls-secret
+  namespace: getit-production
+type: kubernetes.io/tls
+data:
+  tls.crt: # Base64 encoded certificate
+  tls.key: # Base64 encoded private key
+---
+# Secrets for External APIs
+apiVersion: v1
+kind: Secret
+metadata:
+  name: getit-external-api-secrets
+  namespace: getit-production
+type: Opaque
+data:
+  bkash-api-key: # Base64 encoded bKash API key
+  nagad-api-key: # Base64 encoded Nagad API key
+  rocket-api-key: # Base64 encoded Rocket API key
+  twilio-api-key: # Base64 encoded Twilio API key
+  google-maps-api-key: # Base64 encoded Google Maps API key
+---
+# Encryption Configuration
+apiVersion: v1
+kind: EncryptionConfiguration
+metadata:
+  name: getit-encryption-config
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: # 32-byte base64 encoded key
+      - identity: {}
+---
+# Admission Controller Webhook
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: getit-security-webhook
+webhooks:
+  - name: security.getit.com.bd
+    clientConfig:
+      service:
+        name: getit-security-webhook
+        namespace: getit-security
+        path: "/validate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments"]
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None

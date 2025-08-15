@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup Test - GetIt Platform</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f9fafb; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #374151; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        button { background: linear-gradient(to right, #f97316, #dc2626); color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; font-weight: 600; }
+        button:hover { opacity: 0.9; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 6px; }
+        .success { background: #dcfce7; border: 1px solid #16a34a; color: #16a34a; }
+        .error { background: #fef2f2; border: 1px solid #dc2626; color: #dc2626; }
+        .loading { background: #fef3c7; border: 1px solid #d97706; color: #d97706; }
+        .debug-section { margin-top: 30px; padding: 20px; background: #f3f4f6; border-radius: 6px; }
+        .debug-button { background: #6b7280; margin: 5px; padding: 8px 16px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔍 GetIt Signup Functionality Test</h2>
+        <p><strong>Purpose:</strong> Test signup functionality independent of React frontend</p>
+        
+        <form id="signupForm">
+            <div class="form-group">
+                <label for="fullName">Full Name *</label>
+                <input type="text" id="fullName" value="Test User GetIt" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" value="" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number *</label>
+                <input type="tel" id="phoneNumber" value="+8801234567890" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" value="password123" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password *</label>
+                <input type="password" id="confirmPassword" value="password123" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="city">City *</label>
+                <select id="city" required>
+                    <option value="">Select City</option>
+                    <option value="dhaka">Dhaka</option>
+                    <option value="chittagong">Chittagong</option>
+                    <option value="sylhet">Sylhet</option>
+                    <option value="khulna">Khulna</option>
+                    <option value="rajshahi">Rajshahi</option>
+                    <option value="rangpur">Rangpur</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="agreeToTerms" checked required>
+                    I agree to the Terms and Conditions
+                </label>
+            </div>
+            
+            <button type="submit">Create GetIt Account</button>
+        </form>
+        
+        <div id="result"></div>
+        
+        <div class="debug-section">
+            <h3>🔧 Debug Tools</h3>
+            <button onclick="testAPI()" class="debug-button">Test API</button>
+            <button onclick="testReactSignup()" class="debug-button">Test React Signup</button>
+            <button onclick="clearResults()" class="debug-button">Clear Results</button>
+            <div id="debugInfo" style="margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Generate unique email
+        document.getElementById('email').value = 'getit' + Date.now() + '@test.com';
+        
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const formData = {
+                fullName: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                phoneNumber: document.getElementById('phoneNumber').value,
+                password: document.getElementById('password').value,
+                confirmPassword: document.getElementById('confirmPassword').value,
+                city: document.getElementById('city').value,
+                agreeToTerms: document.getElementById('agreeToTerms').checked,
+                language: 'en'
+            };
+            
+            // Validation
+            if (formData.password !== formData.confirmPassword) {
+                resultDiv.innerHTML = '<div class="error">❌ Passwords do not match!</div>';
+                return;
+            }
+            
+            if (!formData.agreeToTerms) {
+                resultDiv.innerHTML = '<div class="error">❌ Please agree to terms and conditions!</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">🔄 Creating GetIt account...</div>';
+            
+            try {
+                console.log('📤 Signup Request:', formData);
+                
+                const response = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                });
+                
+                const result = await response.json();
+                console.log('📥 Signup Response:', result);
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ <strong>SIGNUP SUCCESSFUL!</strong><br><br>
+                            <strong>User Details:</strong><br>
+                            • ID: ${result.data.user.id}<br>
+                            • Name: ${result.data.user.name}<br>
+                            • Email: ${result.data.user.email}<br>
+                            • Phone: ${result.data.user.phoneNumber}<br>
+                            • City: ${result.data.user.city}<br>
+                            • Role: ${result.data.user.role}<br>
+                            • Language: ${result.data.user.preferences.language}<br><br>
+                            <strong>Authentication:</strong><br>
+                            • Token: ${result.data.token ? '✅ Generated' : '❌ Missing'}<br>
+                            • Expires: ${result.data.expiresIn || 'N/A'}<br><br>
+                            <strong>🎉 Backend signup is working perfectly!</strong>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>SIGNUP FAILED</strong><br><br>
+                            <strong>Error Details:</strong><br>
+                            • Message: ${result.error?.message || 'Unknown error'}<br>
+                            • Code: ${result.error?.code || 'N/A'}<br>
+                            • Status: ${response.status}<br><br>
+                            <strong>This indicates a backend validation issue.</strong>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('🚨 Network Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        🚨 <strong>NETWORK ERROR</strong><br><br>
+                        • Error: ${error.message}<br>
+                        • Type: Connection failure<br><br>
+                        <strong>This indicates the backend is not responding.</strong>
+                    </div>
+                `;
+            }
+        });
+        
+        async function testAPI() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = '<div class="loading">🔄 Testing API endpoints...</div>';
+            
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch('/api/health');
+                const healthResult = await healthResponse.json();
+                
+                // Test auth endpoint availability
+                const authTestResponse = await fetch('/api/auth/signup', {
+                    method: 'OPTIONS'
+                });
+                
+                debugDiv.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>API CONNECTION SUCCESS</strong><br><br>
+                        <strong>Health Check:</strong><br>
+                        • Status: ${healthResponse.status}<br>
+                        • Service: ${healthResult.data?.service || 'Unknown'}<br>
+                        • Database: ${healthResult.data?.database || 'Unknown'}<br>
+                        • Uptime: ${healthResult.data?.uptime ? Math.round(healthResult.data.uptime) + 's' : 'Unknown'}<br><br>
+                        <strong>Auth Endpoint:</strong><br>
+                        • Status: ${authTestResponse.status}<br>
+                        • Available: ${authTestResponse.status === 200 ? '✅ Yes' : '❌ No'}<br><br>
+                        <strong>🎯 Backend API is fully operational!</strong>
+                    </div>
+                `;
+            } catch (error) {
+                debugDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>API CONNECTION FAILED</strong><br><br>
+                        • Error: ${error.message}<br>
+                        • This indicates backend connection issues.
+                    </div>
+                `;
+            }
+        }
+        
+        function testReactSignup() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = `
+                <div class="loading">
+                    🔄 <strong>Opening React Signup Page...</strong><br><br>
+                    Check the new tab to test the React frontend signup functionality.<br>
+                    Compare results with this direct API test.
+                </div>
+            `;
+            
+            // Open React signup page
+            window.open('/register', '_blank');
+        }
+        
+        function clearResults() {
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('debugInfo').innerHTML = '';
+        }
+        
+        // Auto-test API on page load
+        setTimeout(() => {
+            console.log('🚀 GetIt Signup Test Page Loaded');
+            testAPI();
+        }, 500);
+    </script>
+</body>
+</html>

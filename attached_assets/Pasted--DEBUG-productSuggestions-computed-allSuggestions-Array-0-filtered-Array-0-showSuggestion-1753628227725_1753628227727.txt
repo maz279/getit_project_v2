@@ -1,0 +1,28 @@
+🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(0), filtered: Array(0), showSuggestions: false}
+1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+injection-topics.js:1 Browsing Topics API removed from https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/ which is main frame
+1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+AISearchBar.tsx:2013 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(3), length: 3}
+AISearchBar.tsx:2017 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(3), filtered: Array(3), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(3), filtered: Array(0), showSuggestions: true}
+AISearchBar.tsx:2013 🚀 DEBUG: Setting suggestions: {allSuggestions: Array(3), length: 3}
+AISearchBar.tsx:2017 ✅ DEBUG: Suggestions state updated, showSuggestions: true
+AISearchBar.tsx:791 🔍 DEBUG: productSuggestions computed: {allSuggestions: Array(3), filtered: Array(3), showSuggestions: true}
+AISearchBar.tsx:803 📄 DEBUG: pageSuggestions computed: {allSuggestions: Array(3), filtered: Array(0), showSuggestions: true}
+AISearchBar.tsx:1928 📋 DEBUG: Form submitted by user - performing search
+AISearchBar.tsx:1587 🔥 DEBUG: performSearch called with: {searchQuery: 'shampoo', searchType: 'text'}
+AISearchBar.tsx:1588 🔍 DEBUG: performSearch call stack: Error
+    at https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/AISearchBar.tsx:1162:56
+    at https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/AISearchBar.tsx:1413:9
+    at HTMLUnknownElement.callCallback2 (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3674:22)
+    at Object.invokeGuardedCallbackDev (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3699:24)
+    at invokeGuardedCallback (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:3736:33)
+    at executeDispatch (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7014:11)
+    at processDispatchQueueItemsInOrder (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7034:15)
+    at processDispatchQueue (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7043:13)
+    at dispatchEventsForPlugins (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=0ebebf42:7051:11)
+Header.tsx:541 Legacy search callback: shampoo []

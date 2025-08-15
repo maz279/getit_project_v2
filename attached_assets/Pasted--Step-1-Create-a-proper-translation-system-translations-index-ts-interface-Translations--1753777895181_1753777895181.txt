@@ -1,0 +1,359 @@
+// Step 1: Create a proper translation system
+// translations/index.ts
+interface Translations {
+  [key: string]: {
+    en: string;
+    bn: string;
+  };
+}
+
+const translations: Translations = {
+  'support.24_7': {
+    en: '24/7 Support',
+    bn: '২৪/৭ সাপোর্ট'
+  },
+  'delivery.deliver_to': {
+    en: 'Deliver to',
+    bn: 'পৌঁছানো'
+  },
+  'delivery.free_above_500': {
+    en: 'Free Delivery ৳500+',
+    bn: 'ফ্রি ডেলিভারি ৳৫০০+'
+  },
+  'location.select_delivery_area': {
+    en: 'Select Delivery Area',
+    bn: 'ডেলিভারি এলাকা নির্বাচন করুন'
+  },
+  'location.select_area_description': {
+    en: 'Choose your area for faster delivery and accurate pricing',
+    bn: 'আপনার এলাকা নির্বাচন করুন দ্রুত ডেলিভারি ও সঠিক মূল্যের জন্য'
+  },
+  'location.search_placeholder': {
+    en: 'Search for city or area...',
+    bn: 'শহর বা এলাকা খুঁজুন...'
+  },
+  'location.search_results': {
+    en: 'Search Results',
+    bn: 'অনুসন্ধান ফলাফল'
+  },
+  'location.popular_areas': {
+    en: 'Popular Areas',
+    bn: 'জনপ্রিয় এলাকা'
+  },
+  'location.all_districts': {
+    en: 'All Districts (64)',
+    bn: 'সকল জেলা (৬৪টি)'
+  },
+  'premium.title': {
+    en: 'Premium',
+    bn: 'প্রিমিয়াম'
+  },
+  'vendor.become_vendor': {
+    en: 'Become a Vendor',
+    bn: 'বিক্রেতা হন'
+  },
+  'vendor.join_as_vendor': {
+    en: 'Join as a Vendor',
+    bn: 'বিক্রেতা হিসেবে যোগ দিন'
+  },
+  'vendor.grow_business': {
+    en: 'Grow your business and reach millions of customers',
+    bn: 'আপনার ব্যবসা বাড়ান এবং লাখো গ্রাহকের কাছে পৌঁছান'
+  },
+  'vendor.register': {
+    en: 'Register as Vendor',
+    bn: 'বিক্রেতা রেজিস্ট্রেশন'
+  },
+  'vendor.login': {
+    en: 'Vendor Login',
+    bn: 'বিক্রেতা লগইন'
+  },
+  'tagline': {
+    en: 'buy smart, ship quick, pay easy',
+    bn: 'স্মার্ট কেনা, দ্রুত শিপিং, সহজ পেমেন্ট'
+  }
+};
+
+// Enhanced translation hook
+export const useTranslation = () => {
+  const { language } = useSimpleLanguage();
+  
+  const t = (key: string): string => {
+    const translation = translations[key];
+    if (!translation) {
+      console.warn(`Translation missing for key: ${key}`);
+      return key;
+    }
+    return translation[language] || translation.en;
+  };
+  
+  return { t };
+};
+
+// Step 2: Fix the most critical performance issue
+// PerformantDropdown.tsx
+import { memo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
+
+interface DropdownProps {
+  isOpen: boolean;
+  onClose: () => void;
+  triggerRef: React.RefObject<HTMLElement>;
+  children: React.ReactNode;
+}
+
+export const PerformantDropdown = memo(({ 
+  isOpen, 
+  onClose, 
+  triggerRef, 
+  children 
+}: DropdownProps) => {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Calculate position based on trigger element
+  const getPosition = useCallback(() => {
+    if (!triggerRef.current) return { top: 0, left: 0 };
+    
+    const rect = triggerRef.current.getBoundingClientRect();
+    return {
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+    };
+  }, [triggerRef]);
+  
+  if (!isOpen) return null;
+  
+  const position = getPosition();
+  
+  // Use portal to prevent z-index issues
+  return createPortal(
+    <div
+      ref={dropdownRef}
+      className="fixed z-[9999]"
+      style={{
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+      }}
+    >
+      <div className="mt-2 bg-white rounded-lg shadow-xl border">
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+});
+
+// Step 3: Fix accessibility with a reusable dropdown component
+// AccessibleDropdown.tsx
+interface AccessibleDropdownProps {
+  trigger: React.ReactNode;
+  children: React.ReactNode;
+  label: string;
+}
+
+export const AccessibleDropdown: React.FC<AccessibleDropdownProps> = ({
+  trigger,
+  children,
+  label
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownId = useId();
+  
+  // Handle keyboard navigation
+  useKeyboardNavigation(isOpen, {
+    onEscape: () => setIsOpen(false),
+  });
+  
+  // Close on click outside
+  useOnClickOutside(triggerRef, () => setIsOpen(false));
+  
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={dropdownId}
+        aria-haspopup="true"
+        aria-label={label}
+        className="focus:outline-none focus:ring-2 focus:ring-blue-400 rounded"
+      >
+        {trigger}
+      </button>
+      
+      <PerformantDropdown
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        triggerRef={triggerRef}
+      >
+        <div
+          id={dropdownId}
+          role="menu"
+          aria-orientation="vertical"
+          aria-labelledby={label}
+        >
+          {children}
+        </div>
+      </PerformantDropdown>
+    </div>
+  );
+};
+
+// Step 4: Implement proper error handling
+// withErrorBoundary.tsx
+export function withErrorBoundary<P extends object>(
+  Component: React.ComponentType<P>,
+  fallback?: React.ReactNode
+) {
+  return (props: P) => (
+    <ErrorBoundary fallback={fallback}>
+      <Component {...props} />
+    </ErrorBoundary>
+  );
+}
+
+// Usage:
+const SafeHeader = withErrorBoundary(Header, <HeaderFallback />);
+
+// Step 5: Implement proper loading states
+// LoadingStates.tsx
+export const HeaderSkeleton: React.FC = () => (
+  <div className="bg-gradient-to-r from-blue-900 via-purple-800 to-indigo-900 p-4">
+    <div className="max-w-7xl mx-auto">
+      <div className="animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-32 h-8 bg-white/20 rounded"></div>
+            <div className="w-24 h-6 bg-white/20 rounded"></div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-20 h-6 bg-white/20 rounded"></div>
+            <div className="w-20 h-6 bg-white/20 rounded"></div>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <div className="w-40 h-10 bg-white/20 rounded"></div>
+          <div className="flex-1 mx-8 h-10 bg-white/20 rounded-full"></div>
+          <div className="flex space-x-2">
+            <div className="w-10 h-10 bg-white/20 rounded"></div>
+            <div className="w-10 h-10 bg-white/20 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Step 6: Implement analytics tracking
+// analytics.ts
+interface AnalyticsEvent {
+  event: string;
+  properties?: Record<string, any>;
+}
+
+class Analytics {
+  track(event: string, properties?: Record<string, any>) {
+    // In production, send to analytics service
+    if (process.env.NODE_ENV === 'production') {
+      // Example: Google Analytics
+      if (typeof window !== 'undefined' && window.gtag) {
+        window.gtag('event', event, properties);
+      }
+      
+      // Example: Mixpanel
+      if (typeof window !== 'undefined' && window.mixpanel) {
+        window.mixpanel.track(event, properties);
+      }
+    }
+  }
+  
+  identify(userId: string, traits?: Record<string, any>) {
+    if (process.env.NODE_ENV === 'production' && window.mixpanel) {
+      window.mixpanel.identify(userId);
+      if (traits) {
+        window.mixpanel.people.set(traits);
+      }
+    }
+  }
+}
+
+export const analytics = new Analytics();
+
+// Usage in Header:
+const handleLocationChange = (location: Location) => {
+  analytics.track('Location Changed', {
+    city: location.city,
+    region: location.region,
+    metro: location.metro
+  });
+  // ... rest of the logic
+};
+
+// Step 7: Implement feature flags for gradual rollout
+// featureFlags.ts
+interface FeatureFlags {
+  newHeader: boolean;
+  aiSearch: boolean;
+  vendorPortal: boolean;
+  darkMode: boolean;
+}
+
+export const useFeatureFlags = (): FeatureFlags => {
+  // In production, fetch from service like LaunchDarkly
+  const [flags, setFlags] = useState<FeatureFlags>({
+    newHeader: true,
+    aiSearch: true,
+    vendorPortal: false,
+    darkMode: true
+  });
+  
+  useEffect(() => {
+    // Fetch flags from service
+    fetchFeatureFlags().then(setFlags);
+  }, []);
+  
+  return flags;
+};
+
+// Step 8: Implement proper caching strategy
+// cache.ts
+class CacheManager {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 5 * 60 * 1000; // 5 minutes
+  
+  set(key: string, data: any, customTTL?: number) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now() + (customTTL || this.ttl)
+    });
+  }
+  
+  get(key: string) {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    if (Date.now() > cached.timestamp) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return cached.data;
+  }
+  
+  clear() {
+    this.cache.clear();
+  }
+}
+
+export const cache = new CacheManager();
+
+// Usage:
+const getPopularLocations = async () => {
+  const cached = cache.get('popular-locations');
+  if (cached) return cached;
+  
+  const locations = await api.getPopularLocations();
+  cache.set('popular-locations', locations);
+  return locations;
+};

@@ -1,0 +1,174 @@
+# Ingress Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Ingress with SSL Termination and Advanced Routing
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: getit-ingress
+  labels:
+    app: getit-platform
+    project: getit-bangladesh
+    tier: ingress
+  annotations:
+    # Ingress Controller Configuration
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # SSL Configuration
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-RSA-AES128-GCM-SHA256,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-RSA-AES128-SHA256,ECDHE-RSA-AES256-SHA384"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Content-Type-Options nosniff;
+      add_header X-Frame-Options DENY;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.getit.com.bd wss://api.getit.com.bd; frame-src 'none';";
+      add_header Referrer-Policy "strict-origin-when-cross-origin";
+      add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=(self)";
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "10"
+    nginx.ingress.kubernetes.io/rate-limit-rpm: "600"
+    
+    # Proxy Configuration
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffers: "8 16k"
+    
+    # Session Affinity
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "getit-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "86400"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "86400"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://getit.com.bd,https://www.getit.com.bd,https://admin.getit.com.bd"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    nginx.ingress.kubernetes.io/cors-max-age: "1728000"
+    
+    # External DNS
+    external-dns.alpha.kubernetes.io/hostname: getit.com.bd,www.getit.com.bd,api.getit.com.bd
+spec:
+  tls:
+  - hosts:
+    - getit.com.bd
+    - www.getit.com.bd
+    - api.getit.com.bd
+    - admin.getit.com.bd
+    secretName: getit-tls-secret
+  rules:
+  # Main Website
+  - host: getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+  # WWW Redirect
+  - host: www.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+  # API Routes
+  - host: api.getit.com.bd
+    http:
+      paths:
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 3000
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 3000
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 3000
+  # Admin Panel
+  - host: admin.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+---
+# Staging Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: getit-staging-ingress
+  namespace: staging
+  labels:
+    app: getit-platform
+    project: getit-bangladesh
+    tier: ingress
+    environment: staging
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: staging-auth
+    nginx.ingress.kubernetes.io/auth-realm: "GetIt Bangladesh Staging Environment"
+    external-dns.alpha.kubernetes.io/hostname: staging.getit.com.bd
+spec:
+  tls:
+  - hosts:
+    - staging.getit.com.bd
+    secretName: getit-staging-tls-secret
+  rules:
+  - host: staging.getit.com.bd
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 3000

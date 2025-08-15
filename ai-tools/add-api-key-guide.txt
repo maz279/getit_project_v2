@@ -1,0 +1,21 @@
+🔐 ADD YOUR API KEY TO REPLIT SECRETS
+
+Follow these exact steps:
+
+1. In your Replit workspace, look for "Secrets" in the left sidebar (🔒 icon)
+   - If you don't see it, click "Tools" → "Secrets"
+
+2. Click the "New Secret" button
+
+3. Fill in:
+   Key: QWEN_API_KEY
+   Value: sk-6b83b72324784bcf80d913780f156f2b
+
+4. Click "Add Secret"
+
+5. Restart your workspace by clicking the "Run" button
+
+After adding the secret and restarting, run this command:
+node ai-tools/test-qwen-connection.js
+
+This will test if the API key is working properly.

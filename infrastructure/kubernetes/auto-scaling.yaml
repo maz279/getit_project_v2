@@ -1,0 +1,196 @@
+# GetIt Platform Auto-scaling Configuration
+# Amazon.com/Shopee.sg Enterprise Auto-scaling Implementation
+
+# Horizontal Pod Autoscaler for API Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-api-hpa
+  namespace: getit-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-api-deployment
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 4
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Horizontal Pod Autoscaler for Frontend Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: getit-frontend-hpa
+  namespace: getit-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: getit-frontend-deployment
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+---
+# Vertical Pod Autoscaler for Database
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: getit-database-vpa
+  namespace: getit-platform
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: getit-postgresql
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: postgresql
+      minAllowed:
+        cpu: 500m
+        memory: 1Gi
+      maxAllowed:
+        cpu: 4
+        memory: 8Gi
+      controlledResources: ["cpu", "memory"]
+
+---
+# Cluster Autoscaler Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-status
+  namespace: kube-system
+data:
+  nodes.max: "100"
+  nodes.min: "3"
+  scale-down-delay-after-add: "10m"
+  scale-down-unneeded-time: "10m"
+  skip-nodes-with-local-storage: "false"
+  skip-nodes-with-system-pods: "false"
+
+---
+# Pod Disruption Budget for API Service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: getit-api-pdb
+  namespace: getit-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: getit-api
+
+---
+# Pod Disruption Budget for Frontend Service
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: getit-frontend-pdb
+  namespace: getit-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: getit-frontend
+
+---
+# Resource Quotas for Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: getit-platform-quota
+  namespace: getit-platform
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: 100Gi
+    limits.cpu: "100"
+    limits.memory: 200Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+
+---
+# Limit Ranges for Pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: getit-platform-limits
+  namespace: getit-platform
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+  - type: Pod
+    max:
+      cpu: "4"
+      memory: "8Gi"

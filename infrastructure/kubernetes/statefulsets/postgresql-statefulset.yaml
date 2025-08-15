@@ -1,0 +1,339 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-master
+  namespace: getit-production
+  labels:
+    app: postgresql
+    component: database
+    role: master
+    platform: getit-bangladesh
+    tier: infrastructure
+  annotations:
+    description: "PostgreSQL Master Database for GetIt Bangladesh"
+    contact: "database-team@getit.com.bd"
+spec:
+  serviceName: postgresql-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+      role: master
+  template:
+    metadata:
+      labels:
+        app: postgresql
+        component: database
+        role: master
+        platform: getit-bangladesh
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgresql
+        image: postgres:15.4-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          name: postgresql
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-database
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-password
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: md5
+        - name: POSTGRES_SHARED_PRELOAD_LIBRARIES
+          value: "pg_stat_statements,pg_buffercache"
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgresql-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgresql-hba-config
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: shared-memory
+          mountPath: /dev/shm
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      volumes:
+      - name: postgresql-config
+        configMap:
+          name: postgresql-config
+      - name: postgresql-hba-config
+        configMap:
+          name: postgresql-hba-config
+      - name: shared-memory
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+  volumeClaimTemplates:
+  - metadata:
+      name: postgresql-data
+      labels:
+        app: postgresql
+        component: database
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd-storage
+      resources:
+        requests:
+          storage: 500Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-read-replica
+  namespace: getit-production
+  labels:
+    app: postgresql
+    component: database
+    role: read-replica
+    platform: getit-bangladesh
+    tier: infrastructure
+  annotations:
+    description: "PostgreSQL Read Replica for GetIt Bangladesh"
+    contact: "database-team@getit.com.bd"
+spec:
+  serviceName: postgresql-read-replica
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgresql
+      role: read-replica
+  template:
+    metadata:
+      labels:
+        app: postgresql
+        component: database
+        role: read-replica
+        platform: getit-bangladesh
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      containers:
+      - name: postgresql
+        image: postgres:15.4-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          name: postgresql
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-database
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-read-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgresql-read-password
+        - name: POSTGRES_MASTER_HOST
+          value: postgresql-master
+        - name: POSTGRES_MASTER_PORT
+          value: "5432"
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: md5
+        - name: POSTGRES_PRIMARY_CONNINFO
+          value: "host=postgresql-master port=5432 user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) application_name=replica"
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgresql-replica-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgresql-hba-config
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: shared-memory
+          mountPath: /dev/shm
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: postgresql-replica-config
+        configMap:
+          name: postgresql-replica-config
+      - name: postgresql-hba-config
+        configMap:
+          name: postgresql-hba-config
+      - name: shared-memory
+        emptyDir:
+          medium: Memory
+          sizeLimit: 512Mi
+  volumeClaimTemplates:
+  - metadata:
+      name: postgresql-data
+      labels:
+        app: postgresql
+        component: database
+        role: read-replica
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd-storage
+      resources:
+        requests:
+          storage: 300Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-master
+  namespace: getit-production
+  labels:
+    app: postgresql
+    component: database
+    role: master
+    platform: getit-bangladesh
+  annotations:
+    description: "PostgreSQL Master Service for GetIt Bangladesh"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  selector:
+    app: postgresql
+    role: master
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-read-replica
+  namespace: getit-production
+  labels:
+    app: postgresql
+    component: database
+    role: read-replica
+    platform: getit-bangladesh
+  annotations:
+    description: "PostgreSQL Read Replica Service for GetIt Bangladesh"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  selector:
+    app: postgresql
+    role: read-replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-headless
+  namespace: getit-production
+  labels:
+    app: postgresql
+    component: database
+    platform: getit-bangladesh
+  annotations:
+    description: "PostgreSQL Headless Service for StatefulSet"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  selector:
+    app: postgresql

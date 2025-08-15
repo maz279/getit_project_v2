@@ -1,0 +1,97 @@
+# Multi-stage Dockerfile for GetIt Bangladesh Frontend
+# Amazon.com/Shopee.sg-Level Production Container
+FROM node:20-alpine AS base
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# =====================================
+# Dependencies Stage
+# =====================================
+FROM base AS deps
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --no-audit --no-fund && \
+    npm cache clean --force
+
+# =====================================
+# Build Stage
+# =====================================
+FROM base AS builder
+
+# Copy package files and install dependencies
+COPY package*.json ./
+COPY tsconfig.json ./
+RUN npm ci --no-audit --no-fund
+
+# Copy source code
+COPY . .
+
+# Build arguments for production
+ARG VITE_API_URL=http://localhost:5000
+ARG VITE_ENTERPRISE_MODE=true
+
+# Set environment variables for build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_ENTERPRISE_MODE=$VITE_ENTERPRISE_MODE
+
+# Build the frontend
+RUN npm run build
+
+# =====================================
+# Production Stage with Nginx
+# =====================================
+FROM nginx:alpine AS production
+
+# Install security updates
+RUN apk upgrade --no-cache
+
+# Copy custom nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Copy built frontend files
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy health check script
+COPY docker/frontend-healthcheck.sh /usr/local/bin/healthcheck.sh
+RUN chmod +x /usr/local/bin/healthcheck.sh
+
+# Create nginx user with proper permissions
+RUN addgroup -g 1001 -S nginx-group && \
+    adduser -S nginx-user -u 1001 -G nginx-group && \
+    chown -R nginx-user:nginx-group /usr/share/nginx/html && \
+    chown -R nginx-user:nginx-group /var/cache/nginx && \
+    chown -R nginx-user:nginx-group /var/log/nginx && \
+    chown -R nginx-user:nginx-group /etc/nginx/conf.d
+
+# Security: Remove unnecessary packages
+RUN rm -rf /var/cache/apk/* /tmp/*
+
+# Switch to non-root user
+USER nginx-user
+
+# Expose port
+EXPOSE 80
+
+# Add labels for metadata
+LABEL org.opencontainers.image.title="GetIt Bangladesh Frontend"
+LABEL org.opencontainers.image.description="Enterprise e-commerce frontend service"
+LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.vendor="GetIt Bangladesh"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD /usr/local/bin/healthcheck.sh
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

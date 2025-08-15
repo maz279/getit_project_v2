@@ -1,0 +1,285 @@
+# Jaeger Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Distributed Tracing
+
+# Service configuration
+service:
+  name: jaeger-all-in-one
+  version: 1.0.0
+  environment: production
+  tags:
+    - deployment.environment=production
+    - region=ap-southeast-1
+    - country=bangladesh
+
+# Collector configuration
+collector:
+  grpc-server:
+    host-port: 0.0.0.0:14250
+  http-server:
+    host-port: 0.0.0.0:14268
+  zipkin:
+    host-port: 0.0.0.0:9411
+  queue:
+    size: 2000
+  num-workers: 50
+  write-cache-ttl: 2s
+
+# Agent configuration
+agent:
+  processors:
+    - jaeger-compact
+    - jaeger-binary
+    - zipkin-compact
+    - zipkin-binary
+  server:
+    host-port: 0.0.0.0:6831
+  http-server:
+    host-port: 0.0.0.0:5778
+
+# Query service configuration
+query:
+  base-path: /jaeger
+  static-files: /go/jaeger-ui/
+  ui-config: /etc/jaeger/ui-config.json
+  max-clock-skew-adjustment: 0s
+  additional-headers:
+    - "Access-Control-Allow-Origin: *"
+    - "Access-Control-Allow-Methods: GET, POST, OPTIONS"
+    - "Access-Control-Allow-Headers: Content-Type, Authorization"
+
+# Storage configuration (Elasticsearch backend)
+storage:
+  type: elasticsearch
+  elasticsearch:
+    server-urls: http://elasticsearch:9200
+    index-prefix: jaeger
+    username: ""
+    password: ""
+    num-shards: 1
+    num-replicas: 0
+    max-span-age: 168h  # 7 days
+    max-num-spans: 10000000
+    bulk:
+      size: 1000
+      workers: 10
+      flush-interval: 500ms
+    indices:
+      spans: jaeger-span
+      services: jaeger-service
+      dependencies: jaeger-dependencies
+    tags-as-fields:
+      all: true
+      include:
+        - http.method
+        - http.status_code
+        - http.url
+        - user.id
+        - session.id
+        - order.id
+        - product.id
+        - vendor.id
+        - payment.method
+        - country
+        - city
+        - mobile.banking
+        - language
+        - device.type
+        - error
+        - component
+        - db.type
+        - db.statement
+        - message.bus.destination
+        - rpc.method
+        - rpc.service
+
+# Metrics configuration
+metrics:
+  backend: prometheus
+  http-route: /metrics
+
+# Sampling strategies for GetIt Bangladesh
+sampling:
+  strategies:
+    default_strategy:
+      type: probabilistic
+      param: 0.1  # 10% sampling rate
+    per_service_strategies:
+      - service: "getit-frontend"
+        type: probabilistic
+        param: 0.05  # 5% for frontend
+      - service: "getit-backend"
+        type: probabilistic
+        param: 0.2   # 20% for backend APIs
+      - service: "payment-service"
+        type: probabilistic
+        param: 1.0   # 100% for payment operations
+      - service: "order-service"
+        type: probabilistic
+        param: 0.8   # 80% for order processing
+      - service: "user-service"
+        type: probabilistic
+        param: 0.3   # 30% for user operations
+      - service: "search-service"
+        type: probabilistic
+        param: 0.1   # 10% for search operations
+      - service: "notification-service"
+        type: probabilistic
+        param: 0.2   # 20% for notifications
+      - service: "analytics-service"
+        type: probabilistic
+        param: 0.05  # 5% for analytics
+      - service: "mobile-banking"
+        type: probabilistic
+        param: 1.0   # 100% for mobile banking
+      - service: "courier-service"
+        type: probabilistic
+        param: 0.5   # 50% for courier operations
+    per_operation_strategies:
+      - operation: "payment.process"
+        service: "payment-service"
+        type: probabilistic
+        param: 1.0   # 100% for payment processing
+      - operation: "order.create"
+        service: "order-service"
+        type: probabilistic
+        param: 1.0   # 100% for order creation
+      - operation: "user.login"
+        service: "user-service"
+        type: probabilistic
+        param: 0.5   # 50% for login operations
+      - operation: "search.query"
+        service: "search-service"
+        type: probabilistic
+        param: 0.05  # 5% for search queries
+      - operation: "product.view"
+        service: "product-service"
+        type: probabilistic
+        param: 0.02  # 2% for product views
+
+# Health check configuration
+health-check:
+  port: 8080
+  path: /health
+
+# CORS configuration
+cors:
+  allowed-origins:
+    - "https://getit.com.bd"
+    - "https://www.getit.com.bd"
+    - "https://admin.getit.com.bd"
+    - "https://grafana.getit.com.bd"
+  allowed-headers:
+    - "Content-Type"
+    - "Authorization"
+    - "X-Requested-With"
+    - "Accept"
+    - "Origin"
+  allowed-methods:
+    - "GET"
+    - "POST"
+    - "OPTIONS"
+
+# Bangladesh specific trace processors
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  
+  resource:
+    attributes:
+      - action: insert
+        key: deployment.environment
+        value: production
+      - action: insert
+        key: country
+        value: bangladesh
+      - action: insert
+        key: timezone
+        value: Asia/Dhaka
+  
+  memory_limiter:
+    limit_mib: 512
+    spike_limit_mib: 128
+    check_interval: 1s
+
+# Bangladesh business context enrichment
+enrichment:
+  business_context:
+    enabled: true
+    attributes:
+      - name: "business.transaction_type"
+        source: "span.tags.transaction_type"
+      - name: "business.payment_method"
+        source: "span.tags.payment_method"
+      - name: "business.is_mobile_banking"
+        source: "span.tags.mobile_banking"
+      - name: "business.courier_partner"
+        source: "span.tags.courier_partner"
+      - name: "business.customer_tier"
+        source: "span.tags.customer_tier"
+      - name: "geo.division"
+        source: "span.tags.bangladesh_division"
+      - name: "cultural.language"
+        source: "span.tags.language"
+      - name: "cultural.is_festival_season"
+        source: "span.tags.festival_season"
+
+# Performance and reliability settings
+reliability:
+  circuit_breaker:
+    enabled: true
+    threshold: 5
+    timeout: 30s
+    reset_timeout: 60s
+  
+  retry:
+    enabled: true
+    max_attempts: 3
+    backoff_multiplier: 2
+    initial_interval: 100ms
+    max_interval: 10s
+
+# Advanced analytics and insights
+analytics:
+  service_map:
+    enabled: true
+    refresh_interval: 5m
+  
+  dependency_analysis:
+    enabled: true
+    analysis_interval: 1h
+  
+  performance_insights:
+    enabled: true
+    slow_query_threshold: 1s
+    error_rate_threshold: 0.05  # 5%
+  
+  business_metrics:
+    enabled: true
+    custom_dimensions:
+      - payment_method
+      - customer_segment
+      - bangladesh_division
+      - mobile_banking_provider
+      - courier_partner
+      - language
+      - device_type
+
+# Custom UI configuration
+ui:
+  config:
+    tracking:
+      gaID: "GA-REPLACE-WITH-ID"
+    dependencies:
+      menuEnabled: true
+    archiveEnabled: true
+    search:
+      maxLookback: "168h"  # 7 days
+      maxTraceDuration: "24h"
+    sitemap:
+      - text: "GetIt Bangladesh Docs"
+        url: "https://docs.getit.com.bd"
+      - text: "Grafana Dashboard"
+        url: "https://grafana.getit.com.bd"
+      - text: "Kibana Logs"
+        url: "https://kibana.getit.com.bd"

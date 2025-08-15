@@ -1,0 +1,83 @@
+# Frontend Service for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Frontend Service Configuration
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+    service-type: web
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:ap-southeast-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "300"
+    external-dns.alpha.kubernetes.io/hostname: getit.com.bd,www.getit.com.bd
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/metrics"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 443
+    protocol: TCP
+  selector:
+    app: frontend
+    tier: frontend
+  sessionAffinity: None
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0  # Allow all traffic for public website
+---
+# ClusterIP Service for Internal Communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-internal-service
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+    service-type: internal
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: frontend
+    tier: frontend
+  sessionAffinity: None
+---
+# Headless Service for StatefulSet (if needed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-headless
+  labels:
+    app: frontend
+    tier: frontend
+    project: getit-bangladesh
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  selector:
+    app: frontend
+    tier: frontend

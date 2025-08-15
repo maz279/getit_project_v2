@@ -1,0 +1,432 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "GetIt Bangladesh - Business Intelligence Dashboard",
+    "tags": ["business", "revenue", "kpi", "amazon-shopee-level"],
+    "style": "dark",
+    "timezone": "Asia/Dhaka",
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Real-Time Revenue (BDT)",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "targets": [{
+          "expr": "business:hourly_revenue",
+          "legendFormat": "Hourly Revenue",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {"displayMode": "basic"},
+            "unit": "currencyBDT",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 5000},
+                {"color": "green", "value": 15000}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Orders Per Hour",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "targets": [{
+          "expr": "increase(total_orders[1h])",
+          "legendFormat": "Orders/Hour",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Conversion Rate",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "targets": [{
+          "expr": "business:conversion_rate",
+          "legendFormat": "Conversion %",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 2},
+                {"color": "green", "value": 4}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Average Order Value",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "targets": [{
+          "expr": "business:average_order_value",
+          "legendFormat": "AOV (BDT)",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "currencyBDT",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 500},
+                {"color": "green", "value": 1000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Revenue Trend (24h)",
+        "type": "timeseries",
+        "gridPos": {"h": 12, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "business:revenue_per_minute",
+            "legendFormat": "Revenue/min",
+            "refId": "A"
+          },
+          {
+            "expr": "business:hourly_revenue",
+            "legendFormat": "Revenue/hour",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "currencyBDT",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "pointSize": 5
+            }
+          }
+        },
+        "options": {
+          "tooltip": {"mode": "multi"},
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 6,
+        "title": "Mobile Banking Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 12, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "business:bkash_transaction_success_rate",
+            "legendFormat": "bKash Success Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "business:nagad_transaction_success_rate",
+            "legendFormat": "Nagad Success Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "business:mobile_banking_share",
+            "legendFormat": "Mobile Banking Share",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Bangladesh Geographic Revenue Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 12, "w": 8, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "business:dhaka_revenue_share",
+            "legendFormat": "Dhaka",
+            "refId": "A"
+          },
+          {
+            "expr": "business:chittagong_revenue_share",
+            "legendFormat": "Chittagong",
+            "refId": "B"
+          },
+          {
+            "expr": "100 - business:dhaka_revenue_share - business:chittagong_revenue_share",
+            "legendFormat": "Other Divisions",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "pieType": "donut",
+          "tooltip": {"mode": "single"},
+          "legend": {"displayMode": "table", "placement": "right"}
+        }
+      },
+      {
+        "id": 8,
+        "title": "Top Selling Products (Last Hour)",
+        "type": "table",
+        "gridPos": {"h": 12, "w": 8, "x": 8, "y": 20},
+        "targets": [{
+          "expr": "business:top_selling_products",
+          "legendFormat": "{{product_name}}",
+          "refId": "A",
+          "format": "table"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "left",
+              "displayMode": "auto"
+            }
+          }
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "includeByName": {
+                "product_name": true,
+                "Value": true
+              },
+              "renameByName": {
+                "Value": "Sales Count"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Customer Metrics",
+        "type": "stat",
+        "gridPos": {"h": 12, "w": 8, "x": 16, "y": 20},
+        "targets": [
+          {
+            "expr": "business:new_customers_rate",
+            "legendFormat": "New Customers/Hour",
+            "refId": "A"
+          },
+          {
+            "expr": "business:customer_retention_rate",
+            "legendFormat": "Retention Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "business:cart_abandonment_rate",
+            "legendFormat": "Cart Abandonment",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Retention Rate"},
+              "properties": [{"id": "unit", "value": "percent"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Cart Abandonment"},
+              "properties": [{"id": "unit", "value": "percent"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "AI Recommendations Performance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "business:ai_recommendation_click_rate",
+            "legendFormat": "Click Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(ai_recommendations_shown[1h])",
+            "legendFormat": "Recommendations Shown/Hour",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "percent"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Recommendations Shown/Hour"},
+              "properties": [{"id": "unit", "value": "short"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "title": "Search to Purchase Funnel",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "increase(total_searches[1h])",
+            "legendFormat": "Searches/Hour",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(search_resulting_purchases[1h])",
+            "legendFormat": "Search Purchases/Hour",
+            "refId": "B"
+          },
+          {
+            "expr": "business:search_to_purchase_rate",
+            "legendFormat": "Search Conversion Rate",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Search Conversion Rate"},
+              "properties": [{"id": "unit", "value": "percent"}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "title": "Vendor Performance Summary",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "active_vendors",
+            "legendFormat": "Active Vendors",
+            "refId": "A"
+          },
+          {
+            "expr": "business:vendor_commission_rate",
+            "legendFormat": "Avg Commission Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "increase(vendor_sales[24h])",
+            "legendFormat": "Vendor Sales (24h)",
+            "refId": "C"
+          },
+          {
+            "expr": "increase(new_vendor_registrations[24h])",
+            "legendFormat": "New Vendors (24h)",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"}
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Avg Commission Rate"},
+              "properties": [{"id": "unit", "value": "percent"}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Vendor Sales (24h)"},
+              "properties": [{"id": "unit", "value": "currencyBDT"}]
+            }
+          ]
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "division",
+          "type": "query",
+          "query": "label_values(division)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(service)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "increase(deployment_events[1m])",
+          "iconColor": "green"
+        },
+        {
+          "name": "Alerts",
+          "datasource": "Prometheus", 
+          "expr": "ALERTS",
+          "iconColor": "red"
+        }
+      ]
+    }
+  }
+}

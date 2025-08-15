@@ -1,0 +1,119 @@
+# Backend Service for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Backend API Service Configuration
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  labels:
+    app: backend
+    tier: backend
+    project: getit-bangladesh
+    service-type: api
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "300"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  - name: websocket
+    port: 3001
+    targetPort: 3001
+    protocol: TCP
+  selector:
+    app: backend
+    tier: backend
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+  loadBalancerSourceRanges:
+  - 10.0.0.0/8     # VPC CIDR
+  - 172.16.0.0/12  # Private networks
+  - 192.168.0.0/16 # Private networks
+---
+# ClusterIP Service for Internal Communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-internal-service
+  labels:
+    app: backend
+    tier: backend
+    project: getit-bangladesh
+    service-type: internal
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  - name: websocket
+    port: 3001
+    targetPort: 3001
+    protocol: TCP
+  - name: grpc
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: backend
+    tier: backend
+  sessionAffinity: None
+---
+# Headless Service for Database Connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-headless
+  labels:
+    app: backend
+    tier: backend
+    project: getit-bangladesh
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: backend
+    tier: backend
+---
+# NodePort Service for Development Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-nodeport
+  labels:
+    app: backend
+    tier: backend
+    project: getit-bangladesh
+    service-type: nodeport
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    nodePort: 30000
+    protocol: TCP
+  selector:
+    app: backend
+    tier: backend
+  sessionAffinity: None

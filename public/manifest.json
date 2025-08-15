@@ -1,0 +1,235 @@
+{
+  "name": "GetIt Bangladesh - আপনার পছন্দের শপিং অ্যাপ",
+  "short_name": "GetIt BD",
+  "description": "Bangladesh's premier e-commerce platform with Amazon.com/Shopee.sg-level shopping experience",
+  "description_bengali": "আমাজন ও শপি মানের শপিং অভিজ্ঞতা সহ বাংলাদেশের প্রধান ই-কমার্স প্ল্যাটফর্ম",
+  "version": "3.0.0",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#e11d48",
+  "background_color": "#ffffff",
+  "lang": "bn",
+  "dir": "auto",
+  "categories": [
+    "shopping",
+    "business",
+    "lifestyle",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-home.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "GetIt Bangladesh Homepage"
+    },
+    {
+      "src": "/screenshots/mobile-home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "GetIt Bangladesh Mobile Experience"
+    },
+    {
+      "src": "/screenshots/desktop-products.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Product Discovery"
+    },
+    {
+      "src": "/screenshots/mobile-checkout.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Express Checkout"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Search Products",
+      "name_bengali": "পণ্য খুঁজুন",
+      "short_name": "Search",
+      "description": "Search for products",
+      "url": "/search",
+      "icons": [
+        {
+          "src": "/icons/search-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "My Cart",
+      "name_bengali": "আমার কার্ট",
+      "short_name": "Cart",
+      "description": "View shopping cart",
+      "url": "/cart",
+      "icons": [
+        {
+          "src": "/icons/cart-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Track Orders",
+      "name_bengali": "অর্ডার ট্র্যাক",
+      "short_name": "Orders",
+      "description": "Track your orders",
+      "url": "/orders",
+      "icons": [
+        {
+          "src": "/icons/orders-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Prayer Times",
+      "name_bengali": "নামাজের সময়",
+      "short_name": "Prayer",
+      "description": "View daily prayer times",
+      "url": "/prayer-times",
+      "icons": [
+        {
+          "src": "/icons/prayer-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.getit.bangladesh",
+      "id": "com.getit.bangladesh"
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "handle_links": "preferred",
+  "protocol_handlers": [
+    {
+      "protocol": "web+getit",
+      "url": "/product/%s"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/import",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/json": [".json"]
+      }
+    }
+  ],
+  "permissions": [
+    "geolocation",
+    "notifications",
+    "camera",
+    "microphone"
+  ],
+  "features": {
+    "background_sync": true,
+    "push_messaging": true,
+    "offline_support": true,
+    "payment_request": true,
+    "web_share": true,
+    "badging": true,
+    "shortcuts": true,
+    "display_override": ["window-controls-overlay", "minimal-ui"],
+    "cultural_features": {
+      "bengali_language": true,
+      "islamic_calendar": true,
+      "prayer_times": true,
+      "halal_certification": true,
+      "cultural_events": true,
+      "local_payment_methods": ["bkash", "nagad", "rocket"],
+      "regional_preferences": true
+    },
+    "enterprise_features": {
+      "offline_browsing": true,
+      "real_time_sync": true,
+      "advanced_search": true,
+      "voice_search": true,
+      "visual_search": true,
+      "ai_recommendations": true,
+      "live_commerce": true,
+      "social_integration": true
+    }
+  },
+  "gcm_sender_id": "103953800507",
+  "gcm_user_visible_only": true
+}

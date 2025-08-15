@@ -1,0 +1,303 @@
+# Alertmanager Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Alert Management and Notification
+
+global:
+  smtp_smarthost: 'smtp.sendgrid.net:587'
+  smtp_from: 'alerts@getit.com.bd'
+  smtp_auth_username: 'apikey'
+  smtp_auth_password: 'SG.REPLACE_WITH_SENDGRID_API_KEY'
+  slack_api_url: 'https://hooks.slack.com/services/REPLACE/WITH/WEBHOOK'
+
+# Routing tree for alerts
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+  # Critical alerts - immediate notification
+  - match:
+      severity: critical
+    receiver: 'critical-alerts'
+    group_wait: 0s
+    repeat_interval: 5m
+    routes:
+    - match:
+        category: business
+      receiver: 'business-critical'
+    - match:
+        category: security
+      receiver: 'security-alerts'
+    - match:
+        region: bangladesh
+      receiver: 'bangladesh-critical'
+  
+  # Warning alerts - hourly digest
+  - match:
+      severity: warning
+    receiver: 'warning-alerts'
+    group_interval: 30m
+    repeat_interval: 2h
+  
+  # Business metrics alerts
+  - match:
+      category: business
+    receiver: 'business-alerts'
+    group_interval: 15m
+    repeat_interval: 30m
+  
+  # Security alerts - immediate escalation
+  - match:
+      category: security
+    receiver: 'security-alerts'
+    group_wait: 0s
+    repeat_interval: 10m
+  
+  # Bangladesh specific alerts
+  - match:
+      region: bangladesh
+    receiver: 'bangladesh-ops'
+    group_interval: 15m
+
+# Alert receivers
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://monitoring-webhook:9093/webhook'
+
+# Critical alerts - Multiple channels
+- name: 'critical-alerts'
+  email_configs:
+  - to: 'devops@getit.com.bd,cto@getit.com.bd'
+    subject: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }} - GetIt Bangladesh'
+    headers:
+      Priority: 'urgent'
+    body: |
+      **CRITICAL ALERT - Immediate Action Required**
+      
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Environment**: {{ .GroupLabels.environment }}
+      **Service**: {{ .GroupLabels.service }}
+      **Severity**: {{ .GroupLabels.severity }}
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Description**: {{ .CommonAnnotations.description }}
+      **Summary**: {{ .CommonAnnotations.summary }}
+      
+      **Affected Services**: {{ .GroupLabels.service }}
+      **Runbook**: {{ .CommonAnnotations.runbook }}
+      
+      **Dashboard**: https://grafana.getit.com.bd
+      **Prometheus**: https://prometheus.getit.com.bd
+      
+      This is an automated alert from GetIt Bangladesh monitoring system.
+  
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/REPLACE/WITH/CRITICAL/WEBHOOK'
+    channel: '#critical-alerts'
+    title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+    text: |
+      **{{ .GroupLabels.alertname }}** - {{ .GroupLabels.service }}
+      {{ .CommonAnnotations.description }}
+      
+      Environment: {{ .GroupLabels.environment }}
+      Severity: {{ .GroupLabels.severity }}
+      Time: {{ .CommonAnnotations.timestamp }}
+    color: 'danger'
+    actions:
+    - type: button
+      text: 'View Dashboard'
+      url: 'https://grafana.getit.com.bd'
+    - type: button
+      text: 'View Runbook'
+      url: '{{ .CommonAnnotations.runbook }}'
+
+# Business critical alerts
+- name: 'business-critical'
+  email_configs:
+  - to: 'business@getit.com.bd,management@getit.com.bd'
+    subject: '💰 BUSINESS CRITICAL: {{ .GroupLabels.alertname }} - GetIt Bangladesh'
+    body: |
+      **BUSINESS CRITICAL ALERT**
+      
+      **Impact**: Revenue and customer experience affected
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Service**: {{ .GroupLabels.service }}
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Business Impact**: {{ .CommonAnnotations.description }}
+      
+      **Immediate Actions Required**:
+      1. Check payment gateway status
+      2. Verify order processing pipeline
+      3. Monitor customer support channels
+      4. Review conversion metrics
+      
+      **Dashboard**: https://grafana.getit.com.bd/business-metrics
+  
+  slack_configs:
+  - channel: '#business-alerts'
+    title: '💰 BUSINESS CRITICAL: {{ .GroupLabels.alertname }}'
+    color: 'danger'
+
+# Security alerts
+- name: 'security-alerts'
+  email_configs:
+  - to: 'security@getit.com.bd,devops@getit.com.bd'
+    subject: '🔒 SECURITY ALERT: {{ .GroupLabels.alertname }} - GetIt Bangladesh'
+    headers:
+      Priority: 'urgent'
+      X-Priority: '1'
+    body: |
+      **SECURITY ALERT - Immediate Investigation Required**
+      
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Service**: {{ .GroupLabels.service }}
+      **Source**: {{ .GroupLabels.instance }}
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Security Incident**: {{ .CommonAnnotations.description }}
+      
+      **Immediate Actions**:
+      1. Investigate logs for suspicious activity
+      2. Check firewall and access logs
+      3. Verify user authentication patterns
+      4. Review recent configuration changes
+      
+      **Security Dashboard**: https://grafana.getit.com.bd/security
+      **SIEM**: https://kibana.getit.com.bd
+  
+  slack_configs:
+  - channel: '#security-alerts'
+    title: '🔒 SECURITY: {{ .GroupLabels.alertname }}'
+    color: 'danger'
+
+# Bangladesh specific operations
+- name: 'bangladesh-ops'
+  email_configs:
+  - to: 'bangladesh-ops@getit.com.bd'
+    subject: '🇧🇩 Bangladesh Alert: {{ .GroupLabels.alertname }}'
+    body: |
+      **Bangladesh Operations Alert**
+      
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Service**: {{ .GroupLabels.service }}
+      **Region**: Bangladesh
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Local Impact**: {{ .CommonAnnotations.description }}
+      
+      **Bangladesh Specific Checks**:
+      - Mobile banking services (bKash, Nagad, Rocket)
+      - Local courier services (Pathao, Paperfly)
+      - Bengali language processing
+      - Prayer time features
+      - Festival promotion systems
+      
+      **Local Dashboard**: https://grafana.getit.com.bd/bangladesh
+  
+  slack_configs:
+  - channel: '#bangladesh-ops'
+    title: '🇧🇩 BD: {{ .GroupLabels.alertname }}'
+
+# Bangladesh critical alerts
+- name: 'bangladesh-critical'
+  email_configs:
+  - to: 'bangladesh-ops@getit.com.bd,management@getit.com.bd'
+    subject: '🚨🇧🇩 CRITICAL: Bangladesh Service Alert - {{ .GroupLabels.alertname }}'
+    body: |
+      **CRITICAL BANGLADESH SERVICE ALERT**
+      
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Service**: {{ .GroupLabels.service }}
+      **Impact**: Critical Bangladesh market functionality affected
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Critical Services Affected**:
+      - Mobile Banking: {{ if eq .GroupLabels.service "mobile-banking" }}🔴 AFFECTED{{ else }}✅ Normal{{ end }}
+      - Courier Services: {{ if eq .GroupLabels.service "courier-service" }}🔴 AFFECTED{{ else }}✅ Normal{{ end }}
+      - Bengali Language: {{ if eq .GroupLabels.service "localization" }}🔴 AFFECTED{{ else }}✅ Normal{{ end }}
+      - Payment Processing: {{ if eq .GroupLabels.service "payment" }}🔴 AFFECTED{{ else }}✅ Normal{{ end }}
+      
+      **Immediate Actions**:
+      1. Contact local service providers
+      2. Activate backup payment methods
+      3. Switch to alternative courier services
+      4. Notify customer support team
+      5. Update status page
+      
+      **Escalation Path**:
+      - Level 1: Bangladesh Operations Team
+      - Level 2: Regional Management
+      - Level 3: Executive Team
+  
+  slack_configs:
+  - channel: '#bangladesh-critical'
+    title: '🚨🇧🇩 CRITICAL BD: {{ .GroupLabels.alertname }}'
+    color: 'danger'
+
+# Warning alerts
+- name: 'warning-alerts'
+  email_configs:
+  - to: 'devops@getit.com.bd'
+    subject: '⚠️ Warning: {{ .GroupLabels.alertname }} - GetIt Bangladesh'
+    body: |
+      **Warning Alert - Monitoring Required**
+      
+      **Alert**: {{ .GroupLabels.alertname }}
+      **Service**: {{ .GroupLabels.service }}
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Issue**: {{ .CommonAnnotations.description }}
+      **Impact**: {{ .CommonAnnotations.summary }}
+      
+      **Action Required**: Monitor for escalation
+      **Dashboard**: https://grafana.getit.com.bd
+  
+  slack_configs:
+  - channel: '#monitoring'
+    title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
+    color: 'warning'
+
+# Business alerts
+- name: 'business-alerts'
+  email_configs:
+  - to: 'business@getit.com.bd'
+    subject: '📊 Business Alert: {{ .GroupLabels.alertname }} - GetIt Bangladesh'
+    body: |
+      **Business Metrics Alert**
+      
+      **Metric**: {{ .GroupLabels.alertname }}
+      **Current Value**: {{ .CommonAnnotations.value }}
+      **Threshold**: {{ .CommonAnnotations.threshold }}
+      **Time**: {{ .CommonAnnotations.timestamp }}
+      
+      **Business Impact**: {{ .CommonAnnotations.description }}
+      
+      **Recommended Actions**:
+      - Review marketing campaigns
+      - Check conversion funnels
+      - Analyze customer feedback
+      - Monitor competitor activity
+      
+      **Business Dashboard**: https://grafana.getit.com.bd/business
+  
+  slack_configs:
+  - channel: '#business-metrics'
+    title: '📊 Business: {{ .GroupLabels.alertname }}'
+    color: 'good'
+
+# Inhibit rules
+inhibit_rules:
+- source_match:
+    severity: 'critical'
+  target_match:
+    severity: 'warning'
+  equal: ['alertname', 'instance']
+
+- source_match:
+    severity: 'critical'
+  target_match:
+    severity: 'info'
+  equal: ['alertname', 'instance']

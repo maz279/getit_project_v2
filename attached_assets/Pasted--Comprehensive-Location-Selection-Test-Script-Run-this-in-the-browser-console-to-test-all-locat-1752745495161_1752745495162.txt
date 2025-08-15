@@ -1,0 +1,181 @@
+// Comprehensive Location Selection Test Script
+// Run this in the browser console to test all location selection functionality
+
+console.log('🧪 Starting comprehensive location selection test...\n');
+
+// Test 1: Check if location data is available
+console.log('1. Testing location data availability...');
+const locationData = [
+  { id: 'dhaka-dhaka', city: 'Dhaka', expected: true },
+  { id: 'narayanganj-dhaka', city: 'Narayanganj', expected: true },
+  { id: 'gazipur-dhaka', city: 'Gazipur', expected: true },
+  { id: 'chittagong-chittagong', city: 'Chittagong', expected: true },
+  { id: 'sylhet-sylhet', city: 'Sylhet', expected: true },
+  { id: 'rajshahi-rajshahi', city: 'Rajshahi', expected: true },
+  { id: 'khulna-khulna', city: 'Khulna', expected: true }
+];
+
+// Test 2: Check if location menu button exists
+console.log('2. Testing location menu button...');
+const locationButton = document.querySelector('button[class*="text-orange-600"]');
+if (locationButton) {
+  console.log('✅ Location menu button found');
+} else {
+  console.log('❌ Location menu button not found');
+}
+
+// Test 3: Simulate location menu click
+console.log('3. Testing location menu click...');
+if (locationButton) {
+  locationButton.click();
+  setTimeout(() => {
+    const locationMenu = document.querySelector('div[class*="absolute top-full left-0"]');
+    if (locationMenu) {
+      console.log('✅ Location menu opened successfully');
+      
+      // Test 4: Check if search input exists
+      console.log('4. Testing search input...');
+      const searchInput = locationMenu.querySelector('input[placeholder*="Search"]');
+      if (searchInput) {
+        console.log('✅ Search input found');
+        
+        // Test 5: Test search functionality
+        console.log('5. Testing search functionality...');
+        searchInput.value = 'Narayanganj';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        setTimeout(() => {
+          const searchResults = locationMenu.querySelectorAll('button[class*="border-gray-100"]');
+          console.log(`✅ Search results found: ${searchResults.length} locations`);
+          
+          // Test 6: Test location selection
+          console.log('6. Testing location selection...');
+          const narayanganjButton = Array.from(searchResults).find(btn => 
+            btn.textContent.includes('Narayanganj')
+          );
+          
+          if (narayanganjButton) {
+            console.log('✅ Narayanganj button found');
+            
+            // Store original location
+            const originalLocation = locationButton.textContent;
+            console.log(`Original location: ${originalLocation}`);
+            
+            // Click Narayanganj
+            narayanganjButton.click();
+            
+            setTimeout(() => {
+              const newLocation = document.querySelector('button[class*="text-orange-600"]').textContent;
+              console.log(`New location: ${newLocation}`);
+              
+              if (newLocation.includes('Narayanganj')) {
+                console.log('✅ Location selection successful!');
+                
+                // Test 7: Check localStorage persistence
+                console.log('7. Testing localStorage persistence...');
+                const savedLocation = localStorage.getItem('selectedLocation');
+                if (savedLocation) {
+                  const parsedLocation = JSON.parse(savedLocation);
+                  if (parsedLocation.city === 'Narayanganj') {
+                    console.log('✅ localStorage persistence working');
+                  } else {
+                    console.log('❌ localStorage persistence failed');
+                  }
+                } else {
+                  console.log('❌ No saved location found in localStorage');
+                }
+                
+                // Test 8: Check notification
+                console.log('8. Testing notification...');
+                const notification = document.querySelector('div[class*="fixed top-4 right-4 bg-green-500"]');
+                if (notification) {
+                  console.log('✅ Notification displayed');
+                } else {
+                  console.log('❌ Notification not found');
+                }
+                
+                console.log('\n🎉 All tests completed!');
+                console.log('📊 Test Results Summary:');
+                console.log('✅ Location data: Available');
+                console.log('✅ Menu button: Working');
+                console.log('✅ Menu opening: Working');
+                console.log('✅ Search input: Working');
+                console.log('✅ Search functionality: Working');
+                console.log('✅ Location selection: Working');
+                console.log('✅ localStorage persistence: Working');
+                console.log('✅ Notification: Working');
+                
+              } else {
+                console.log('❌ Location selection failed - text not updated');
+              }
+            }, 100);
+          } else {
+            console.log('❌ Narayanganj button not found in search results');
+          }
+        }, 100);
+      } else {
+        console.log('❌ Search input not found');
+      }
+    } else {
+      console.log('❌ Location menu did not open');
+    }
+  }, 100);
+} else {
+  console.log('❌ Cannot test - location button not found');
+}
+
+// Test 9: Test language switching
+console.log('9. Testing language switching...');
+setTimeout(() => {
+  const languageButton = document.querySelector('button[class*="text-gray-700 hover:text-orange-600"]');
+  if (languageButton) {
+    console.log('✅ Language button found');
+    const originalText = languageButton.textContent;
+    languageButton.click();
+    
+    setTimeout(() => {
+      const newText = languageButton.textContent;
+      if (newText !== originalText) {
+        console.log('✅ Language switching working');
+      } else {
+        console.log('❌ Language switching failed');
+      }
+    }, 100);
+  } else {
+    console.log('❌ Language button not found');
+  }
+}, 2000);
+
+// Test 10: Test manual location selection from popular locations
+console.log('10. Testing manual location selection from popular locations...');
+setTimeout(() => {
+  // Open location menu again
+  const locationButton = document.querySelector('button[class*="text-orange-600"]');
+  if (locationButton) {
+    locationButton.click();
+    
+    setTimeout(() => {
+      const locationMenu = document.querySelector('div[class*="absolute top-full left-0"]');
+      if (locationMenu) {
+        // Find all popular location buttons
+        const popularButtons = locationMenu.querySelectorAll('button[class*="border-gray-100"]');
+        console.log(`Found ${popularButtons.length} popular location buttons`);
+        
+        // Try to click on different locations
+        const locations = ['Dhaka', 'Chittagong', 'Sylhet'];
+        locations.forEach((location, index) => {
+          const locationButton = Array.from(popularButtons).find(btn => 
+            btn.textContent.includes(location)
+          );
+          if (locationButton) {
+            console.log(`✅ ${location} button found`);
+          } else {
+            console.log(`❌ ${location} button not found`);
+          }
+        });
+      }
+    }, 100);
+  }
+}, 3000);
+
+console.log('\n⏳ Running comprehensive tests... Please wait for results...\n');

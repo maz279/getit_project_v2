@@ -1,0 +1,45 @@
+
+export const bridalSareeProducts = [
+  {
+    id: 'bridal-saree-1',
+    name: 'Bridal Red Saree - Heavy Embroidery',
+    nameBn: 'বধূর লাল শাড়ি - ভারী সূচিকর্ম',
+    price: 18000,
+    originalPrice: 25000,
+    rating: 4.9,
+    reviews: 234,
+    vendor: 'Bridal Collections',
+    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&h=400&fit=crop',
+    discount: 28,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 67,
+    category: 'Bridal Saree',
+    stock: { status: 'limited', quantity: 8 },
+    delivery: { estimatedDays: 1, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  },
+  {
+    id: 'bridal-saree-2',
+    name: 'Traditional Bridal Saree - Gold Work',
+    nameBn: 'ঐতিহ্যবাহী বধূর শাড়ি - সোনার কাজ',
+    price: 22000,
+    originalPrice: 30000,
+    rating: 4.8,
+    reviews: 178,
+    vendor: 'Traditional Bridal',
+    image: 'https://images.unsplash.com/photo-1564557287817-3785e38ec1e5?w=400&h=400&fit=crop',
+    discount: 27,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 45,
+    category: 'Bridal Saree',
+    stock: { status: 'limited', quantity: 5 },
+    delivery: { estimatedDays: 1, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  }
+];

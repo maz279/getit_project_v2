@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: getit-monitoring
+  labels:
+    name: getit-monitoring
+    environment: shared
+    platform: getit-bangladesh
+    tier: monitoring
+    purpose: observability
+  annotations:
+    description: "GetIt Bangladesh Multi-Vendor E-commerce Monitoring Infrastructure"
+    contact: "devops-team@getit.com.bd"
+    cost-center: "infrastructure"
+    retention-policy: "6-months"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-resource-quota
+  namespace: getit-monitoring
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "10"
+    pods: "30"
+    services: "15"
+    secrets: "20"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limit-range
+  namespace: getit-monitoring
+spec:
+  limits:
+  - default:
+      cpu: 2
+      memory: 4Gi
+    defaultRequest:
+      cpu: 200m
+      memory: 512Mi
+    type: Container
+  - max:
+      cpu: 4
+      memory: 8Gi
+    min:
+      cpu: 100m
+      memory: 256Mi
+    type: Container
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: getit-monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          platform: getit-bangladesh
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus
+    - protocol: TCP
+      port: 3000  # Grafana
+    - protocol: TCP
+      port: 9200  # Elasticsearch
+    - protocol: TCP
+      port: 5601  # Kibana
+    - protocol: TCP
+      port: 16686 # Jaeger
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          platform: getit-bangladesh
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 5000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443

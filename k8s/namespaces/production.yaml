@@ -1,0 +1,136 @@
+# Kubernetes Namespace for GetIt Bangladesh Production Environment
+# Amazon.com/Shopee.sg-Level Production Environment Configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    name: production
+    environment: production
+    project: getit-bangladesh
+    tier: application
+    owner: devops-team
+    version: v1.0.0
+    criticality: high
+    compliance: required
+  annotations:
+    description: "GetIt Bangladesh Multi-Vendor E-commerce Platform - Production Environment"
+    contact: "devops@getit.com.bd"
+    created-by: "GitLab CI/CD Pipeline"
+    purpose: "Live production workloads serving customers"
+    backup-policy: "daily"
+    monitoring: "enabled"
+    alerting: "enabled"
+---
+# Resource Quota for Production Environment
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-resource-quota
+  namespace: production
+  labels:
+    environment: production
+    project: getit-bangladesh
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "16"
+    requests.memory: 32Gi
+    limits.cpu: "32"
+    limits.memory: 64Gi
+    
+    # Storage Resources
+    requests.storage: 1Ti
+    persistentvolumeclaims: "50"
+    
+    # Object Counts
+    pods: "200"
+    services: "50"
+    secrets: "50"
+    configmaps: "50"
+    deployments.apps: "50"
+    ingresses.networking.k8s.io: "20"
+    
+    # Load Balancer Services
+    services.loadbalancers: "10"
+---
+# Limit Range for Production Environment
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: production-limit-range
+  namespace: production
+  labels:
+    environment: production
+    project: getit-bangladesh
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: "1"
+      memory: 1Gi
+    defaultRequest:
+      cpu: 200m
+      memory: 256Mi
+    max:
+      cpu: "4"
+      memory: 8Gi
+    min:
+      cpu: 100m
+      memory: 128Mi
+  - type: Pod
+    max:
+      cpu: "8"
+      memory: 16Gi
+  - type: PersistentVolumeClaim
+    max:
+      storage: 500Gi
+    min:
+      storage: 1Gi
+---
+# Network Policy for Production Environment
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: production-network-policy
+  namespace: production
+  labels:
+    environment: production
+    project: getit-bangladesh
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  - to: [] # Allow external traffic
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 9200  # Elasticsearch

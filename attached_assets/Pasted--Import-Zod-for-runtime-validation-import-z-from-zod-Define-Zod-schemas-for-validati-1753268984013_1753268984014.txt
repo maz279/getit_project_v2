@@ -1,0 +1,488 @@
+// Import Zod for runtime validation
+import { z } from 'zod';
+
+// Define Zod schemas for validation
+const SearchEnhancementSchema = z.object({
+  enhancedQuery: z.string(),
+  intent: z.string(),
+  categories: z.array(z.string()),
+  semanticKeywords: z.array(z.string()),
+  suggestions: z.array(z.object({
+    text: z.string(),
+    relevance: z.number(),
+    type: z.enum(['product', 'category', 'brand', 'intent']),
+    context: z.string(),
+  })),
+  confidence: z.number(),
+});
+
+const SuggestionsArraySchema = z.array(z.string());
+
+const IntentAnalysisSchema = z.object({
+  intent: z.string(),
+  confidence: z.number(),
+  category: z.string(),
+  urgency: z.enum(['low', 'medium', 'high']),
+});
+
+// Interfaces (kept for type annotations where needed)
+interface DeepSeekResponse {
+  choices: Array<{
+    message: {
+      content: string;
+      role: string;
+    };
+    finish_reason: string;
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+// Type definitions based on Zod schemas for convenience
+type SearchEnhancement = z.infer<typeof SearchEnhancementSchema>;
+type IntentAnalysis = z.infer<typeof IntentAnalysisSchema>;
+
+/**
+ * Service class for interacting with the DeepSeek AI API for e-commerce search enhancements.
+ * Implements a singleton pattern.
+ */
+export class DeepSeekAIService {
+  private static instance: DeepSeekAIService | null = null;
+  private apiKey: string;
+  private readonly baseUrl = 'https://api.deepseek.com/v1/chat/completions';
+
+  // Constants for configuration
+  private static readonly TIMEOUT_ENHANCE_QUERY_MS = 8000;
+  private static readonly TIMEOUT_CONTEXTUAL_SUGGESTIONS_MS = 10000;
+  private static readonly TIMEOUT_ANALYZE_INTENT_MS = 8000;
+
+  private static readonly MAX_TOKENS_ENHANCE_QUERY = 200;
+  private static readonly MAX_TOKENS_CONTEXTUAL_SUGGESTIONS = 300;
+  private static readonly MAX_TOKENS_ANALYZE_INTENT = 300;
+
+  private static readonly DEFAULT_LANGUAGE = 'en';
+  private static readonly INPUT_MAX_LENGTH = 1000;
+
+  /**
+   * Private constructor to enforce singleton pattern.
+   */
+  private constructor() {
+    this.apiKey = process.env.DEEPSEEK_API_KEY || '';
+    if (!this.apiKey) {
+      console.warn('⚠️ DEEPSEEK_API_KEY not provided - AI enhancement disabled');
+    } else {
+      console.log('✅ DeepSeek AI Service initialized successfully');
+    }
+  }
+
+  /**
+   * Gets the singleton instance of DeepSeekAIService.
+   * @returns The singleton instance.
+   */
+  public static getInstance(): DeepSeekAIService {
+    if (!DeepSeekAIService.instance) {
+      DeepSeekAIService.instance = new DeepSeekAIService();
+    }
+    return DeepSeekAIService.instance;
+  }
+
+  /**
+   * Sanitizes user input to prevent prompt injection and limit length.
+   * @param input The raw user input string.
+   * @returns The sanitized input string.
+   */
+  private sanitizeInput(input: string): string {
+    if (!input || typeof input !== 'string') {
+      return '';
+    }
+    // Basic sanitization to remove common injection patterns
+    return input
+      .replace(/[<>]/g, '') // Remove HTML tags
+      .replace(/javascript:/gi, '') // Remove javascript: protocols
+      .replace(/on\w+\s*=/gi, '') // Remove event handlers
+      .replace(/\${.*?}/g, '') // Remove template literals
+      .substring(0, DeepSeekAIService.INPUT_MAX_LENGTH) // Limit length
+      .trim();
+  }
+
+  /**
+   * Generic method to call the DeepSeek API.
+   * Handles common setup, timeout, error handling, and initial JSON parsing.
+   * @template T The expected type of the parsed AI response content.
+   * @param prompt The prompt to send to the AI.
+   * @param schema The Zod schema to validate the parsed response against.
+   * @param maxTokens Maximum tokens for the AI response.
+   * @param timeoutMs Timeout for the API call in milliseconds.
+   * @returns A promise resolving to the validated response content or null on failure.
+   */
+  private async callDeepSeekAPI<T>(
+    prompt: string,
+    schema: z.ZodSchema<T>,
+    maxTokens: number,
+    timeoutMs: number
+  ): Promise<T | null> {
+    if (!this.apiKey) {
+      console.warn('⚠️ DeepSeek API key missing, skipping API call.');
+      return null;
+    }
+
+    let controller: AbortController | undefined;
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    try {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller!.abort(), timeoutMs);
+
+      console.log(`🚀 Calling DeepSeek API with timeout ${timeoutMs}ms`);
+
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`, // SECURITY: API key in header, not logged
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert e-commerce AI assistant. Provide concise, accurate responses in the specified JSON format.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.1, // Low temperature for more deterministic outputs
+          response_format: { type: "json_object" }, // Encourage JSON output
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+
+      // Clear timeout on success
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Could not read error body');
+        console.error(`❌ DeepSeek API request failed: Status ${response.status}`, { statusText: response.statusText, errorBodyPreview: errorText.substring(0, 100) });
+        // Throw generic error to caller
+        throw new Error(`DeepSeek API error: ${response.status}`);
+      }
+
+      const data: DeepSeekResponse = await response.json(); // Type assertion based on interface
+      const aiContentRaw = data.choices[0]?.message?.content?.trim();
+
+      if (!aiContentRaw) {
+        console.warn('⚠️ Empty or invalid content received from DeepSeek AI.');
+        return null;
+      }
+
+      console.log(`✅ Received AI content (length: ${aiContentRaw.length})`);
+
+      // Attempt to parse JSON
+      let parsedContent: any;
+      try {
+        parsedContent = JSON.parse(aiContentRaw);
+      } catch (jsonParseError: any) {
+        console.error('❌ Failed to parse JSON from DeepSeek response:', jsonParseError.message, { rawContentPreview: aiContentRaw.substring(0, 200) });
+        return null; // Parsing failed, let caller handle fallback
+      }
+
+      // Validate parsed content against the provided schema
+      const validationResult = schema.safeParse(parsedContent);
+      if (!validationResult.success) {
+        console.error('❌ DeepSeek response failed validation:', validationResult.error.issues, { rawParsedContent: parsedContent });
+        return null; // Validation failed, let caller handle fallback
+      }
+
+      console.log(`✅ AI response validated successfully.`);
+      return validationResult.data; // Return the validated and typed data
+
+    } catch (error: any) {
+      // Clear timeout in error cases
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+
+      if (error.name === 'AbortError') {
+        console.warn(`⏱️ DeepSeek API call timed out after ${timeoutMs}ms.`);
+      } else {
+        // Log specific error details for debugging, but don't expose to user
+        console.error('❌ Error during DeepSeek API call:', error.message || error);
+      }
+      return null; // Indicate failure to caller
+
+    } finally {
+      // Always cleanup resources
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
+
+  /**
+   * Enhances a search query using DeepSeek AI.
+   * @param query The original user search query.
+   * @param language The language code (e.g., 'en', 'bn'). Defaults to 'en'.
+   * @param context Optional context object for the search.
+   * @returns A promise resolving to the enhanced search data or a fallback object.
+   */
+  public async enhanceSearchQuery(
+    query: string,
+    language: string = DeepSeekAIService.DEFAULT_LANGUAGE,
+    context: any = {}
+  ): Promise<SearchEnhancement> {
+    try {
+      const sanitizedQuery = this.sanitizeInput(query);
+
+      // Use fallback immediately if no API key
+      if (!this.apiKey) {
+        console.log('🔍 enhanceSearchQuery: No API key, using fallback.');
+        return this.getFallbackEnhancement(sanitizedQuery, language);
+      }
+
+      const prompt = this.buildSearchEnhancementPrompt(sanitizedQuery, language, context);
+
+      const result = await this.callDeepSeekAPI<SearchEnhancement>(
+        prompt,
+        SearchEnhancementSchema,
+        DeepSeekAIService.MAX_TOKENS_ENHANCE_QUERY,
+        DeepSeekAIService.TIMEOUT_ENHANCE_QUERY_MS
+      );
+
+      if (result) {
+        console.log(`✅ DeepSeek enhanced query with ${result.suggestions.length} suggestions.`);
+        return result;
+      } else {
+        console.warn('⚠️ enhanceSearchQuery: AI call failed or returned invalid data, using fallback.');
+        return this.getFallbackEnhancement(sanitizedQuery, language);
+      }
+    } catch (error) {
+      // Catch any unexpected errors in the main logic flow
+      console.error('❌ Unexpected error in enhanceSearchQuery:', error);
+      return this.getFallbackEnhancement(query, language); // Ensure fallback is always returned
+    }
+  }
+
+  /**
+   * Generates contextual search suggestions using DeepSeek AI.
+   * @param query The current user search query.
+   * @param userHistory An array of previous user search queries.
+   * @param language The language code (e.g., 'en', 'bn'). Defaults to 'en'.
+   * @returns A promise resolving to an array of suggestions or a fallback array.
+   */
+  public async generateContextualSuggestions(
+    query: string,
+    userHistory: string[] = [],
+    language: string = DeepSeekAIService.DEFAULT_LANGUAGE
+  ): Promise<string[]> {
+    try {
+      const sanitizedQuery = this.sanitizeInput(query);
+      const sanitizedHistory = userHistory.map(item => this.sanitizeInput(item)).slice(0, 5); // Limit history
+
+       // Use fallback immediately if no API key
+       if (!this.apiKey) {
+        console.log('🔍 generateContextualSuggestions: No API key, using fallback.');
+        return this.getFallbackSuggestions(sanitizedQuery, language);
+      }
+
+      const prompt = `
+Generate 12 contextual e-commerce search suggestions for the query: "${sanitizedQuery}"
+Language: ${language}
+User history context: ${sanitizedHistory.join(', ')}
+Context: Bangladesh e-commerce marketplace
+Requirements:
+- Include Bengali and English suggestions
+- Focus on popular Bangladesh products
+- Consider seasonal trends and festivals
+- Mix product names, categories, and brands
+- Return only a JSON array of strings, e.g., ["suggestion 1", "suggestion 2"]
+`;
+
+      const result = await this.callDeepSeekAPI<string[]>(
+        prompt,
+        SuggestionsArraySchema, // Validate as array of strings
+        DeepSeekAIService.MAX_TOKENS_CONTEXTUAL_SUGGESTIONS,
+        DeepSeekAIService.TIMEOUT_CONTEXTUAL_SUGGESTIONS_MS
+      );
+
+      if (result) {
+        console.log(`✅ DeepSeek generated ${result.length} contextual suggestions.`);
+        // Ensure we return max 12 suggestions
+        return result.slice(0, 12);
+      } else {
+        console.warn('⚠️ generateContextualSuggestions: AI call failed or returned invalid data, using fallback.');
+        return this.getFallbackSuggestions(sanitizedQuery, language);
+      }
+    } catch (error) {
+      console.error('❌ Unexpected error in generateContextualSuggestions:', error);
+      return this.getFallbackSuggestions(query, language);
+    }
+  }
+
+  /**
+   * Analyzes the intent behind a search query using DeepSeek AI.
+   * @param query The user search query.
+   * @param language The language code (e.g., 'en', 'bn'). Defaults to 'en'.
+   * @returns A promise resolving to the intent analysis object or a fallback object.
+   */
+  public async analyzeSearchIntent(
+    query: string,
+    language: string = DeepSeekAIService.DEFAULT_LANGUAGE
+  ): Promise<IntentAnalysis> {
+    try {
+      const sanitizedQuery = this.sanitizeInput(query);
+
+       // Use fallback immediately if no API key
+       if (!this.apiKey) {
+        console.log('🔍 analyzeSearchIntent: No API key, using fallback.');
+        return this.getFallbackIntent(sanitizedQuery, language);
+      }
+
+      const prompt = `
+Analyze the search intent for: "${sanitizedQuery}"
+Language: ${language}
+Determine:
+1. Primary intent (browse, research, purchase, compare, support)
+2. Confidence level (0-1)
+3. Product category
+4. Purchase urgency (low/medium/high)
+Return JSON format:
+{
+  "intent": "purchase_intent_description",
+  "confidence": 0.85,
+  "category": "electronics",
+  "urgency": "medium"
+}
+`;
+
+      const result = await this.callDeepSeekAPI<IntentAnalysis>(
+        prompt,
+        IntentAnalysisSchema,
+        DeepSeekAIService.MAX_TOKENS_ANALYZE_INTENT,
+        DeepSeekAIService.TIMEOUT_ANALYZE_INTENT_MS
+      );
+
+      if (result) {
+        console.log(`✅ DeepSeek analyzed search intent: ${result.intent}`);
+        return result;
+      } else {
+        console.warn('⚠️ analyzeSearchIntent: AI call failed or returned invalid data, using fallback.');
+        return this.getFallbackIntent(sanitizedQuery, language);
+      }
+    } catch (error) {
+      console.error('❌ Unexpected error in analyzeSearchIntent:', error);
+      return this.getFallbackIntent(query, language);
+    }
+  }
+
+  /**
+   * Builds the prompt for the search enhancement task.
+   * @param query The sanitized search query.
+   * @param language The language.
+   * @param context The context object.
+   * @returns The formatted prompt string.
+   */
+  private buildSearchEnhancementPrompt(query: string, language: string, context: any): string {
+    // Note: The prompt structure is slightly adjusted for clarity and JSON format instruction
+    return `
+Enhance this e-commerce search query for Bangladesh market: "${query}"
+Language: ${language}
+Provide a JSON response with the following structure:
+{
+  "enhancedQuery": "improved search query with better keywords",
+  "intent": "detailed intent description (e.g., looking to buy, research, compare)",
+  "categories": ["relevant_category_1", "relevant_category_2"],
+  "semanticKeywords": ["keyword1", "keyword2", "synonym1"],
+  "suggestions": [
+    {
+      "text": "suggestion text 1",
+      "relevance": 0.95, // Number between 0 and 1
+      "type": "product", // One of: product, category, brand, intent
+      "context": "brief context for this suggestion"
+    },
+    {
+      "text": "suggestion text 2",
+      "relevance": 0.85,
+      "type": "category",
+      "context": "context for suggestion 2"
+    }
+    // ... up to 12 suggestions
+  ],
+  "confidence": 0.85 // Overall confidence in the analysis (0-1)
+}
+`;
+  }
+
+  // --- Fallback Methods ---
+
+  private getFallbackEnhancement(query: string, language: string): SearchEnhancement {
+    return {
+      enhancedQuery: query,
+      intent: 'Product search',
+      categories: ['general'],
+      semanticKeywords: [query],
+      suggestions: [
+        {
+          text: `${query} in Bangladesh`,
+          relevance: 0.7,
+          type: 'product',
+          context: 'Fallback suggestion for local market',
+        },
+        {
+          text: `Buy ${query} online`,
+          relevance: 0.65,
+          type: 'intent',
+          context: 'Fallback purchase intent',
+        },
+      ],
+      confidence: 0.3, // Lower confidence for fallback
+    };
+  }
+
+  private getFallbackSuggestions(query: string, language: string): string[] {
+    const baseSuggestions = [
+      `${query} price`,
+      `${query} buy`,
+      `${query} deals`,
+      `${query} reviews`,
+      `${query} specs`,
+      `Best ${query}`,
+    ];
+    if (language === 'bn') {
+      baseSuggestions.push(
+        `${query} দাম`,
+        `${query} কিনুন`,
+        `${query} অফার`,
+        `${query} রিভিউ`,
+        `সেরা ${query}`
+      );
+    }
+    // Add variety to fallback suggestions
+    baseSuggestions.push(
+        `Cheap ${query}`,
+        `${query} comparison`,
+        `Top rated ${query}`
+    );
+    return baseSuggestions.slice(0, 12); // Ensure max 12
+  }
+
+  private getFallbackIntent(query: string, language: string): IntentAnalysis {
+    return {
+      intent: 'General product search',
+      confidence: 0.3, // Lower confidence for fallback
+      category: 'general',
+      urgency: 'medium',
+    };
+  }
+}

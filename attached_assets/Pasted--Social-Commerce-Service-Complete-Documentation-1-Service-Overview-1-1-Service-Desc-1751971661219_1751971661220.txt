@@ -1,0 +1,838 @@
+# Social Commerce Service - Complete Documentation
+
+## 1. Service Overview
+
+### 1.1 Service Description
+The Social Commerce Service integrates social networking features with ecommerce functionality, enabling users to discover, share, and purchase products through social interactions, reviews, influencer collaborations, and community-driven shopping experiences tailored for Bangladesh's social media culture.
+
+### 1.2 Core Responsibilities
+- **Social Shopping**: Enable social discovery and group purchasing
+- **Influencer Management**: Manage influencer partnerships and campaigns
+- **User-Generated Content**: Handle reviews, photos, videos, and social posts
+- **Social Sharing**: Enable product sharing across social platforms
+- **Community Features**: Create shopping communities and interest groups
+- **Social Analytics**: Track social engagement and conversion metrics
+
+### 1.3 Technology Stack
+```yaml
+Service: social-commerce-service
+Technology: Node.js + Express.js + React
+Database: PostgreSQL + MongoDB + Neo4j
+Media Storage: AWS S3 + CloudFront
+Social APIs: Facebook, Instagram, YouTube, TikTok
+Real-time: Socket.io + Redis
+```
+
+## 2. Database Design
+
+### 2.1 PostgreSQL Schema
+```sql
+-- Social profiles table
+CREATE TABLE social_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    profile_type profile_type DEFAULT 'customer',
+    display_name VARCHAR(100) NOT NULL,
+    bio TEXT,
+    avatar_url VARCHAR(500),
+    follower_count INTEGER DEFAULT 0,
+    following_count INTEGER DEFAULT 0,
+    total_likes INTEGER DEFAULT 0,
+    total_shares INTEGER DEFAULT 0,
+    verification_status verification_status DEFAULT 'unverified',
+    privacy_settings JSONB DEFAULT '{"profile": "public", "posts": "public"}',
+    social_links JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Social posts table
+CREATE TABLE social_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    author_id UUID NOT NULL REFERENCES social_profiles(id),
+    post_type post_type NOT NULL,
+    content TEXT,
+    media_urls JSONB,
+    product_tags JSONB, -- Array of product IDs
+    hashtags JSONB,
+    mentions JSONB, -- Array of user IDs
+    location_tag VARCHAR(255),
+    visibility post_visibility DEFAULT 'public',
+    like_count INTEGER DEFAULT 0,
+    comment_count INTEGER DEFAULT 0,
+    share_count INTEGER DEFAULT 0,
+    view_count INTEGER DEFAULT 0,
+    engagement_score DECIMAL(5,2) DEFAULT 0,
+    is_sponsored BOOLEAN DEFAULT false,
+    sponsor_id UUID REFERENCES vendors(id),
+    scheduled_at TIMESTAMP,
+    published_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Social interactions table
+CREATE TABLE social_interactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    target_type interaction_target NOT NULL,
+    target_id UUID NOT NULL,
+    interaction_type interaction_type NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, target_type, target_id, interaction_type)
+);
+
+-- Social comments table
+CREATE TABLE social_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES social_posts(id),
+    author_id UUID NOT NULL REFERENCES social_profiles(id),
+    parent_comment_id UUID REFERENCES social_comments(id),
+    content TEXT NOT NULL,
+    media_url VARCHAR(500),
+    like_count INTEGER DEFAULT 0,
+    reply_count INTEGER DEFAULT 0,
+    is_pinned BOOLEAN DEFAULT false,
+    is_hidden BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Influencer profiles table
+CREATE TABLE influencer_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    social_profile_id UUID NOT NULL REFERENCES social_profiles(id),
+    influencer_tier influencer_tier NOT NULL,
+    categories JSONB NOT NULL, -- Array of categories
+    external_platforms JSONB, -- Facebook, Instagram, YouTube followers
+    engagement_rate DECIMAL(5,2),
+    average_views INTEGER,
+    content_quality_score DECIMAL(5,2),
+    collaboration_rate DECIMAL(10,2), -- Per post/video rate
+    minimum_collaboration_amount DECIMAL(10,2),
+    preferred_collaboration_types JSONB,
+    portfolio_urls JSONB,
+    performance_metrics JSONB,
+    verification_documents JSONB,
+    status influencer_status DEFAULT 'pending',
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Collaboration campaigns table
+CREATE TABLE collaboration_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES vendors(id),
+    campaign_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    campaign_type campaign_type NOT NULL,
+    target_audience JSONB,
+    budget DECIMAL(12,2) NOT NULL,
+    product_ids JSONB, -- Array of product IDs
+    requirements JSONB,
+    deliverables JSONB,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status campaign_status DEFAULT 'draft',
+    application_deadline DATE,
+    max_participants INTEGER,
+    current_participants INTEGER DEFAULT 0,
+    total_reach INTEGER DEFAULT 0,
+    total_engagement INTEGER DEFAULT 0,
+    conversion_count INTEGER DEFAULT 0,
+    roi DECIMAL(8,4),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Collaboration applications table
+CREATE TABLE collaboration_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID NOT NULL REFERENCES collaboration_campaigns(id),
+    influencer_id UUID NOT NULL REFERENCES influencer_profiles(id),
+    proposal TEXT,
+    proposed_rate DECIMAL(10,2),
+    deliverable_timeline JSONB,
+    portfolio_samples JSONB,
+    status application_status DEFAULT 'pending',
+    vendor_feedback TEXT,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP,
+    UNIQUE(campaign_id, influencer_id)
+);
+
+-- Social groups table
+CREATE TABLE social_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    name_bn VARCHAR(255), -- Bangla name
+    description TEXT,
+    avatar_url VARCHAR(500),
+    cover_url VARCHAR(500),
+    category VARCHAR(100),
+    privacy_type group_privacy DEFAULT 'public',
+    member_count INTEGER DEFAULT 0,
+    post_count INTEGER DEFAULT 0,
+    created_by UUID NOT NULL REFERENCES users(id),
+    group_rules JSONB,
+    moderation_settings JSONB,
+    tags JSONB,
+    location VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Group memberships table
+CREATE TABLE group_memberships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES social_groups(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    role member_role DEFAULT 'member',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity TIMESTAMP,
+    is_muted BOOLEAN DEFAULT false,
+    UNIQUE(group_id, user_id)
+);
+
+-- Social wishlists table
+CREATE TABLE social_wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    privacy_type wishlist_privacy DEFAULT 'public',
+    product_count INTEGER DEFAULT 0,
+    follower_count INTEGER DEFAULT 0,
+    is_collaborative BOOLEAN DEFAULT false,
+    collaborators JSONB,
+    tags JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Wishlist items table
+CREATE TABLE wishlist_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wishlist_id UUID NOT NULL REFERENCES social_wishlists(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    added_by UUID NOT NULL REFERENCES users(id),
+    priority priority_level DEFAULT 'medium',
+    notes TEXT,
+    price_alert_threshold DECIMAL(10,2),
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(wishlist_id, product_id)
+);
+
+-- Social reviews table
+CREATE TABLE social_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id),
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    order_id UUID REFERENCES orders(id),
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title VARCHAR(255),
+    content TEXT,
+    media_urls JSONB,
+    helpful_count INTEGER DEFAULT 0,
+    verified_purchase BOOLEAN DEFAULT false,
+    is_featured BOOLEAN DEFAULT false,
+    response_from_vendor TEXT,
+    response_date TIMESTAMP,
+    tags JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create custom types
+CREATE TYPE profile_type AS ENUM ('customer', 'influencer', 'vendor', 'admin');
+CREATE TYPE verification_status AS ENUM ('unverified', 'pending', 'verified', 'rejected');
+CREATE TYPE post_type AS ENUM ('text', 'image', 'video', 'product_showcase', 'story', 'live');
+CREATE TYPE post_visibility AS ENUM ('public', 'followers', 'friends', 'private');
+CREATE TYPE interaction_target AS ENUM ('post', 'comment', 'user', 'product');
+CREATE TYPE interaction_type AS ENUM ('like', 'follow', 'share', 'save', 'view');
+CREATE TYPE influencer_tier AS ENUM ('nano', 'micro', 'macro', 'mega');
+CREATE TYPE influencer_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
+CREATE TYPE campaign_type AS ENUM ('product_review', 'brand_awareness', 'product_launch', 'seasonal');
+CREATE TYPE campaign_status AS ENUM ('draft', 'active', 'paused', 'completed', 'cancelled');
+CREATE TYPE application_status AS ENUM ('pending', 'approved', 'rejected', 'withdrawn');
+CREATE TYPE group_privacy AS ENUM ('public', 'private', 'secret');
+CREATE TYPE member_role AS ENUM ('member', 'moderator', 'admin', 'owner');
+CREATE TYPE wishlist_privacy AS ENUM ('public', 'friends', 'private');
+CREATE TYPE priority_level AS ENUM ('low', 'medium', 'high');
+
+-- Create indexes
+CREATE INDEX idx_social_profiles_user_id ON social_profiles(user_id);
+CREATE INDEX idx_social_posts_author ON social_posts(author_id);
+CREATE INDEX idx_social_posts_published ON social_posts(published_at DESC);
+CREATE INDEX idx_social_interactions_user ON social_interactions(user_id);
+CREATE INDEX idx_social_interactions_target ON social_interactions(target_type, target_id);
+CREATE INDEX idx_influencer_profiles_tier ON influencer_profiles(influencer_tier);
+CREATE INDEX idx_collaboration_campaigns_vendor ON collaboration_campaigns(vendor_id);
+CREATE INDEX idx_social_reviews_product ON social_reviews(product_id);
+```
+
+### 2.2 Neo4j Graph Schema
+```cypher
+// User nodes
+CREATE (u:User {
+    id: "uuid",
+    display_name: "John Doe",
+    profile_type: "customer",
+    created_at: datetime()
+})
+
+// Follow relationships
+CREATE (u1:User)-[:FOLLOWS {since: datetime()}]->(u2:User)
+
+// Product nodes
+CREATE (p:Product {
+    id: "uuid",
+    name: "iPhone 14 Pro",
+    category: "electronics"
+})
+
+// Interest relationships
+CREATE (u:User)-[:INTERESTED_IN {strength: 0.8}]->(c:Category {name: "electronics"})
+
+// Purchase relationships
+CREATE (u:User)-[:PURCHASED {date: datetime(), amount: 1200.00}]->(p:Product)
+
+// Recommendation relationships
+CREATE (u:User)-[:RECOMMENDED {reason: "similar_taste", score: 0.9}]->(p:Product)
+
+// Group nodes
+CREATE (g:Group {
+    id: "uuid",
+    name: "Tech Enthusiasts BD",
+    category: "technology"
+})
+
+// Group membership
+CREATE (u:User)-[:MEMBER_OF {role: "admin", joined: datetime()}]->(g:Group)
+```
+
+### 2.3 MongoDB Collections
+```javascript
+// Social feed aggregations
+{
+    _id: ObjectId,
+    user_id: "uuid",
+    feed_type: "home", // home, discover, following
+    generated_at: ISODate,
+    expires_at: ISODate,
+    posts: [
+        {
+            post_id: "uuid",
+            score: 0.85,
+            ranking_factors: {
+                recency: 0.7,
+                engagement: 0.9,
+                relevance: 0.8,
+                social_signals: 0.6
+            }
+        }
+    ],
+    total_posts: 50,
+    last_refresh: ISODate
+}
+
+// User activity streams
+{
+    _id: ObjectId,
+    user_id: "uuid",
+    activity_type: "product_view",
+    timestamp: ISODate,
+    data: {
+        product_id: "uuid",
+        category: "electronics",
+        duration: 45, // seconds
+        source: "social_post"
+    },
+    session_id: "session_uuid",
+    device_info: {
+        type: "mobile",
+        os: "Android"
+    }
+}
+
+// Trending hashtags
+{
+    _id: ObjectId,
+    hashtag: "#dhakamarket",
+    mention_count: 1250,
+    growth_rate: 0.15,
+    categories: ["fashion", "lifestyle"],
+    top_posts: ["post_uuid1", "post_uuid2"],
+    trending_score: 0.87,
+    location: "Dhaka",
+    updated_at: ISODate
+}
+
+// Social analytics
+{
+    _id: ObjectId,
+    entity_type: "post", // post, user, product, campaign
+    entity_id: "uuid",
+    date: ISODate,
+    metrics: {
+        views: 1500,
+        likes: 230,
+        comments: 45,
+        shares: 78,
+        engagement_rate: 0.235,
+        reach: 2500,
+        impressions: 3200
+    },
+    demographics: {
+        age_groups: {
+            "18-24": 0.35,
+            "25-34": 0.45,
+            "35-44": 0.20
+        },
+        locations: {
+            "Dhaka": 0.6,
+            "Chittagong": 0.25,
+            "Other": 0.15
+        }
+    }
+}
+```
+
+## 3. Folder Structure
+
+```
+social-commerce-service/
+├── src/
+│   ├── controllers/
+│   │   ├── social-profile-controller.js    # Social profile management
+│   │   ├── social-post-controller.js       # Social posts and content
+│   │   ├── social-feed-controller.js       # News feed generation
+│   │   ├── influencer-controller.js        # Influencer management
+│   │   ├── collaboration-controller.js     # Brand collaborations
+│   │   ├── social-group-controller.js      # Social groups and communities
+│   │   ├── wishlist-controller.js          # Social wishlists
+│   │   ├── social-review-controller.js     # Social reviews and ratings
+│   │   └── social-analytics-controller.js  # Social analytics
+│   ├── models/
+│   │   ├── SocialProfile.js                # Social profile model
+│   │   ├── SocialPost.js                   # Social post model
+│   │   ├── SocialInteraction.js            # Social interaction model
+│   │   ├── SocialComment.js                # Comment model
+│   │   ├── InfluencerProfile.js            # Influencer profile model
+│   │   ├── CollaborationCampaign.js        # Collaboration campaign model
+│   │   ├── SocialGroup.js                  # Social group model
+│   │   ├── SocialWishlist.js               # Social wishlist model
+│   │   └── SocialReview.js                 # Social review model
+│   ├── routes/
+│   │   ├── social-profile-routes.js        # Profile management endpoints
+│   │   ├── social-post-routes.js           # Post management endpoints
+│   │   ├── social-feed-routes.js           # Feed endpoints
+│   │   ├── influencer-routes.js            # Influencer endpoints
+│   │   ├── collaboration-routes.js         # Collaboration endpoints
+│   │   ├── social-group-routes.js          # Group endpoints
+│   │   ├── wishlist-routes.js              # Wishlist endpoints
+│   │   └── social-review-routes.js         # Review endpoints
+│   ├── services/
+│   │   ├── social-profile-service.js       # Social profile logic
+│   │   ├── social-post-service.js          # Post creation and management
+│   │   ├── feed-generation-service.js      # Feed algorithm service
+│   │   ├── recommendation-service.js       # Social recommendations
+│   │   ├── influencer-service.js           # Influencer management
+│   │   ├── collaboration-service.js        # Collaboration management
+│   │   ├── social-group-service.js         # Group management
+│   │   ├── content-moderation-service.js   # Content moderation
+│   │   ├── social-analytics-service.js     # Social analytics
+│   │   └── notification-service.js         # Social notifications
+│   ├── middleware/
+│   │   ├── social-auth.js                  # Social authentication
+│   │   ├── content-validation.js           # Content validation
+│   │   ├── privacy-control.js              # Privacy settings enforcement
+│   │   ├── rate-limiting.js                # Social action rate limiting
+│   │   └── content-filtering.js            # Content filtering middleware
+│   ├── utils/
+│   │   ├── feed-algorithm.js               # Feed ranking algorithm
+│   │   ├── hashtag-extractor.js            # Hashtag extraction
+│   │   ├── mention-parser.js               # User mention parsing
+│   │   ├── content-analyzer.js             # Content analysis utilities
+│   │   ├── social-metrics.js               # Social metrics calculation
+│   │   └── media-processor.js              # Media processing utilities
+│   ├── algorithms/
+│   │   ├── feed-ranking-algorithm.js       # Feed post ranking
+│   │   ├── recommendation-algorithm.js     # Social recommendations
+│   │   ├── trend-detection-algorithm.js    # Trending content detection
+│   │   ├── influence-scoring.js            # Influencer scoring
+│   │   └── similarity-algorithm.js         # User similarity calculation
+│   ├── integrations/
+│   │   ├── facebook-api.js                 # Facebook integration
+│   │   ├── instagram-api.js                # Instagram integration
+│   │   ├── youtube-api.js                  # YouTube integration
+│   │   ├── tiktok-api.js                   # TikTok integration
+│   │   └── whatsapp-business-api.js        # WhatsApp Business integration
+│   ├── config/
+│   │   ├── database.js                     # Database configuration
+│   │   ├── social-apis.js                  # Social platform API configs
+│   │   ├── content-policies.js             # Content moderation policies
+│   │   ├── feed-config.js                  # Feed algorithm configuration
+│   │   └── analytics-config.js             # Analytics configuration
+│   └── app.js                              # Express application setup
+├── bangladesh-features/                    # Bangladesh-specific features
+│   ├── local-social-trends.js             # Local trend detection
+│   ├── bengali-content-analysis.js        # Bangla content analysis
+│   ├── cultural-content-filters.js        # Cultural content filtering
+│   ├── local-influencer-discovery.js      # Local influencer discovery
+│   └── regional-group-recommendations.js  # Regional group suggestions
+├── content-moderation/                     # Content moderation
+│   ├── automated-moderation.js            # Automated content moderation
+│   ├── image-content-filter.js            # Image content filtering
+│   ├── text-content-filter.js             # Text content filtering
+│   ├── spam-detection.js                  # Spam content detection
+│   ├── hate-speech-detection.js           # Hate speech detection
+│   └── fake-news-detection.js             # Fake news detection
+├── recommendation-engine/                  # Recommendation system
+│   ├── collaborative-filtering.js         # Collaborative filtering
+│   ├── content-based-filtering.js         # Content-based filtering
+│   ├── social-graph-analysis.js           # Social graph analysis
+│   ├── trend-based-recommendations.js     # Trend-based recommendations
+│   └── hybrid-recommendations.js          # Hybrid recommendation system
+├── analytics/                             # Social analytics
+│   ├── engagement-analytics.js            # Engagement metrics
+│   ├── influence-analytics.js             # Influence measurement
+│   ├── conversion-analytics.js            # Social commerce conversion
+│   ├── trend-analytics.js                 # Trending content analytics
+│   └── campaign-analytics.js              # Campaign performance analytics
+├── gamification/                          # Social gamification
+│   ├── points-system.js                   # Social points system
+│   ├── badges-achievements.js             # Badges and achievements
+│   ├── leaderboards.js                    # Social leaderboards
+│   ├── challenges.js                      # Social challenges
+│   └── rewards-system.js                  # Social rewards system
+├── tests/
+│   ├── unit/
+│   │   ├── social-profile.test.js
+│   │   ├── feed-algorithm.test.js
+│   │   ├── content-moderation.test.js
+│   │   ├── recommendation-engine.test.js
+│   │   └── social-analytics.test.js
+│   ├── integration/
+│   │   ├── social-flow.test.js
+│   │   ├── influencer-collaboration.test.js
+│   │   └── social-commerce-flow.test.js
+│   └── performance/
+│       ├── feed-generation-performance.test.js
+│       └── recommendation-performance.test.js
+├── localization/                          # Multi-language support
+│   ├── en/
+│   │   ├── social-messages.json           # English social messages
+│   │   ├── content-policies.json          # English content policies
+│   │   └── notification-templates.json    # English notification templates
+│   └── bn/                               # Bangla translations
+│       ├── social-messages.json           # Bangla social messages
+│       ├── content-policies.json          # Bangla content policies
+│       └── notification-templates.json    # Bangla notification templates
+├── documentation/                         # Social commerce documentation
+│   ├── api-documentation/
+│   │   ├── social-apis.md
+│   │   ├── influencer-apis.md
+│   │   └── analytics-apis.md
+│   ├── integration-guides/
+│   │   ├── social-platform-integration.md
+│   │   ├── influencer-program-setup.md
+│   │   └── content-moderation-setup.md
+│   └── best-practices/
+│       ├── content-guidelines.md
+│       ├── community-management.md
+│       └── influencer-collaboration.md
+├── docker-compose.yml                     # Multi-service composition
+├── Dockerfile                            # Docker configuration
+├── package.json                          # Node.js dependencies
+└── README.md                             # Service documentation
+```
+
+## 4. API Endpoints
+
+### 4.1 Social Profile APIs
+```javascript
+// Create/Update social profile
+POST /api/v1/social/profile
+Body: {
+    display_name: "John Doe",
+    bio: "Tech enthusiast from Dhaka",
+    avatar_url: "https://cdn.example.com/avatars/john.jpg",
+    privacy_settings: {
+        profile: "public",
+        posts: "followers"
+    },
+    social_links: {
+        facebook: "john.doe.fb",
+        instagram: "john_doe_insta"
+    }
+}
+
+// Get social profile
+GET /api/v1/social/profile/:user_id
+Response: {
+    id: "uuid",
+    user_id: "uuid",
+    display_name: "John Doe",
+    bio: "Tech enthusiast from Dhaka",
+    follower_count: 1250,
+    following_count: 890,
+    verification_status: "verified",
+    recent_posts: [...],
+    mutual_followers: 45
+}
+
+// Follow/Unfollow user
+POST /api/v1/social/profile/:user_id/follow
+DELETE /api/v1/social/profile/:user_id/follow
+
+// Get followers/following
+GET /api/v1/social/profile/:user_id/followers
+GET /api/v1/social/profile/:user_id/following
+```
+
+### 4.2 Social Posts APIs
+```javascript
+// Create social post
+POST /api/v1/social/posts
+Body: {
+    post_type: "product_showcase",
+    content: "Check out this amazing iPhone deal! 🔥",
+    media_urls: ["https://cdn.example.com/images/post1.jpg"],
+    product_tags: ["product_uuid1", "product_uuid2"],
+    hashtags: ["#iphone", "#deals", "#dhaka"],
+    location_tag: "Dhaka, Bangladesh",
+    visibility: "public"
+}
+
+// Get social feed
+GET /api/v1/social/feed
+Query: ?type=home&page=1&limit=20
+Response: {
+    posts: [
+        {
+            id: "uuid",
+            author: {...},
+            content: "Check out this amazing deal!",
+            media_urls: [...],
+            product_tags: [...],
+            like_count: 45,
+            comment_count: 12,
+            created_at: "2024-03-17T10:30:00Z",
+            user_interaction: {
+                liked: true,
+                shared: false,
+                saved: false
+            }
+        }
+    ],
+    has_more: true,
+    next_cursor: "cursor_string"
+}
+
+// Like/Unlike post
+POST /api/v1/social/posts/:post_id/like
+DELETE /api/v1/social/posts/:post_id/like
+
+// Share post
+POST /api/v1/social/posts/:post_id/share
+Body: {
+    platform: "facebook", // facebook, instagram, whatsapp, native
+    message: "Sharing this amazing deal!"
+}
+
+// Add comment
+POST /api/v1/social/posts/:post_id/comments
+Body: {
+    content: "Great product! Thanks for sharing.",
+    parent_comment_id: "uuid" // optional for replies
+}
+```
+
+### 4.3 Influencer APIs
+```javascript
+// Apply for influencer program
+POST /api/v1/social/influencer/apply
+Body: {
+    categories: ["fashion", "lifestyle"],
+    external_platforms: {
+        instagram: {
+            username: "john_doe_insta",
+            followers: 15000,
+            engagement_rate: 0.045
+        },
+        youtube: {
+            channel_name: "John's Tech Reviews",
+            subscribers: 8500,
+            average_views: 2500
+        }
+    },
+    collaboration_rate: 5000.00,
+    portfolio_urls: ["https://portfolio.com/john"],
+    preferred_collaboration_types: ["product_review", "unboxing"]
+}
+
+// Get influencer dashboard
+GET /api/v1/social/influencer/dashboard
+Response: {
+    profile: {...},
+    active_campaigns: 3,
+    completed_campaigns: 12,
+    total_earnings: 25000.00,
+    performance_metrics: {
+        total_reach: 150000,
+        total_engagement: 12500,
+        conversion_rate: 0.035
+    },
+    recent_opportunities: [...]
+}
+
+// Browse collaboration opportunities
+GET /api/v1/social/influencer/opportunities
+Query: ?category=fashion&budget_min=2000&budget_max=10000
+
+// Apply for collaboration
+POST /api/v1/social/influencer/campaigns/:campaign_id/apply
+Body: {
+    proposal: "I would love to create engaging content for your brand...",
+    proposed_rate: 7500.00,
+    deliverable_timeline: {
+        "content_creation": "2024-03-20",
+        "posting": "2024-03-22",
+        "performance_report": "2024-03-29"
+    }
+}
+```
+
+### 4.4 Collaboration Campaign APIs
+```javascript
+// Create collaboration campaign
+POST /api/v1/social/campaigns
+Body: {
+    campaign_name: "Spring Fashion Collection Launch",
+    description: "Promote our new spring collection",
+    campaign_type: "product_launch",
+    budget: 50000.00,
+    product_ids: ["product_uuid1", "product_uuid2"],
+    target_audience: {
+        age_range: [18, 35],
+        locations: ["Dhaka", "Chittagong"],
+        interests: ["fashion", "lifestyle"]
+    },
+    requirements: {
+        min_followers: 5000,
+        categories: ["fashion", "lifestyle"],
+        deliverables: ["3 posts", "1 story", "1 reel"]
+    },
+    start_date: "2024-03-15",
+    end_date: "2024-04-15"
+}
+
+// Get campaign applications
+GET /api/v1/social/campaigns/:campaign_id/applications
+Query: ?status=pending&sort=rating_desc
+
+// Approve/Reject application
+PUT /api/v1/social/campaigns/:campaign_id/applications/:application_id
+Body: {
+    status: "approved",
+    feedback: "Great portfolio and engagement rate!"
+}
+
+// Track campaign performance
+GET /api/v1/social/campaigns/:campaign_id/analytics
+Response: {
+    total_reach: 125000,
+    total_engagement: 8500,
+    conversion_count: 245,
+    roi: 1.85,
+    top_performing_posts: [...],
+    demographic_breakdown: {...}
+}
+```
+
+### 4.5 Social Group APIs
+```javascript
+// Create social group
+POST /api/v1/social/groups
+Body: {
+    name: "Dhaka Tech Enthusiasts",
+    name_bn: "ঢাকা টেক উৎসাহী",
+    description: "A community for tech lovers in Dhaka",
+    category: "technology",
+    privacy_type: "public",
+    group_rules: [
+        "Be respectful to all members",
+        "No spam or self-promotion",
+        "Share relevant tech content only"
+    ]
+}
+
+// Join group
+POST /api/v1/social/groups/:group_id/join
+
+// Get group feed
+GET /api/v1/social/groups/:group_id/feed
+Query: ?page=1&limit=20
+
+// Post in group
+POST /api/v1/social/groups/:group_id/posts
+Body: {
+    content: "What do you think about the new iPhone release?",
+    media_urls: [],
+    product_tags: ["iphone_uuid"]
+}
+```
+
+## 5. Bangladesh-Specific Features
+
+### 5.1 Local Social Features
+- **Bengali Content Support**: Full Bangla language support for posts and comments
+- **Cultural Content Filters**: Respect for local cultural values and religious sensitivities
+- **Regional Groups**: Location-based groups for different districts and divisions
+- **Festival Integration**: Special features during Eid, Durga Puja, Pohela Boishakh
+- **Local Influencer Discovery**: Dedicated section for Bangladeshi influencers
+
+### 5.2 Mobile-First Social Experience
+- **Data-Efficient Content**: Optimized for slower mobile networks
+- **Offline Capability**: Cached content for offline viewing
+- **Voice Posts**: Voice note support for users who prefer speaking
+- **Short Video Support**: TikTok-style short videos optimized for mobile
+- **WhatsApp Integration**: Share products directly to WhatsApp
+
+### 5.3 Local Commerce Integration
+- **Group Buying**: Coordinate group purchases for better deals
+- **Local Vendor Spotlights**: Highlight local vendors and artisans
+- **Price Comparison Social Posts**: Users share price comparisons across vendors
+- **Delivery Coordination**: Social coordination for group deliveries
+- **Local Review Network**: Hyper-local product reviews and recommendations
+
+## 6. Content Moderation & Safety
+
+### 6.1 Automated Moderation
+- **Text Analysis**: Bengali and English text analysis for inappropriate content
+- **Image Recognition**: Automated detection of inappropriate images
+- **Spam Detection**: Machine learning-based spam content detection
+- **Fake News Detection**: Detection and flagging of misinformation
+- **Hate Speech Detection**: Automated detection of hate speech in multiple languages
+
+### 6.2 Community Guidelines
+- **Cultural Sensitivity**: Guidelines respecting Bangladeshi culture and values
+- **Religious Considerations**: Respectful handling of religious content
+- **Gender Sensitivity**: Special attention to women's safety and privacy
+- **Youth Protection**: Enhanced protection for underage users
+- **Vendor Conduct**: Guidelines for vendor participation in social features
+
+## 7. Social Analytics & Insights
+
+### 7.1 User Analytics
+- **Engagement Metrics**: Likes, comments, shares, saves, view time
+- **Reach Metrics**: Unique viewers, impressions, viral coefficient
+- **Conversion Metrics**: Social-to-purchase conversion rates
+- **Influence Metrics**: User influence score and reach
+- **Content Performance**: Best performing content types and timing
+
+### 7.2 Business Analytics
+- **Campaign ROI**: Return on investment for social campaigns
+- **Influencer Performance**: Detailed influencer collaboration metrics
+- **Social Commerce Conversion**: Social media to sales conversion tracking
+- **Trend Analysis**: Trending products, hashtags, and topics
+- **Competitor Analysis**: Social performance vs competitors
+
+This comprehensive social commerce service creates an engaging, culturally-aware social shopping experience that drives community engagement, influencer collaborations, and social-driven sales for the GetIt platform in Bangladesh.

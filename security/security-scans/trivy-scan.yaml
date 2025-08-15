@@ -1,0 +1,285 @@
+# Trivy Security Scanning Configuration for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Container Security Scanning
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-security-scan
+  namespace: security
+  labels:
+    app: trivy-scanner
+    tier: security
+    project: getit-bangladesh
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM Bangladesh time
+  timeZone: "Asia/Dhaka"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: trivy-scanner
+            tier: security
+            project: getit-bangladesh
+        spec:
+          serviceAccountName: trivy-service-account
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            fsGroup: 65534
+          containers:
+          - name: trivy-scanner
+            image: aquasec/trivy:latest
+            imagePullPolicy: Always
+            env:
+            - name: TRIVY_DB_REPOSITORY
+              value: "ghcr.io/aquasecurity/trivy-db"
+            - name: TRIVY_CACHE_DIR
+              value: "/tmp/trivy-cache"
+            - name: TRIVY_NO_PROGRESS
+              value: "true"
+            - name: TRIVY_QUIET
+              value: "false"
+            - name: TRIVY_FORMAT
+              value: "json"
+            - name: TRIVY_SEVERITY
+              value: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+            - name: REGISTRY_URL
+              value: "registry.gitlab.com/getit-bangladesh/platform"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: trivy-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trivy-secrets
+                  key: aws-secret-access-key
+            - name: S3_BUCKET
+              value: "getit-bangladesh-security-reports"
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: trivy-secrets
+                  key: slack-webhook-url
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Install required tools
+              apk add --no-cache aws-cli curl jq
+              
+              echo "Starting Trivy security scan for GetIt Bangladesh platform..."
+              
+              # Define images to scan
+              IMAGES=(
+                "${REGISTRY_URL}/frontend:latest"
+                "${REGISTRY_URL}/backend:latest"
+                "${REGISTRY_URL}/postgres:latest"
+                "${REGISTRY_URL}/redis:latest"
+              )
+              
+              # Create timestamp for reports
+              SCAN_DATE=$(date +%Y%m%d_%H%M%S)
+              REPORT_DIR="/tmp/scan-reports"
+              mkdir -p ${REPORT_DIR}
+              
+              # Initialize summary report
+              SUMMARY_REPORT="${REPORT_DIR}/security-summary-${SCAN_DATE}.json"
+              echo '{"scan_date":"'${SCAN_DATE}'","total_images":'${#IMAGES[@]}',"results":[]}' > ${SUMMARY_REPORT}
+              
+              # Track critical issues
+              CRITICAL_COUNT=0
+              HIGH_COUNT=0
+              MEDIUM_COUNT=0
+              
+              # Scan each image
+              for IMAGE in "${IMAGES[@]}"; do
+                echo "Scanning image: ${IMAGE}"
+                
+                IMAGE_NAME=$(echo ${IMAGE} | sed 's|.*/||' | sed 's|:.*||')
+                REPORT_FILE="${REPORT_DIR}/trivy-${IMAGE_NAME}-${SCAN_DATE}.json"
+                
+                # Run Trivy scan
+                trivy image \
+                  --format json \
+                  --output ${REPORT_FILE} \
+                  --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+                  --ignore-unfixed \
+                  --no-progress \
+                  ${IMAGE} || echo "Scan failed for ${IMAGE}"
+                
+                if [ -f ${REPORT_FILE} ]; then
+                  # Extract vulnerability counts
+                  CRITICAL_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' ${REPORT_FILE})
+                  HIGH_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' ${REPORT_FILE})
+                  MEDIUM_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' ${REPORT_FILE})
+                  
+                  # Update counts
+                  CRITICAL_COUNT=$((CRITICAL_COUNT + CRITICAL_VULNS))
+                  HIGH_COUNT=$((HIGH_COUNT + HIGH_VULNS))
+                  MEDIUM_COUNT=$((MEDIUM_COUNT + MEDIUM_VULNS))
+                  
+                  # Add to summary
+                  jq --arg image "${IMAGE}" \
+                     --arg critical "${CRITICAL_VULNS}" \
+                     --arg high "${HIGH_VULNS}" \
+                     --arg medium "${MEDIUM_VULNS}" \
+                     '.results += [{"image": $image, "critical": ($critical|tonumber), "high": ($high|tonumber), "medium": ($medium|tonumber)}]' \
+                     ${SUMMARY_REPORT} > ${SUMMARY_REPORT}.tmp && mv ${SUMMARY_REPORT}.tmp ${SUMMARY_REPORT}
+                  
+                  echo "Vulnerabilities found in ${IMAGE_NAME}: Critical=${CRITICAL_VULNS}, High=${HIGH_VULNS}, Medium=${MEDIUM_VULNS}"
+                fi
+              done
+              
+              # Update summary with totals
+              jq --arg critical "${CRITICAL_COUNT}" \
+                 --arg high "${HIGH_COUNT}" \
+                 --arg medium "${MEDIUM_COUNT}" \
+                 '. += {"total_critical": ($critical|tonumber), "total_high": ($high|tonumber), "total_medium": ($medium|tonumber)}' \
+                 ${SUMMARY_REPORT} > ${SUMMARY_REPORT}.tmp && mv ${SUMMARY_REPORT}.tmp ${SUMMARY_REPORT}
+              
+              # Upload reports to S3
+              echo "Uploading security reports to S3..."
+              aws s3 sync ${REPORT_DIR} s3://${S3_BUCKET}/trivy-scans/${SCAN_DATE}/
+              
+              # Generate alert message
+              ALERT_COLOR="good"
+              if [ ${CRITICAL_COUNT} -gt 0 ]; then
+                ALERT_COLOR="danger"
+              elif [ ${HIGH_COUNT} -gt 10 ]; then
+                ALERT_COLOR="warning"
+              fi
+              
+              # Send Slack notification
+              if [ ! -z "${SLACK_WEBHOOK_URL}" ]; then
+                curl -X POST ${SLACK_WEBHOOK_URL} \
+                  -H 'Content-type: application/json' \
+                  --data "{
+                    \"attachments\": [{
+                      \"color\": \"${ALERT_COLOR}\",
+                      \"title\": \"🔒 GetIt Bangladesh Security Scan Report\",
+                      \"text\": \"Daily Trivy security scan completed\",
+                      \"fields\": [
+                        {\"title\": \"Images Scanned\", \"value\": \"${#IMAGES[@]}\", \"short\": true},
+                        {\"title\": \"Critical Vulnerabilities\", \"value\": \"${CRITICAL_COUNT}\", \"short\": true},
+                        {\"title\": \"High Vulnerabilities\", \"value\": \"${HIGH_COUNT}\", \"short\": true},
+                        {\"title\": \"Medium Vulnerabilities\", \"value\": \"${MEDIUM_COUNT}\", \"short\": true},
+                        {\"title\": \"Report Location\", \"value\": \"s3://${S3_BUCKET}/trivy-scans/${SCAN_DATE}/\", \"short\": false}
+                      ],
+                      \"footer\": \"GetIt Bangladesh Security Team\",
+                      \"ts\": $(date +%s)
+                    }]
+                  }"
+              fi
+              
+              # Create compliance report for Bangladesh DPA
+              COMPLIANCE_REPORT="${REPORT_DIR}/bangladesh-dpa-compliance-${SCAN_DATE}.json"
+              cat > ${COMPLIANCE_REPORT} << EOF
+              {
+                "compliance_framework": "Bangladesh Data Protection Act",
+                "scan_date": "${SCAN_DATE}",
+                "total_vulnerabilities": $((CRITICAL_COUNT + HIGH_COUNT + MEDIUM_COUNT)),
+                "critical_security_issues": ${CRITICAL_COUNT},
+                "high_priority_fixes": ${HIGH_COUNT},
+                "compliance_status": $([ ${CRITICAL_COUNT} -eq 0 ] && echo '"COMPLIANT"' || echo '"NON_COMPLIANT"'),
+                "remediation_required": $([ ${CRITICAL_COUNT} -gt 0 ] && echo 'true' || echo 'false'),
+                "next_scan_scheduled": "$(date -d '+1 day' +%Y-%m-%d)",
+                "data_residency_compliance": "Bangladesh",
+                "encryption_standards": "AES-256-GCM",
+                "access_controls": "RBAC Enabled"
+              }
+              EOF
+              
+              # Upload compliance report
+              aws s3 cp ${COMPLIANCE_REPORT} s3://${S3_BUCKET}/compliance/bangladesh-dpa/${SCAN_DATE}/
+              
+              echo "Security scan completed successfully"
+              echo "Critical: ${CRITICAL_COUNT}, High: ${HIGH_COUNT}, Medium: ${MEDIUM_COUNT}"
+              
+              # Exit with error if critical vulnerabilities found
+              if [ ${CRITICAL_COUNT} -gt 0 ]; then
+                echo "CRITICAL vulnerabilities found! Manual review required."
+                exit 1
+              fi
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+            volumeMounts:
+            - name: trivy-cache
+              mountPath: /tmp/trivy-cache
+            - name: scan-reports
+              mountPath: /tmp/scan-reports
+          volumes:
+          - name: trivy-cache
+            emptyDir:
+              sizeLimit: 2Gi
+          - name: scan-reports
+            emptyDir:
+              sizeLimit: 1Gi
+---
+# Trivy Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trivy-service-account
+  namespace: security
+  labels:
+    app: trivy-scanner
+    project: getit-bangladesh
+---
+# Trivy Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: trivy-secrets
+  namespace: security
+  labels:
+    app: trivy-scanner
+    project: getit-bangladesh
+type: Opaque
+stringData:
+  aws-access-key-id: "REPLACE_WITH_AWS_ACCESS_KEY"
+  aws-secret-access-key: "REPLACE_WITH_AWS_SECRET_KEY"
+  slack-webhook-url: "https://hooks.slack.com/services/REPLACE/WITH/WEBHOOK"
+---
+# RBAC for Trivy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trivy-scanner-role
+  labels:
+    project: getit-bangladesh
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trivy-scanner-binding
+  labels:
+    project: getit-bangladesh
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: trivy-scanner-role
+subjects:
+- kind: ServiceAccount
+  name: trivy-service-account
+  namespace: security

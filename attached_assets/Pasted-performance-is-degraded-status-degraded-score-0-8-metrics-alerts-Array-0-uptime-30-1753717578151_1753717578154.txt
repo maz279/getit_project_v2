@@ -1,0 +1,68 @@
+performance is degraded: {status: 'degraded', score: 0.8, metrics: {…}, alerts: Array(0), uptime: 30857, …}
+overrideMethod @ hook.js:608
+(anonymous) @ PerformanceMonitoringService.ts:299
+setInterval
+startHealthMonitoring @ PerformanceMonitoringService.ts:293
+PerformanceMonitoringService @ PerformanceMonitoringService.ts:45
+getInstance @ PerformanceMonitoringService.ts:50
+(anonymous) @ AISearchBar.tsx:52
+renderWithHooks @ chunk-RPCDYKBN.js?v=0ebebf42:11548
+updateFunctionComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14582
+updateSimpleMemoComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14463
+updateMemoComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14366
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15977
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this warning
+PerformanceMonitoringService.ts:128 [PERFORMANCE] search-text: 1322.60ms
+PerformanceMonitoringService.ts:283 [PERFORMANCE ALERT] Slow performance: search took 1323ms
+overrideMethod @ hook.js:608
+addAlert @ PerformanceMonitoringService.ts:283
+checkPerformanceAlerts @ PerformanceMonitoringService.ts:268
+trackSearchPerformance @ PerformanceMonitoringService.ts:87
+measureAsyncOperation @ PerformanceMonitoringService.ts:130
+await in measureAsyncOperation
+(anonymous) @ AISearchBar.tsx:149
+(anonymous) @ AISearchBar.tsx:226
+callCallback2 @ chunk-RPCDYKBN.js?v=0ebebf42:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=0ebebf42:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=0ebebf42:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=0ebebf42:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=0ebebf42:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=0ebebf42:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=0ebebf42:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=0ebebf42:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=0ebebf42:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this warning
+SearchAnalyticsService.ts:112 [ANALYTICS] Critical performance detected: {query: 'shampoo', responseTime: 1329.1999999284744, threshold: 3000}
+overrideMethod @ hook.js:608
+analyzePerformance @ SearchAnalyticsService.ts:112
+trackSearchEvent @ SearchAnalyticsService.ts:53
+(anonymous) @ AISearchBar.tsx:183
+await in (anonymous)
+(anonymous) @ AISearchBar.tsx:226
+callCallback2 @ chunk-RPCDYKBN.js?v=0ebebf42:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=0ebebf42:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=0ebebf42:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=0ebebf42:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=0ebebf42:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=0ebebf42:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=0ebebf42:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=0ebebf42:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=0ebebf42:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=0ebebf42:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=0ebebf42:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=0ebebf42:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=0ebebf42:5449Understand this warning

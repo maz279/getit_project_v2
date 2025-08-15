@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-pipeline-config
+  namespace: getit-production
+  labels:
+    component: ai-integration
+    tier: machine-learning
+data:
+  kubeflow-pipeline.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Workflow
+    metadata:
+      name: getit-ml-training-pipeline
+      namespace: getit-production
+    spec:
+      entrypoint: ml-training-pipeline
+      templates:
+      - name: ml-training-pipeline
+        dag:
+          tasks:
+          - name: data-preprocessing
+            template: data-preprocessing
+          - name: feature-engineering
+            template: feature-engineering
+            dependencies: [data-preprocessing]
+          - name: model-training
+            template: model-training
+            dependencies: [feature-engineering]
+          - name: model-validation
+            template: model-validation
+            dependencies: [model-training]
+          - name: model-deployment
+            template: model-deployment
+            dependencies: [model-validation]
+
+      - name: data-preprocessing
+        container:
+          image: getit/ml-preprocessing:latest
+          command: [python, preprocess.py]
+          env:
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: database-secret
+                key: url
+          - name: ENVIRONMENT
+            value: "production"
+
+      - name: feature-engineering
+        container:
+          image: getit/ml-features:latest
+          command: [python, feature_engineering.py]
+          env:
+          - name: FEATURE_STORE_URL
+            value: "feast-feature-store:6566"
+
+      - name: model-training
+        container:
+          image: getit/ml-training:latest
+          command: [python, train_models.py]
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2"
+              nvidia.com/gpu: 1
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+              nvidia.com/gpu: 1
+
+  ml-models-config.json: |
+    {
+      "models": {
+        "recommendation_engine": {
+          "type": "collaborative_filtering",
+          "algorithm": "matrix_factorization",
+          "framework": "pytorch",
+          "features": ["user_behavior", "item_features", "social_signals"],
+          "accuracy_target": 0.89,
+          "training_schedule": "daily",
+          "model_path": "/models/recommendation/collaborative_filtering.pkl",
+          "bangladesh_features": {
+            "cultural_preferences": true,
+            "local_trends": true,
+            "festival_seasonality": true
+          }
+        },
+        "fraud_detection": {
+          "type": "anomaly_detection",
+          "algorithm": "isolation_forest",
+          "framework": "scikit-learn",
+          "features": ["transaction_amount", "user_behavior", "device_fingerprint", "location"],
+          "accuracy_target": 0.95,
+          "training_schedule": "hourly",
+          "model_path": "/models/fraud/isolation_forest.pkl",
+          "bangladesh_features": {
+            "mobile_banking_patterns": true,
+            "geographic_risk_scoring": true,
+            "kyc_compliance_scoring": true
+          }
+        },
+        "price_optimization": {
+          "type": "regression",
+          "algorithm": "xgboost",
+          "framework": "xgboost",
+          "features": ["market_data", "competitor_prices", "demand_signals", "inventory_levels"],
+          "accuracy_target": 0.85,
+          "training_schedule": "weekly",
+          "model_path": "/models/pricing/xgboost.pkl"
+        },
+        "demand_forecasting": {
+          "type": "time_series",
+          "algorithm": "lstm",
+          "framework": "tensorflow",
+          "features": ["historical_sales", "seasonality", "external_factors"],
+          "accuracy_target": 0.82,
+          "training_schedule": "daily",
+          "model_path": "/models/demand/lstm.h5"
+        },
+        "search_ranking": {
+          "type": "learning_to_rank",
+          "algorithm": "lambdamart",
+          "framework": "lightgbm",
+          "features": ["query_features", "document_features", "user_context"],
+          "accuracy_target": 0.88,
+          "training_schedule": "daily",
+          "model_path": "/models/search/lambdamart.pkl"
+        }
+      },
+      "feature_store": {
+        "provider": "feast",
+        "online_store": "redis",
+        "offline_store": "postgresql",
+        "features": {
+          "user_features": {
+            "user_age_group": "categorical",
+            "user_location": "categorical",
+            "purchase_history": "numerical",
+            "avg_order_value": "numerical",
+            "bangladesh_division": "categorical"
+          },
+          "product_features": {
+            "category": "categorical",
+            "brand": "categorical",
+            "price_range": "categorical",
+            "avg_rating": "numerical",
+            "stock_level": "numerical"
+          },
+          "transaction_features": {
+            "payment_method": "categorical",
+            "transaction_amount": "numerical",
+            "transaction_time": "timestamp",
+            "device_type": "categorical",
+            "bangladesh_mobile_banking": "boolean"
+          }
+        }
+      },
+      "monitoring": {
+        "drift_detection": {
+          "enabled": true,
+          "threshold": 0.1,
+          "metrics": ["accuracy", "precision", "recall", "f1_score"]
+        },
+        "performance_tracking": {
+          "enabled": true,
+          "sla": {
+            "latency": "100ms",
+            "availability": "99.9%",
+            "throughput": "1000 req/sec"
+          }
+        }
+      }
+    }
+
+  tensorboard-config.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: tensorboard
+      namespace: getit-production
+      labels:
+        app: tensorboard
+        component: ai-integration
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: tensorboard
+      template:
+        metadata:
+          labels:
+            app: tensorboard
+        spec:
+          containers:
+          - name: tensorboard
+            image: tensorflow/tensorflow:latest
+            command:
+            - tensorboard
+            - --logdir=/logs
+            - --host=0.0.0.0
+            - --port=6006
+            ports:
+            - containerPort: 6006
+            volumeMounts:
+            - name: logs
+              mountPath: /logs
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+          volumes:
+          - name: logs
+            persistentVolumeClaim:
+              claimName: tensorboard-logs
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-config
+  namespace: getit-production
+  labels:
+    component: ai-integration
+    tier: ml-ops
+data:
+  mlflow-server.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: mlflow-server
+      namespace: getit-production
+      labels:
+        app: mlflow-server
+        component: ai-integration
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: mlflow-server
+      template:
+        metadata:
+          labels:
+            app: mlflow-server
+        spec:
+          containers:
+          - name: mlflow-server
+            image: getit/mlflow:latest
+            ports:
+            - containerPort: 5000
+            env:
+            - name: BACKEND_STORE_URI
+              value: "postgresql://mlflow:password@postgres:5432/mlflow"
+            - name: DEFAULT_ARTIFACT_ROOT
+              value: "s3://getit-ml-artifacts"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: secret_access_key
+            command:
+            - mlflow
+            - server
+            - --backend-store-uri=$(BACKEND_STORE_URI)
+            - --default-artifact-root=$(DEFAULT_ARTIFACT_ROOT)
+            - --host=0.0.0.0
+            - --port=5000
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+
+  model-serving.yaml: |
+    apiVersion: serving.kubeflow.org/v1beta1
+    kind: InferenceService
+    metadata:
+      name: recommendation-model
+      namespace: getit-production
+    spec:
+      predictor:
+        tensorflow:
+          storageUri: "s3://getit-models/recommendation/latest"
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+        autoscaling:
+          minReplicas: 2
+          maxReplicas: 10
+          target: 70
+
+    ---
+    apiVersion: serving.kubeflow.org/v1beta1
+    kind: InferenceService
+    metadata:
+      name: fraud-detection-model
+      namespace: getit-production
+    spec:
+      predictor:
+        sklearn:
+          storageUri: "s3://getit-models/fraud-detection/latest"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+        autoscaling:
+          minReplicas: 3
+          maxReplicas: 15
+          target: 60

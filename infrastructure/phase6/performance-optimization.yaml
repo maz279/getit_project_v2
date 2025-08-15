@@ -1,0 +1,459 @@
+# Phase 6 Performance Optimization Configuration
+# Amazon.com/Shopee.sg Performance Excellence Implementation
+
+# Redis Cluster for Advanced Caching
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-config
+  namespace: getit-platform
+data:
+  redis.conf: |
+    # Redis Cluster Configuration for GetIt Platform
+    cluster-enabled yes
+    cluster-config-file nodes.conf
+    cluster-node-timeout 5000
+    cluster-announce-ip ${POD_IP}
+    cluster-announce-port 6379
+    cluster-announce-bus-port 16379
+    
+    # Memory optimization
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    save ""
+    
+    # Performance tuning
+    tcp-keepalive 60
+    timeout 0
+    tcp-backlog 511
+    databases 1
+    
+    # Persistence (disabled for performance)
+    appendonly no
+    
+    # Network optimization
+    tcp-nodelay yes
+    
+    # Client output buffer limits
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+
+---
+# Redis Cluster StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: getit-platform
+spec:
+  serviceName: redis-cluster
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        command:
+        - redis-server
+        args:
+        - /etc/redis/redis.conf
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: conf
+          mountPath: /etc/redis/
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 2Gi
+      volumes:
+      - name: conf
+        configMap:
+          name: redis-cluster-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Performance Monitoring DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: performance-monitor
+  namespace: getit-platform
+spec:
+  selector:
+    matchLabels:
+      name: performance-monitor
+  template:
+    metadata:
+      labels:
+        name: performance-monitor
+    spec:
+      containers:
+      - name: node-exporter
+        image: prom/node-exporter:latest
+        ports:
+        - containerPort: 9100
+        args:
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        - --collector.filesystem.ignored-mount-points
+        - ^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: root
+          mountPath: /rootfs
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: root
+        hostPath:
+          path: /
+      hostNetwork: true
+      hostPID: true
+
+---
+# Application Performance Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apm-config
+  namespace: getit-platform
+data:
+  apm-server.yml: |
+    apm-server:
+      host: "0.0.0.0:8200"
+      rum:
+        enabled: true
+        event_rate:
+          limit: 10000
+          lru_size: 1000
+      
+    output.elasticsearch:
+      hosts: ["elasticsearch:9200"]
+      template.settings:
+        index.number_of_shards: 1
+        index.number_of_replicas: 1
+    
+    logging.level: info
+    logging.to_files: true
+    logging.files:
+      path: /var/log/apm-server
+      name: apm-server
+      keepfiles: 7
+      permissions: 0644
+
+---
+# Load Testing Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-test-1m-users
+  namespace: getit-platform
+spec:
+  parallelism: 100
+  completions: 100
+  template:
+    spec:
+      containers:
+      - name: k6-load-test
+        image: grafana/k6:latest
+        command:
+        - k6
+        - run
+        - --vus=10000
+        - --duration=10m
+        - --rps=100000
+        - /scripts/load-test.js
+        env:
+        - name: TARGET_URL
+          value: "https://api.getit.com.bd"
+        - name: TEST_SCENARIO
+          value: "stress"
+        volumeMounts:
+        - name: test-scripts
+          mountPath: /scripts
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1
+            memory: 2Gi
+      volumes:
+      - name: test-scripts
+        configMap:
+          name: k6-test-scripts
+      restartPolicy: OnFailure
+
+---
+# K6 Test Scripts ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-test-scripts
+  namespace: getit-platform
+data:
+  load-test.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+    import { Rate } from 'k6/metrics';
+    
+    const errorRate = new Rate('errors');
+    
+    export let options = {
+      stages: [
+        { duration: '2m', target: 10000 }, // Ramp up to 10k users
+        { duration: '5m', target: 50000 }, // Ramp up to 50k users
+        { duration: '10m', target: 100000 }, // Stay at 100k users
+        { duration: '5m', target: 50000 }, // Scale down to 50k users
+        { duration: '2m', target: 0 }, // Scale down to 0 users
+      ],
+      thresholds: {
+        http_req_duration: ['p(95)<50'], // 95% of requests under 50ms
+        http_req_failed: ['rate<0.01'], // Error rate under 1%
+        errors: ['rate<0.01'],
+      },
+    };
+    
+    export default function() {
+      const baseUrl = __ENV.TARGET_URL || 'http://getit-api-service:5000';
+      
+      // Test scenarios
+      const scenarios = [
+        () => testHomepage(baseUrl),
+        () => testProductSearch(baseUrl),
+        () => testProductDetails(baseUrl),
+        () => testCart(baseUrl),
+        () => testCheckout(baseUrl),
+      ];
+      
+      // Execute random scenario
+      const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+      scenario();
+      
+      sleep(Math.random() * 3);
+    }
+    
+    function testHomepage(baseUrl) {
+      const res = http.get(`${baseUrl}/api/health`);
+      check(res, {
+        'homepage status is 200': (r) => r.status === 200,
+        'homepage response time < 50ms': (r) => r.timings.duration < 50,
+      }) || errorRate.add(1);
+    }
+    
+    function testProductSearch(baseUrl) {
+      const searchTerms = ['smartphone', 'laptop', 'clothing', 'books', 'electronics'];
+      const term = searchTerms[Math.floor(Math.random() * searchTerms.length)];
+      
+      const res = http.get(`${baseUrl}/api/products/search?q=${term}`);
+      check(res, {
+        'search status is 200': (r) => r.status === 200,
+        'search response time < 100ms': (r) => r.timings.duration < 100,
+      }) || errorRate.add(1);
+    }
+    
+    function testProductDetails(baseUrl) {
+      const productId = Math.floor(Math.random() * 1000) + 1;
+      
+      const res = http.get(`${baseUrl}/api/products/${productId}`);
+      check(res, {
+        'product details response time < 50ms': (r) => r.timings.duration < 50,
+      }) || errorRate.add(1);
+    }
+    
+    function testCart(baseUrl) {
+      const res = http.get(`${baseUrl}/api/cart`);
+      check(res, {
+        'cart response time < 30ms': (r) => r.timings.duration < 30,
+      }) || errorRate.add(1);
+    }
+    
+    function testCheckout(baseUrl) {
+      const res = http.get(`${baseUrl}/api/test`);
+      check(res, {
+        'checkout response time < 100ms': (r) => r.timings.duration < 100,
+      }) || errorRate.add(1);
+    }
+
+---
+# CDN Configuration for Static Assets
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: cdn-optimization
+  namespace: getit-platform
+spec:
+  hosts:
+  - cdn.getit.com.bd
+  http:
+  - match:
+    - uri:
+        prefix: "/static/"
+    headers:
+      response:
+        add:
+          cache-control: "public, max-age=31536000" # 1 year
+          expires: "Thu, 31 Dec 2025 23:59:59 GMT"
+    route:
+    - destination:
+        host: getit-cdn-service
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/images/"
+    headers:
+      response:
+        add:
+          cache-control: "public, max-age=2592000" # 30 days
+    route:
+    - destination:
+        host: getit-cdn-service
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/api/"
+    headers:
+      response:
+        add:
+          cache-control: "no-cache, no-store, must-revalidate"
+    route:
+    - destination:
+        host: getit-api-service
+        port:
+          number: 5000
+
+---
+# Database Connection Pooling
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+  namespace: getit-platform
+data:
+  pgbouncer.ini: |
+    [databases]
+    getit_production = host=postgresql-primary port=5432 dbname=getit_production
+    
+    [pgbouncer]
+    listen_port = 6432
+    listen_addr = 0.0.0.0
+    auth_type = md5
+    auth_file = /etc/pgbouncer/userlist.txt
+    
+    # Pool settings for high performance
+    pool_mode = transaction
+    max_client_conn = 1000
+    default_pool_size = 50
+    max_db_connections = 100
+    max_user_connections = 100
+    
+    # Performance tuning
+    server_round_robin = 1
+    ignore_startup_parameters = extra_float_digits
+    
+    # Logging
+    log_connections = 0
+    log_disconnections = 0
+    log_pooler_errors = 1
+    
+    # Timeouts
+    server_login_retry = 15
+    query_timeout = 30
+    query_wait_timeout = 120
+    client_idle_timeout = 0
+    server_idle_timeout = 600
+    server_lifetime = 3600
+    server_connect_timeout = 15
+    
+  userlist.txt: |
+    "getit_user" "md5d82c8a5e7c8b5c5c7b8b5c5c7b8b5c5c"
+
+---
+# Performance Tuning Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: performance-tuner
+  namespace: getit-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: performance-tuner
+  template:
+    metadata:
+      labels:
+        app: performance-tuner
+    spec:
+      containers:
+      - name: performance-tuner
+        image: getit/performance-tuner:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MONITORING_INTERVAL
+          value: "30s"
+        - name: OPTIMIZATION_THRESHOLD
+          value: "70"
+        - name: AUTO_SCALING_ENABLED
+          value: "true"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10

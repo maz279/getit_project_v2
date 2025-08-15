@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: getit-development
+  labels:
+    app: shipping-service
+    service: shipping-service
+    tier: core
+    component: microservice
+    bangladesh: enabled
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: shipping-service
+  template:
+    metadata:
+      labels:
+        app: shipping-service
+        service: shipping-service
+        tier: core
+        component: microservice
+        bangladesh: enabled
+    spec:
+      containers:
+      - name: shipping-service
+        image: getit/shipping-service:latest
+        ports:
+        - containerPort: 3013
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "development"
+        - name: PORT
+          value: "3013"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: shipping-service-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: redis-url
+        # Bangladesh Shipping Partner Credentials
+        - name: PATHAO_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: pathao-client-id
+        - name: PATHAO_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: pathao-client-secret
+        - name: PATHAO_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: pathao-username
+        - name: PATHAO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: pathao-password
+        - name: PAPERFLY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: paperfly-api-key
+        - name: PAPERFLY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: paperfly-secret-key
+        - name: SUNDARBAN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: sundarban-api-key
+        - name: REDX_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: redx-api-key
+        - name: ECOURIER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shipping-secret
+              key: ecourier-api-key
+        # Bangladesh Division Configuration
+        - name: DHAKA_DIVISION_ENABLED
+          value: "true"
+        - name: CHITTAGONG_DIVISION_ENABLED
+          value: "true"
+        - name: SYLHET_DIVISION_ENABLED
+          value: "true"
+        - name: RAJSHAHI_DIVISION_ENABLED
+          value: "true"
+        - name: KHULNA_DIVISION_ENABLED
+          value: "true"
+        - name: BARISAL_DIVISION_ENABLED
+          value: "true"
+        - name: RANGPUR_DIVISION_ENABLED
+          value: "true"
+        - name: MYMENSINGH_DIVISION_ENABLED
+          value: "true"
+        # COD Configuration
+        - name: COD_ENABLED
+          value: "true"
+        - name: COD_VERIFICATION_REQUIRED
+          value: "true"
+        - name: SAME_DAY_DELIVERY_ENABLED
+          value: "true"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/shipping/health
+            port: 3013
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/shipping/ready
+            port: 3013
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: getit-development
+  labels:
+    app: shipping-service
+    bangladesh: enabled
+spec:
+  selector:
+    app: shipping-service
+  ports:
+  - port: 3013
+    targetPort: 3013
+    protocol: TCP
+  type: ClusterIP

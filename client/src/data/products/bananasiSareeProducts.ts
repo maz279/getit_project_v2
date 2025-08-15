@@ -1,0 +1,45 @@
+
+export const bananasiSareeProducts = [
+  {
+    id: 'banarasi-saree-1',
+    name: 'Pure Banarasi Silk Saree - Golden Zari',
+    nameBn: 'খাঁটি বানারসি রেশম শাড়ি - সোনালী জরি',
+    price: 12000,
+    originalPrice: 16000,
+    rating: 4.9,
+    reviews: 345,
+    vendor: 'Banarasi Silk Palace',
+    image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=400&fit=crop',
+    discount: 25,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 123,
+    category: 'Banarasi Saree',
+    stock: { status: 'in_stock', quantity: 18 },
+    delivery: { estimatedDays: 1, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  },
+  {
+    id: 'banarasi-saree-2',
+    name: 'Banarasi Wedding Saree - Heavy Work',
+    nameBn: 'বানারসি বিবাহের শাড়ি - ভারী কাজ',
+    price: 15000,
+    originalPrice: 20000,
+    rating: 4.8,
+    reviews: 278,
+    vendor: 'Wedding Banarasi',
+    image: 'https://images.unsplash.com/photo-1566479179817-0d0c12e18b3b?w=400&h=400&fit=crop',
+    discount: 25,
+    freeShipping: true,
+    location: 'Dhaka',
+    verified: true,
+    quickDelivery: true,
+    sold: 89,
+    category: 'Banarasi Saree',
+    stock: { status: 'limited', quantity: 7 },
+    delivery: { estimatedDays: 1, express: true, cod: true, freeShipping: true },
+    features: { trending: true, festival: true, priceHistory: true, emi: true }
+  }
+];

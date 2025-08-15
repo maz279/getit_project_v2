@@ -1,0 +1,60 @@
+_app-f10df38f71c1285f.js:38 Adding extension: Perplexity Object
+hook.js:608 Command: hello has unrecognized contributions: editor-context-menu. Valid contributions are commandbar,filetree-context-menu,sidebar-search,editor-context-menu Object
+overrideMethod @ hook.js:608Understand this warning
+39Refused to frame '<URL>' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'self'".
+Understand this error
+sketch-style-show:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+hook.js:608 onClick is deprecated, please use onPress
+overrideMethod @ hook.js:608Understand this warning
+5sketch-style-show:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+hook.js:608 task queue exceeded allotted deadline by 161ms
+overrideMethod @ hook.js:608Understand this warning
+sketch-style-show:1 Access to fetch at 'https://sp.replit.com/v1/t' from origin 'https://replit.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
+sp.replit.com/v1/t:1  Failed to load resource: net::ERR_FAILEDUnderstand this error
+hook.js:608 task queue exceeded allotted deadline by 307ms
+overrideMethod @ hook.js:608Understand this warning
+hook.js:608 task queue exceeded allotted deadline by 326ms
+overrideMethod @ hook.js:608Understand this warning
+102-3d47774b8c277a0f.js:1 WebSocket connection to 'wss://eval.janeway.platform.replit.com/wsv2/v2.public.Q2dZSTh0enl3d1lTQmdpUitmTERCaUlIYW1GdVpYZGhlVEFBT3VFQkNpUXhZbVE1WlRrd1lTMDNaVFZsTFRSa09UZ3RZalJsTlMwd016QTJaR015TXpabU4yWVNBMjVwZUJvWmNtVndiR2wwTFhKbGNHd3RabWxzWlhNdGFtRnVaWGRoZVNJUmMydGxkR05vTFhOMGVXeGxMWE5vYjNjcUQyMXZhR1J0WVhwb1lYSjFiR2x6YkVKWENocHlaWEJzYVhRdGNtVndiQzFpYkc5amEzTXRhbUZ1WlhkaGVSSVljbVZ3YkdsMExYSmxjR3d0YldWMFlTMXFZVzVsZDJGNUdoOXlaWEJzYVhRdGJXRnlaMkZ5YVc1bExXSnNiMk5yY3kxcVlXNWxkMkY1U2djSXFmWDhGQkFCVUFCYUQybHVkR1Z1ZEY5d1pYSnpiMjVoYkhnQVVpT...sTWtKd2VGTTBZa2hEYTBsRFR6aDNTbkY0ZVRCT1REWlVKVEpDUm1zbE1rWWxNa0l4Y0haVVdFWkRaM1ZHYW10cGFIbEpWRXhtV1RkVGMzcHRlVnBtUVRCRFdXWk9kbWcyT1dSSVdrcFdRemN4WVRkWFkwRTFjSEI2UTJVMmNGUk5kMVZ4VG05aE5IbEpRVWRMU0hCemVVMWlURWN5ZGxnbE1rSWxNa0pCYlRkVU1FeG1aalJ6WkRCM2VVSm1ZM3B0VTBSVWRGUnRPVWx5VVVsclRtTjFhVmtsTWtKTWNFcEhhMlpITkRSVlpXTnhlbEpVVkVwMFVtTkZTemh3ZDAxeVFtaFJUa1pISlRKQ2JXNXJZMmhWWnlVelJDVXpSQT09Lxb-sIM7gn_NyrDWgQTSxfG1rn5eIcBGSjehmrJrFVk72R2PFjYgtjYAEInMRakxfQckJnSmfG6uH7LNUSWECw.Q2dad2NtOWtPak1pQ25KbGNHeHBkQzVqYjIwPQ' failed: 
+connect @ 102-3d47774b8c277a0f.js:1Understand this error
+sp.replit.com/v1/t:1  Failed to load resource: net::ERR_NETWORK_IO_SUSPENDEDUnderstand this error
+sp.replit.com/v1/m:1  Failed to load resource: net::ERR_NETWORK_IO_SUSPENDEDUnderstand this error
+hook.js:608 Error sending segment performance metrics TypeError: Failed to fetch
+    at _app-f10df38f71c1285f.js:38:9046
+    at o (sdk.min.js:1:23763)
+    at t.<anonymous> (remote-metrics.ts:138:12)
+    at tslib.es6.js:103:23
+    at Object.next (tslib.es6.js:108:37)
+    at tslib.es6.js:80:8
+    at new Promise (<anonymous>)
+    at u (tslib.es6.js:72:27)
+    at i.148.t.send (sdk.min.js:1:22021)
+    at t.<anonymous> (remote-metrics.ts:125:16)
+    at tslib.es6.js:103:23
+    at Object.next (tslib.es6.js:108:37)
+    at tslib.es6.js:80:8
+    at new Promise (<anonymous>)
+    at u (tslib.es6.js:72:27)
+    at t.flush (sdk.min.js:1:21754)
+    at l (remote-metrics.ts:83:14)
+    at n (_app-f10df38f71c1285f.js:38:2959)
+overrideMethod @ hook.js:608Understand this error
+sp.replit.com/v1/t:1  Failed to load resource: net::ERR_NETWORK_CHANGEDUnderstand this error
+analytics.google.com/g/collect?v=2&tid=G-MPJY3F1YEL&gtm=45je57g1v9135634466za200&_p=1753001602356&gcd=13l3l3l3l2l1&npa=0&dma=0&tag_exp=101509157~102015666~103116026~103200004~103233427~104684208~104684211&ul=en-gb&sr=1489x931&cid=217226779.1751392893&ecid=1217171549&ir=1&uaa=x86&uab=64&uafvl=Not)A%253BBrand%3B8.0.0.0%7CChromium%3B138.0.7204.158%7CGoogle%2520Chrome%3B138.0.7204.158&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=EBAIAAQ&dl=https%3A%2F%2Freplit.com%2F%40mohdmazharulisl%2Fsketch-style-show&dp=%2F%40mohdmazharulisl%2Fsketch-style-show&dt=replEnvironmentDesktop&sid=1753001263&sct=89&seg=1&_tu=wAQ&_s=97&tfd=9142760:1  Failed to load resource: net::ERR_NAME_NOT_RESOLVEDUnderstand this error
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A1a67f49f&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=0c2e77ac-eac2-4bff-b414-06824a61c9ed:1  Failed to load resource: net::ERR_NAME_NOT_RESOLVEDUnderstand this error
+stallwart.build.js:1 stallwart: failed ping 1
+analytics.google.com/g/collect?v=2&tid=G-MPJY3F1YEL&gtm=45je57g1v9135634466za200&_p=1753001602356&gcd=13l3l3l3l2l1&npa=0&dma=0&tag_exp=101509157~102015666~103116026~103200004~103233427~104684208~104684211&ul=en-gb&sr=1489x931&cid=217226779.1751392893&ecid=1217171549&ir=1&uaa=x86&uab=64&uafvl=Not)A%253BBrand%3B8.0.0.0%7CChromium%3B138.0.7204.158%7CGoogle%2520Chrome%3B138.0.7204.158&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=EBAIAAQ&_s=111&dl=https%3A%2F%2Freplit.com%2F%40mohdmazharulisl%2Fsketch-style-show&dp=%2F%40mohdmazharulisl%2Fsketch-style-show&dt=replEnvironmentDesktop&sid=1753001263&sct=89&seg=1&_tu=wAQ&en=Workspace%20Tab%20Closed&_ee=1&ep.event_category=All&ep.value=0&_et=34900&tfd=10358934:1  Failed to load resource: the server responded with a status of 502 ()Understand this error
+workspace_iframe.html:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning

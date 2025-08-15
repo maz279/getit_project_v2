@@ -1,0 +1,349 @@
+# Volume Backup CronJob for GetIt Bangladesh Multi-Vendor E-commerce Platform
+# Amazon.com/Shopee.sg-Level Persistent Volume Backup and Recovery
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: volume-backup
+  namespace: production
+  labels:
+    app: volume-backup
+    tier: backup
+    project: getit-bangladesh
+spec:
+  # Run daily at 3:00 AM Bangladesh time (UTC+6 = 21:00 UTC)
+  schedule: "0 21 * * *"
+  timeZone: "Asia/Dhaka"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: volume-backup
+            tier: backup
+            project: getit-bangladesh
+        spec:
+          serviceAccountName: volume-backup-service-account
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: volume-backup
+            image: alpine:3.18
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: volume-backup-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: volume-backup-secrets
+                  key: aws-secret-access-key
+            - name: AWS_DEFAULT_REGION
+              value: "ap-southeast-1"
+            - name: S3_BUCKET
+              value: "getit-bangladesh-volume-backups"
+            - name: BACKUP_RETENTION_DAYS
+              value: "30"
+            - name: RESTIC_REPOSITORY
+              value: "s3:getit-bangladesh-volume-backups/restic"
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: volume-backup-secrets
+                  key: restic-password
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: volume-backup-secrets
+                  key: slack-webhook-url
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Install required tools
+              apk add --no-cache \
+                restic \
+                aws-cli \
+                curl \
+                jq \
+                rsync \
+                tar \
+                gzip
+              
+              echo "Starting volume backup for GetIt Bangladesh platform..."
+              
+              # Create backup timestamp
+              BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              BACKUP_TAG="getit-volumes-${BACKUP_DATE}"
+              
+              # Initialize restic repository if not exists
+              restic cat config >/dev/null 2>&1 || {
+                echo "Initializing restic repository..."
+                restic init
+              }
+              
+              # Define volumes to backup
+              VOLUMES=(
+                "/data/postgres-data"
+                "/data/redis-data"
+                "/data/elasticsearch-data"
+                "/data/grafana-data"
+                "/data/prometheus-data"
+                "/data/app-logs"
+                "/data/uploads"
+                "/data/certificates"
+              )
+              
+              # Track backup statistics
+              TOTAL_SIZE=0
+              SUCCESSFUL_BACKUPS=0
+              FAILED_BACKUPS=0
+              
+              echo "Creating volume snapshots..."
+              
+              # Create snapshots for each volume
+              for VOLUME in "${VOLUMES[@]}"; do
+                VOLUME_NAME=$(basename ${VOLUME})
+                echo "Backing up volume: ${VOLUME_NAME}"
+                
+                if [ -d "${VOLUME}" ]; then
+                  # Calculate volume size
+                  VOLUME_SIZE=$(du -sh ${VOLUME} | cut -f1)
+                  
+                  # Create restic backup
+                  if restic backup ${VOLUME} \
+                    --tag production \
+                    --tag ${VOLUME_NAME} \
+                    --tag getit-bangladesh \
+                    --tag ${BACKUP_TAG} \
+                    --exclude-caches \
+                    --exclude "*.tmp" \
+                    --exclude "*.log" \
+                    --exclude "lost+found"; then
+                    
+                    echo "Successfully backed up ${VOLUME_NAME} (${VOLUME_SIZE})"
+                    SUCCESSFUL_BACKUPS=$((SUCCESSFUL_BACKUPS + 1))
+                    
+                    # Add to total size (convert to bytes for calculation)
+                    SIZE_BYTES=$(du -sb ${VOLUME} | cut -f1)
+                    TOTAL_SIZE=$((TOTAL_SIZE + SIZE_BYTES))
+                  else
+                    echo "Failed to backup ${VOLUME_NAME}"
+                    FAILED_BACKUPS=$((FAILED_BACKUPS + 1))
+                  fi
+                else
+                  echo "Volume ${VOLUME} not found, skipping..."
+                  FAILED_BACKUPS=$((FAILED_BACKUPS + 1))
+                fi
+              done
+              
+              # Convert total size to human readable
+              TOTAL_SIZE_HR=$(echo ${TOTAL_SIZE} | awk '{
+                if ($1 > 1024^3) printf "%.2f GB", $1/1024^3
+                else if ($1 > 1024^2) printf "%.2f MB", $1/1024^2
+                else if ($1 > 1024) printf "%.2f KB", $1/1024
+                else printf "%d B", $1
+              }')
+              
+              # Clean up old backups
+              echo "Cleaning up old backups..."
+              RETENTION_DATE=$(date -d "${BACKUP_RETENTION_DAYS} days ago" +%Y-%m-%d)
+              restic forget \
+                --tag getit-bangladesh \
+                --keep-daily ${BACKUP_RETENTION_DAYS} \
+                --keep-weekly 12 \
+                --keep-monthly 12 \
+                --prune
+              
+              # Verify backup integrity
+              echo "Verifying backup integrity..."
+              restic check --read-data-subset=5%
+              
+              # Get backup statistics
+              BACKUP_STATS=$(restic stats --mode=raw-data latest)
+              
+              # Create backup report
+              BACKUP_REPORT="/tmp/volume-backup-report-${BACKUP_DATE}.json"
+              cat > ${BACKUP_REPORT} << EOF
+              {
+                "backup_date": "${BACKUP_DATE}",
+                "backup_type": "volume_backup",
+                "environment": "production",
+                "total_volumes": ${#VOLUMES[@]},
+                "successful_backups": ${SUCCESSFUL_BACKUPS},
+                "failed_backups": ${FAILED_BACKUPS},
+                "total_size": "${TOTAL_SIZE_HR}",
+                "backup_tag": "${BACKUP_TAG}",
+                "retention_days": ${BACKUP_RETENTION_DAYS},
+                "repository": "${RESTIC_REPOSITORY}",
+                "status": "$([ ${FAILED_BACKUPS} -eq 0 ] && echo 'SUCCESS' || echo 'PARTIAL_FAILURE')",
+                "volumes_backed_up": [
+              EOF
+              
+              # Add volume details to report
+              for VOLUME in "${VOLUMES[@]}"; do
+                VOLUME_NAME=$(basename ${VOLUME})
+                if [ -d "${VOLUME}" ]; then
+                  VOLUME_SIZE=$(du -sh ${VOLUME} | cut -f1)
+                  echo "    {\"volume\": \"${VOLUME_NAME}\", \"size\": \"${VOLUME_SIZE}\", \"status\": \"success\"}," >> ${BACKUP_REPORT}
+                else
+                  echo "    {\"volume\": \"${VOLUME_NAME}\", \"size\": \"0\", \"status\": \"not_found\"}," >> ${BACKUP_REPORT}
+                fi
+              done
+              
+              # Remove trailing comma and close JSON
+              sed -i '$ s/,$//' ${BACKUP_REPORT}
+              echo "  ]" >> ${BACKUP_REPORT}
+              echo "}" >> ${BACKUP_REPORT}
+              
+              # Upload backup report to S3
+              aws s3 cp ${BACKUP_REPORT} s3://${S3_BUCKET}/reports/volume-backup-report-${BACKUP_DATE}.json
+              
+              # Send Slack notification
+              if [ ! -z "${SLACK_WEBHOOK_URL}" ]; then
+                ALERT_COLOR="good"
+                if [ ${FAILED_BACKUPS} -gt 0 ]; then
+                  ALERT_COLOR="warning"
+                fi
+                
+                curl -X POST ${SLACK_WEBHOOK_URL} \
+                  -H 'Content-type: application/json' \
+                  --data "{
+                    \"attachments\": [{
+                      \"color\": \"${ALERT_COLOR}\",
+                      \"title\": \"💾 GetIt Bangladesh Volume Backup Report\",
+                      \"text\": \"Daily volume backup completed\",
+                      \"fields\": [
+                        {\"title\": \"Total Volumes\", \"value\": \"${#VOLUMES[@]}\", \"short\": true},
+                        {\"title\": \"Successful\", \"value\": \"${SUCCESSFUL_BACKUPS}\", \"short\": true},
+                        {\"title\": \"Failed\", \"value\": \"${FAILED_BACKUPS}\", \"short\": true},
+                        {\"title\": \"Total Size\", \"value\": \"${TOTAL_SIZE_HR}\", \"short\": true},
+                        {\"title\": \"Repository\", \"value\": \"${RESTIC_REPOSITORY}\", \"short\": false},
+                        {\"title\": \"Backup Tag\", \"value\": \"${BACKUP_TAG}\", \"short\": false}
+                      ],
+                      \"footer\": \"GetIt Bangladesh Backup System\",
+                      \"ts\": $(date +%s)
+                    }]
+                  }"
+              fi
+              
+              # Create volume inventory
+              INVENTORY_FILE="/tmp/volume-inventory-${BACKUP_DATE}.json"
+              echo '{"inventory_date":"'${BACKUP_DATE}'","volumes":[]}' > ${INVENTORY_FILE}
+              
+              for VOLUME in "${VOLUMES[@]}"; do
+                if [ -d "${VOLUME}" ]; then
+                  VOLUME_NAME=$(basename ${VOLUME})
+                  VOLUME_SIZE=$(du -sb ${VOLUME} | cut -f1)
+                  FILE_COUNT=$(find ${VOLUME} -type f | wc -l)
+                  LAST_MODIFIED=$(find ${VOLUME} -type f -printf '%T@\n' | sort -n | tail -1 | xargs -I {} date -d @{} '+%Y-%m-%d %H:%M:%S')
+                  
+                  jq --arg name "${VOLUME_NAME}" \
+                     --arg path "${VOLUME}" \
+                     --arg size "${VOLUME_SIZE}" \
+                     --arg files "${FILE_COUNT}" \
+                     --arg modified "${LAST_MODIFIED}" \
+                     '.volumes += [{"name": $name, "path": $path, "size_bytes": ($size|tonumber), "file_count": ($files|tonumber), "last_modified": $modified}]' \
+                     ${INVENTORY_FILE} > ${INVENTORY_FILE}.tmp && mv ${INVENTORY_FILE}.tmp ${INVENTORY_FILE}
+                fi
+              done
+              
+              # Upload inventory
+              aws s3 cp ${INVENTORY_FILE} s3://${S3_BUCKET}/inventory/volume-inventory-${BACKUP_DATE}.json
+              
+              echo "Volume backup completed successfully"
+              echo "Successful: ${SUCCESSFUL_BACKUPS}, Failed: ${FAILED_BACKUPS}, Total Size: ${TOTAL_SIZE_HR}"
+              
+              # Exit with error if any backups failed
+              if [ ${FAILED_BACKUPS} -gt 0 ]; then
+                echo "Some volume backups failed! Check logs for details."
+                exit 1
+              fi
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+            volumeMounts:
+            - name: postgres-data
+              mountPath: /data/postgres-data
+              readOnly: true
+            - name: redis-data
+              mountPath: /data/redis-data
+              readOnly: true
+            - name: elasticsearch-data
+              mountPath: /data/elasticsearch-data
+              readOnly: true
+            - name: grafana-data
+              mountPath: /data/grafana-data
+              readOnly: true
+            - name: prometheus-data
+              mountPath: /data/prometheus-data
+              readOnly: true
+            - name: app-logs
+              mountPath: /data/app-logs
+              readOnly: true
+            - name: uploads
+              mountPath: /data/uploads
+              readOnly: true
+          volumes:
+          - name: postgres-data
+            persistentVolumeClaim:
+              claimName: postgres-data-pvc
+          - name: redis-data
+            persistentVolumeClaim:
+              claimName: redis-data-pvc
+          - name: elasticsearch-data
+            persistentVolumeClaim:
+              claimName: elasticsearch-data-pvc
+          - name: grafana-data
+            persistentVolumeClaim:
+              claimName: grafana-data-pvc
+          - name: prometheus-data
+            persistentVolumeClaim:
+              claimName: prometheus-data-pvc
+          - name: app-logs
+            persistentVolumeClaim:
+              claimName: backend-logs-pvc
+          - name: uploads
+            persistentVolumeClaim:
+              claimName: uploads-pvc
+---
+# Volume Backup Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: volume-backup-service-account
+  namespace: production
+  labels:
+    app: volume-backup
+    project: getit-bangladesh
+---
+# Volume Backup Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: volume-backup-secrets
+  namespace: production
+  labels:
+    app: volume-backup
+    project: getit-bangladesh
+type: Opaque
+stringData:
+  aws-access-key-id: "REPLACE_WITH_AWS_ACCESS_KEY"
+  aws-secret-access-key: "REPLACE_WITH_AWS_SECRET_KEY"
+  restic-password: "REPLACE_WITH_RESTIC_PASSWORD"
+  slack-webhook-url: "https://hooks.slack.com/services/REPLACE/WITH/WEBHOOK"

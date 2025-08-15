@@ -1,0 +1,48 @@
+Warning: Each child in a list should have a unique "key" prop.
+
+Check the render method of `AISearchBar`. See https://reactjs.org/link/warning-keys for more information.
+    at button
+    at https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/components/ai-search/AISearchBar.tsx:219:3
+    at div
+    at div
+    at div
+    at div
+    at Header (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/layouts/components/Header/Header.tsx:27:3)
+    at div
+    at CustomerLayout (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/shared/layouts/CustomerLayout.tsx:23:27)
+    at RenderedRoute (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=4af66e9e:5455:26)
+    at Routes (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=4af66e9e:6188:3)
+    at Suspense
+    at AuthProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/domains/customer/auth/components/AuthProvider.tsx:29:32)
+    at Router (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=4af66e9e:6131:13)
+    at BrowserRouter (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-router-dom.js?v=4af66e9e:9149:3)
+    at ThemeProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/ThemeContext.tsx:218:33)
+    at Provider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=4af66e9e:38:15)
+    at TooltipProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=4af66e9e:951:5)
+    at QueryClientProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=4af66e9e:2805:3)
+    at SimpleLanguageProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/SimpleLanguageContext.tsx:30:42)
+    at _a (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-helmet-async.js?v=4af66e9e:624:5)
+    at App
+    at CartProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/CartContext.tsx?v=42KbIUuJL3lUsu0JicBxb:170:32)
+    at AuthProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/domains/customer/auth/components/AuthProvider.tsx?v=42KbIUuJL3lUsu0JicBxb:29:32)
+    at ThemeProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/src/contexts/ThemeContext.tsx?v=42KbIUuJL3lUsu0JicBxb:218:33)
+    at QueryClientProvider (https://1bd9e90a-7e5e-4d98-b4e5-0306dc236f7f-00-1aw5ubo0xsn2l.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=4af66e9e:2805:3)
+overrideMethod @ hook.js:608
+printWarning @ react_jsx-dev-runtime.js?v=4af66e9e:64
+error @ react_jsx-dev-runtime.js?v=4af66e9e:48
+validateExplicitKey @ react_jsx-dev-runtime.js?v=4af66e9e:724
+validateChildKeys @ react_jsx-dev-runtime.js?v=4af66e9e:737
+jsxWithValidation @ react_jsx-dev-runtime.js?v=4af66e9e:855
+(anonymous) @ AISearchBar.tsx:909
+renderWithHooks @ chunk-RPCDYKBN.js?v=4af66e9e:11548
+updateFunctionComponent @ chunk-RPCDYKBN.js?v=4af66e9e:14582
+updateSimpleMemoComponent @ chunk-RPCDYKBN.js?v=4af66e9e:14463
+beginWork @ chunk-RPCDYKBN.js?v=4af66e9e:15980
+beginWork$1 @ chunk-RPCDYKBN.js?v=4af66e9e:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=4af66e9e:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=4af66e9e:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=4af66e9e:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=4af66e9e:18678
+workLoop @ chunk-RPCDYKBN.js?v=4af66e9e:197
+flushWork @ chunk-RPCDYKBN.js?v=4af66e9e:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=4af66e9e:384Understand this error

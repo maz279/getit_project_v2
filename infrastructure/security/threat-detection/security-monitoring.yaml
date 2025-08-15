@@ -1,0 +1,270 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: threat-detection-config
+  namespace: getit-security
+  labels:
+    component: security
+    type: threat-detection
+data:
+  falco-rules.yaml: |
+    - rule: Suspicious network activity
+      desc: Detect suspicious network connections
+      condition: >
+        spawned_process and 
+        proc.name in (nc, ncat, netcat, socat) and
+        not user.name in (root, admin)
+      output: >
+        Suspicious network activity detected 
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: WARNING
+
+    - rule: Unauthorized file access
+      desc: Detect unauthorized access to sensitive files
+      condition: >
+        open_read and
+        fd.name startswith /etc and
+        not proc.name in (systemd, dbus, networkd)
+      output: >
+        Unauthorized file access 
+        (user=%user.name file=%fd.name command=%proc.cmdline)
+      priority: ERROR
+
+    - rule: Bangladesh payment gateway access
+      desc: Monitor access to payment gateway credentials
+      condition: >
+        open_read and
+        (fd.name contains "bkash" or 
+         fd.name contains "nagad" or 
+         fd.name contains "rocket" or
+         fd.name contains "payment")
+      output: >
+        Payment gateway credential access 
+        (user=%user.name file=%fd.name command=%proc.cmdline)
+      priority: CRITICAL
+
+  wazuh-rules.xml: |
+    <group name="getit-platform">
+      <!-- Payment fraud detection -->
+      <rule id="100001" level="12">
+        <if_group>payment</if_group>
+        <match>transaction_amount > 100000</match>
+        <description>High-value transaction detected</description>
+        <mitre>
+          <id>T1566</id>
+        </mitre>
+      </rule>
+
+      <!-- Multiple failed login attempts -->
+      <rule id="100002" level="10">
+        <if_group>authentication</if_group>
+        <match>failed_login_attempts >= 5</match>
+        <same_source_ip />
+        <timeframe>300</timeframe>
+        <description>Multiple failed login attempts from same IP</description>
+        <mitre>
+          <id>T1110</id>
+        </mitre>
+      </rule>
+
+      <!-- Bangladesh-specific suspicious activity -->
+      <rule id="100003" level="8">
+        <if_group>user_activity</if_group>
+        <match>login_country != "Bangladesh"</match>
+        <description>Login from outside Bangladesh detected</description>
+        <mitre>
+          <id>T1078</id>
+        </mitre>
+      </rule>
+
+      <!-- Vendor KYC bypass attempt -->
+      <rule id="100004" level="15">
+        <if_group>vendor_management</if_group>
+        <match>kyc_bypass_attempt</match>
+        <description>Attempt to bypass KYC verification</description>
+        <mitre>
+          <id>T1562</id>
+        </mitre>
+      </rule>
+    </group>
+
+  elk-config.yml: |
+    elasticsearch:
+      hosts: ["elasticsearch:9200"]
+      index: "getit-security-logs"
+      
+    logstash:
+      input:
+        beats:
+          port: 5044
+        syslog:
+          port: 514
+      
+      filter:
+        grok:
+          patterns:
+            - "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+        
+        mutate:
+          add_field:
+            platform: "getit"
+            environment: "production"
+            
+      output:
+        elasticsearch:
+          hosts: ["elasticsearch:9200"]
+          index: "getit-logs-%{+YYYY.MM.dd}"
+    
+    kibana:
+      dashboards:
+        - name: "Payment Security Dashboard"
+          visualizations:
+            - transaction_volume
+            - fraud_detection_alerts
+            - payment_gateway_health
+            
+        - name: "Authentication Security Dashboard"
+          visualizations:
+            - login_attempts
+            - failed_authentications
+            - user_behavior_anomalies
+            
+        - name: "Bangladesh Compliance Dashboard"
+          visualizations:
+            - kyc_verification_status
+            - data_residency_compliance
+            - regulatory_audit_trail
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: intrusion-detection-config
+  namespace: getit-security
+  labels:
+    component: security
+    type: intrusion-detection
+data:
+  suricata-rules.yaml: |
+    alert http any any -> any any (msg:"Suspicious API access pattern"; 
+      flow:to_server; content:"POST"; http_method; 
+      content:"/api/v1/payments"; http_uri; 
+      threshold:type threshold, track by_src, count 10, seconds 60; 
+      sid:1000001;)
+
+    alert http any any -> any any (msg:"Bangladesh payment gateway anomaly"; 
+      flow:to_server; content:"bkash"; http_uri; 
+      content:"nagad"; http_uri; 
+      content:"rocket"; http_uri; 
+      threshold:type threshold, track by_src, count 3, seconds 30; 
+      sid:1000002;)
+
+    alert tcp any any -> any 22 (msg:"SSH brute force attempt"; 
+      flow:to_server; flags:S; 
+      threshold:type threshold, track by_src, count 5, seconds 60; 
+      sid:1000003;)
+
+    alert http any any -> any any (msg:"SQL injection attempt"; 
+      flow:to_server; content:"union"; nocase; 
+      content:"select"; nocase; 
+      sid:1000004;)
+
+  fail2ban-config.conf: |
+    [DEFAULT]
+    ignoreip = 127.0.0.1/8 ::1
+    bantime = 3600
+    findtime = 600
+    maxretry = 3
+
+    [getit-api]
+    enabled = true
+    filter = getit-api
+    logpath = /var/log/getit/api.log
+    maxretry = 5
+    bantime = 7200
+
+    [getit-payment]
+    enabled = true
+    filter = getit-payment
+    logpath = /var/log/getit/payment.log
+    maxretry = 3
+    bantime = 14400
+
+    [getit-admin]
+    enabled = true
+    filter = getit-admin
+    logpath = /var/log/getit/admin.log
+    maxretry = 2
+    bantime = 86400
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: security-metrics
+  namespace: getit-monitoring
+  labels:
+    component: security
+    tier: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: getit-platform
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: security-alerts
+  namespace: getit-monitoring
+  labels:
+    component: security
+    tier: monitoring
+spec:
+  groups:
+  - name: security.rules
+    rules:
+    - alert: HighFailedLogins
+      expr: rate(failed_login_attempts_total[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+        component: authentication
+      annotations:
+        summary: "High number of failed login attempts"
+        description: "{{ $value }} failed login attempts per second"
+
+    - alert: PaymentFraudDetected
+      expr: suspicious_payment_transactions_total > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: payment
+        bangladesh: enabled
+      annotations:
+        summary: "Suspicious payment activity detected"
+        description: "{{ $value }} potentially fraudulent transactions"
+
+    - alert: UnauthorizedAPIAccess
+      expr: rate(unauthorized_api_requests_total[5m]) > 5
+      for: 1m
+      labels:
+        severity: warning
+        component: api
+      annotations:
+        summary: "Unauthorized API access attempts"
+        description: "{{ $value }} unauthorized requests per second"
+
+    - alert: KYCBypassAttempt
+      expr: kyc_bypass_attempts_total > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: vendor
+        bangladesh: compliance
+      annotations:
+        summary: "KYC bypass attempt detected"
+        description: "Attempt to bypass Bangladesh KYC requirements"

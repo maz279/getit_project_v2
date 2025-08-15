@@ -1,0 +1,499 @@
+import React, { useState, useCallback, useMemo, useReducer } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import Header from '../../components/shared/layouts/Header/Header';
+import { Footer } from '@/shared/layouts/components/Footer';
+import { NewProductsSection } from '../../components/customer/home/homepage/NewProductsSection';
+import { NewArrivalsFilters } from '../../components/newarrivals/NewArrivalsFilters';
+import { PreOrderSection } from '../../components/newarrivals/PreOrderSection';
+import { BrandSpotlight } from '../../components/newarrivals/BrandSpotlight';
+import { Button } from '@/shared/ui/button';
+import { Filter, Grid, List, Calendar, Star, Package, Bell } from 'lucide-react';
+import { useSEO } from '@/shared/hooks/useSEO';
+
+// Types and Interfaces
+type TabId = 'all' | 'today' | 'week' | 'preorder';
+type ViewMode = 'grid' | 'list';
+
+interface TabConfig {
+  id: TabId;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  ariaLabel: string;
+}
+
+interface NewArrivalsState {
+  activeTab: TabId;
+  viewMode: ViewMode;
+  showFilters: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface NewArrivalsAction {
+  type: 'SET_ACTIVE_TAB' | 'SET_VIEW_MODE' | 'TOGGLE_FILTERS' | 'SET_LOADING' | 'SET_ERROR';
+  payload?: any;
+}
+
+// Constants
+const STATS = {
+  NEW_ITEMS_THIS_WEEK: 500,
+  NOTIFICATION_TEXT: 'Get notified for new arrivals'
+} as const;
+
+const CSS_CLASSES = {
+  container: 'bg-white flex flex-col overflow-hidden items-stretch min-h-screen',
+  heroGradient: 'bg-gradient-to-r from-blue-600 via-purple-600 to-red-500 text-white py-12',
+  heroContainer: 'max-w-7xl mx-auto px-4 text-center',
+  heroTitle: 'text-4xl font-bold mb-4',
+  heroSubtitle: 'text-xl text-blue-100 mb-6',
+  statsBadge: 'flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2',
+  tabsContainer: 'bg-white border-b sticky top-0 z-40',
+  tabButton: (isActive: boolean) => `
+    flex items-center space-x-2 px-4 py-2 rounded-lg transition-all
+    ${isActive 
+      ? 'bg-blue-50 text-blue-600 border-2 border-blue-200' 
+      : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+    }
+  `,
+  mainContent: 'max-w-7xl mx-auto px-4 pb-12',
+  contentGrid: 'flex gap-6',
+  sidebar: 'w-64 flex-shrink-0',
+  newsletterGradient: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white py-12',
+  emailInput: `
+    flex-1 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-500 
+    focus:outline-none focus:ring-2 focus:ring-white
+  `
+} as const;
+
+// Reducer
+const newArrivalsReducer = (state: NewArrivalsState, action: NewArrivalsAction): NewArrivalsState => {
+  switch (action.type) {
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.payload, isLoading: true };
+    case 'SET_VIEW_MODE':
+      return { ...state, viewMode: action.payload };
+    case 'TOGGLE_FILTERS':
+      return { ...state, showFilters: !state.showFilters };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload, isLoading: false };
+    default:
+      return state;
+  }
+};
+
+// Sub-components
+const HeroStats: React.FC = React.memo(() => (
+  <div className="flex items-center justify-center gap-4">
+    <div className={CSS_CLASSES.statsBadge}>
+      <Package className="w-5 h-5 text-green-400" aria-hidden="true" />
+      <span className="text-sm">{STATS.NEW_ITEMS_THIS_WEEK}+ new items this week</span>
+    </div>
+    <div className={CSS_CLASSES.statsBadge}>
+      <Bell className="w-5 h-5 text-yellow-400" aria-hidden="true" />
+      <span className="text-sm">{STATS.NOTIFICATION_TEXT}</span>
+    </div>
+  </div>
+));
+HeroStats.displayName = 'HeroStats';
+
+const HeroSection: React.FC = React.memo(() => (
+  <section className={CSS_CLASSES.heroGradient} role="banner">
+    <div className={CSS_CLASSES.heroContainer}>
+      <h1 className={CSS_CLASSES.heroTitle}>✨ New Arrivals</h1>
+      <p className={CSS_CLASSES.heroSubtitle}>
+        Be the first to discover the latest products
+      </p>
+      <HeroStats />
+    </div>
+  </section>
+));
+HeroSection.displayName = 'HeroSection';
+
+interface TabButtonProps {
+  tab: TabConfig;
+  isActive: boolean;
+  onClick: (tabId: TabId) => void;
+}
+
+const TabButton: React.FC<TabButtonProps> = React.memo(({ tab, isActive, onClick }) => {
+  const Icon = tab.icon;
+  
+  const handleClick = useCallback(() => {
+    onClick(tab.id);
+  }, [onClick, tab.id]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(tab.id);
+    }
+  }, [onClick, tab.id]);
+
+  return (
+    <button
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className={CSS_CLASSES.tabButton(isActive)}
+      role="tab"
+      aria-selected={isActive}
+      aria-label={tab.ariaLabel}
+      tabIndex={isActive ? 0 : -1}
+    >
+      <Icon className={`w-4 h-4 ${tab.color}`} aria-hidden="true" />
+      <span className="font-medium">{tab.label}</span>
+    </button>
+  );
+});
+TabButton.displayName = 'TabButton';
+
+interface ViewModeToggleProps {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+}
+
+const ViewModeToggle: React.FC<ViewModeToggleProps> = React.memo(({ viewMode, onViewModeChange }) => (
+  <div className="flex items-center gap-1 border rounded-lg p-1" role="radiogroup" aria-label="View mode">
+    <Button
+      variant={viewMode === 'grid' ? "default" : "ghost"}
+      size="sm"
+      onClick={() => onViewModeChange('grid')}
+      aria-label="Grid view"
+      role="radio"
+      aria-checked={viewMode === 'grid'}
+    >
+      <Grid className="w-4 h-4" aria-hidden="true" />
+    </Button>
+    <Button
+      variant={viewMode === 'list' ? "default" : "ghost"}
+      size="sm"
+      onClick={() => onViewModeChange('list')}
+      aria-label="List view"
+      role="radio"
+      aria-checked={viewMode === 'list'}
+    >
+      <List className="w-4 h-4" aria-hidden="true" />
+    </Button>
+  </div>
+));
+ViewModeToggle.displayName = 'ViewModeToggle';
+
+interface NavigationTabsProps {
+  activeTab: TabId;
+  viewMode: ViewMode;
+  showFilters: boolean;
+  onTabChange: (tabId: TabId) => void;
+  onViewModeChange: (mode: ViewMode) => void;
+  onToggleFilters: () => void;
+}
+
+const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
+  activeTab,
+  viewMode,
+  showFilters,
+  onTabChange,
+  onViewModeChange,
+  onToggleFilters
+}) => {
+  const tabs: TabConfig[] = useMemo(() => [
+    { 
+      id: 'all', 
+      label: 'All New', 
+      icon: Package, 
+      color: 'text-blue-600',
+      ariaLabel: 'View all new arrivals'
+    },
+    { 
+      id: 'today', 
+      label: 'Today', 
+      icon: Calendar, 
+      color: 'text-green-600',
+      ariaLabel: 'View today\'s new arrivals'
+    },
+    { 
+      id: 'week', 
+      label: 'This Week', 
+      icon: Star, 
+      color: 'text-purple-600',
+      ariaLabel: 'View this week\'s new arrivals'
+    },
+    { 
+      id: 'preorder', 
+      label: 'Pre-Orders', 
+      icon: Bell, 
+      color: 'text-red-600',
+      ariaLabel: 'View pre-order items'
+    },
+  ], []);
+
+  return (
+    <nav className={CSS_CLASSES.tabsContainer}>
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center space-x-6" role="tablist">
+            {tabs.map((tab) => (
+              <TabButton
+                key={tab.id}
+                tab={tab}
+                isActive={activeTab === tab.id}
+                onClick={onTabChange}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleFilters}
+              aria-expanded={showFilters}
+              aria-label={showFilters ? "Hide filters" : "Show filters"}
+            >
+              <Filter className="w-4 h-4 mr-2" aria-hidden="true" />
+              Filters
+            </Button>
+            
+            <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+});
+NavigationTabs.displayName = 'NavigationTabs';
+
+interface EmailFormData {
+  email: string;
+  isValid: boolean;
+  error: string | null;
+}
+
+const NewsletterSignup: React.FC = React.memo(() => {
+  const [formData, setFormData] = useState<EmailFormData>({
+    email: '',
+    isValid: false,
+    error: null
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validateEmail = useCallback((email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }, []);
+
+  const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value;
+    const isValid = validateEmail(email);
+    
+    setFormData({
+      email,
+      isValid,
+      error: email && !isValid ? 'Please enter a valid email address' : null
+    });
+  }, [validateEmail]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.isValid) return;
+    
+    setIsSubmitting(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Reset form on success
+      setFormData({ email: '', isValid: false, error: null });
+      
+      // Show success message (you might want to use a toast library)
+      alert('Successfully subscribed to newsletter!');
+    } catch (error) {
+      setFormData(prev => ({ 
+        ...prev, 
+        error: 'Failed to subscribe. Please try again.' 
+      }));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [formData.isValid]);
+
+  return (
+    <section className={CSS_CLASSES.newsletterGradient}>
+      <div className="max-w-7xl mx-auto px-4 text-center">
+        <h2 className="text-3xl font-bold mb-4">🔔 Never Miss New Arrivals</h2>
+        <p className="text-lg text-purple-100 mb-8">
+          Get notified instantly when new products arrive in your favorite categories
+        </p>
+        <form 
+          onSubmit={handleSubmit}
+          className="flex flex-col items-center gap-4 max-w-md mx-auto"
+          noValidate
+        >
+          <div className="flex items-center gap-4 w-full">
+            <input
+              type="email"
+              value={formData.email}
+              onChange={handleEmailChange}
+              placeholder="Your email address"
+              className={CSS_CLASSES.emailInput}
+              required
+              aria-label="Email address for newsletter subscription"
+              aria-invalid={!!formData.error}
+              aria-describedby={formData.error ? "email-error" : undefined}
+            />
+            <Button 
+              type="submit"
+              disabled={!formData.isValid || isSubmitting}
+              className="bg-white text-purple-600 hover:bg-gray-100 disabled:opacity-50"
+              aria-label="Subscribe to newsletter"
+            >
+              {isSubmitting ? 'Subscribing...' : 'Subscribe'}
+            </Button>
+          </div>
+          {formData.error && (
+            <p id="email-error" className="text-red-200 text-sm" role="alert">
+              {formData.error}
+            </p>
+          )}
+        </form>
+      </div>
+    </section>
+  );
+});
+NewsletterSignup.displayName = 'NewsletterSignup';
+
+interface ContentSectionProps {
+  activeTab: TabId;
+  viewMode: ViewMode;
+  showFilters: boolean;
+}
+
+const ContentSection: React.FC<ContentSectionProps> = React.memo(({ 
+  activeTab, 
+  viewMode, 
+  showFilters 
+}) => (
+  <div className={CSS_CLASSES.mainContent}>
+    <div className={CSS_CLASSES.contentGrid}>
+      {showFilters && (
+        <aside className={CSS_CLASSES.sidebar} aria-label="Product filters">
+          <NewArrivalsFilters />
+        </aside>
+      )}
+
+      <main className="flex-1" role="main">
+        {activeTab === 'preorder' ? (
+          <PreOrderSection viewMode={viewMode} />
+        ) : (
+          <div>
+            <NewProductsSection />
+            
+            <div className="mt-12 text-center">
+              <Button variant="outline" size="lg" aria-label="Load more new arrivals">
+                Load More New Arrivals
+              </Button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  </div>
+));
+ContentSection.displayName = 'ContentSection';
+
+// Error Fallback Component
+interface ErrorFallbackProps {
+  error: Error;
+  resetErrorBoundary: () => void;
+}
+
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, resetErrorBoundary }) => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center p-8">
+      <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
+      <p className="text-gray-600 mb-4">{error.message}</p>
+      <Button onClick={resetErrorBoundary}>Try again</Button>
+    </div>
+  </div>
+);
+
+// Main Component
+const NewArrivals: React.FC = () => {
+  const [state, dispatch] = useReducer(newArrivalsReducer, {
+    activeTab: 'all',
+    viewMode: 'grid',
+    showFilters: false,
+    isLoading: false,
+    error: null
+  });
+
+  // SEO Configuration
+  useSEO({
+    title: 'New Arrivals - Latest Products on GetIt Bangladesh | Fresh Inventory',
+    description: 'Discover the latest products and new arrivals on GetIt Bangladesh. Be the first to shop fresh inventory from top brands and verified vendors.',
+    keywords: 'new arrivals, latest products, fresh inventory, new items, recent products, bangladesh shopping',
+    canonical: 'https://getit-bangladesh.com/new-arrivals',
+  });
+
+  // Event Handlers
+  const handleTabChange = useCallback((tabId: TabId) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', payload: tabId });
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: mode });
+  }, []);
+
+  const handleToggleFilters = useCallback(() => {
+    dispatch({ type: 'TOGGLE_FILTERS' });
+  }, []);
+
+  if (state.error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Page</h1>
+          <p className="text-gray-600">{state.error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <div className={CSS_CLASSES.container}>
+        <Header />
+        
+        <HeroSection />
+        
+        <NavigationTabs
+          activeTab={state.activeTab}
+          viewMode={state.viewMode}
+          showFilters={state.showFilters}
+          onTabChange={handleTabChange}
+          onViewModeChange={handleViewModeChange}
+          onToggleFilters={handleToggleFilters}
+        />
+
+        {/* Brand Spotlight */}
+        <section className="max-w-7xl mx-auto px-4 py-6">
+          <BrandSpotlight />
+        </section>
+
+        <ContentSection
+          activeTab={state.activeTab}
+          viewMode={state.viewMode}
+          showFilters={state.showFilters}
+        />
+
+        <NewsletterSignup />
+        
+        <Footer />
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default NewArrivals;

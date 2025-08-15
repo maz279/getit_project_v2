@@ -1,0 +1,745 @@
+# Grok AI Integration for Ecommerce Search Bar
+
+Here's a production-ready implementation connecting Grok AI to your ecommerce search bar with all AI functionality:
+
+## Architecture Overview
+
+```
+Frontend → API Gateway → Search Service → Grok AI → Product DB
+                    ↘ Recommendation Engine ↗
+```
+
+## 1. Backend Service (Node.js/Express)
+
+```javascript
+// server.js
+const express = require('express');
+const axios = require('axios');
+const redis = require('redis');
+const { v4: uuidv4 } = require('uuid');
+
+const app = express();
+app.use(express.json());
+
+// Redis for caching
+const redisClient = redis.createClient({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: process.env.REDIS_PORT || 6379
+});
+
+// Grok API configuration
+const GROK_CONFIG = {
+  apiKey: process.env.GROK_API_KEY,
+  apiUrl: 'https://api.x.ai/v1/chat/completions',
+  model: 'grok-beta',
+  timeout: 30000
+};
+
+// Product service integration
+const ProductService = require('./services/productService');
+const RecommendationService = require('./services/recommendationService');
+
+// Middleware for rate limiting
+const rateLimit = require('./middleware/rateLimit');
+
+app.use('/api/search', rateLimit);
+
+// Main search endpoint
+app.post('/api/search', async (req, res) => {
+  try {
+    const { query, userId, sessionId, filters = {} } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    // 1. Classify query intent
+    const intent = await classifyQueryIntent(query);
+    
+    // 2. Process based on intent
+    let result;
+    switch(intent.type) {
+      case 'product_search':
+        result = await handleProductSearch(query, filters, userId);
+        break;
+      case 'recommendation':
+        result = await handleRecommendation(query, userId);
+        break;
+      case 'conversational':
+        result = await handleConversationalSearch(query, sessionId);
+        break;
+      default:
+        result = await handleProductSearch(query, filters, userId);
+    }
+
+    // 3. Log interaction for training
+    logInteraction({ query, intent, result, userId, sessionId });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Query intent classification
+async function classifyQueryIntent(query) {
+  const cacheKey = `intent:${query.toLowerCase()}`;
+  
+  // Check cache first
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (err) {
+    console.warn('Cache read error:', err);
+  }
+
+  const prompt = `
+Classify this ecommerce query into one of these categories:
+1. product_search - Looking for specific products
+2. recommendation - Asking for suggestions/recommendations
+3. conversational - General conversation or support
+
+Query: "${query}"
+
+Respond ONLY with JSON format:
+{"type": "product_search|recommendation|conversational", "confidence": 0.0-1.0}
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, {
+      temperature: 0.1,
+      max_tokens: 100
+    });
+
+    const intent = JSON.parse(response.choices[0].message.content.trim());
+    
+    // Cache for 1 hour
+    await redisClient.setex(cacheKey, 3600, JSON.stringify(intent));
+    
+    return intent;
+  } catch (error) {
+    console.error('Intent classification error:', error);
+    return { type: 'product_search', confidence: 0.5 };
+  }
+}
+
+// Product search handler
+async function handleProductSearch(query, filters, userId) {
+  // 1. Enhance query with Grok
+  const enhancedQuery = await enhanceSearchQuery(query);
+  
+  // 2. Get products from search service
+  const products = await ProductService.searchProducts(enhancedQuery, filters);
+  
+  // 3. Rerank with AI
+  const rerankedProducts = await rerankProducts(products, query, userId);
+  
+  // 4. Generate suggestions
+  const suggestions = await generateSearchSuggestions(query, filters);
+  
+  return {
+    type: 'product_search',
+    query: enhancedQuery,
+    originalQuery: query,
+    products: rerankedProducts.slice(0, 20),
+    totalResults: rerankedProducts.length,
+    suggestions,
+    filters: await getDynamicFilters(rerankedProducts)
+  };
+}
+
+// Recommendation handler
+async function handleRecommendation(query, userId) {
+  // Get user preferences
+  const userPreferences = await RecommendationService.getUserPreferences(userId);
+  
+  // Get recommendations
+  const recommendations = await RecommendationService.getRecommendations(userId, query);
+  
+  // Personalize with Grok
+  const personalizedRecs = await personalizeRecommendations(recommendations, query, userPreferences);
+  
+  return {
+    type: 'recommendation',
+    query,
+    recommendations: personalizedRecs,
+    message: await generateRecommendationMessage(query, personalizedRecs.length)
+  };
+}
+
+// Conversational handler
+async function handleConversationalSearch(query, sessionId) {
+  // Get conversation history
+  const history = await getConversationHistory(sessionId);
+  
+  // Generate response
+  const response = await generateConversationalResponse(query, history);
+  
+  // Save conversation
+  await saveConversationTurn(sessionId, query, response);
+  
+  return {
+    type: 'conversational',
+    query,
+    response,
+    sessionId
+  };
+}
+
+// Grok API helper
+async function callGrokAPI(prompt, options = {}) {
+  const defaultOptions = {
+    model: GROK_CONFIG.model,
+    messages: Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }],
+    temperature: 0.7,
+    max_tokens: 500,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0
+  };
+
+  const config = { ...defaultOptions, ...options };
+
+  try {
+    const response = await axios.post(GROK_CONFIG.apiUrl, config, {
+      headers: {
+        'Authorization': `Bearer ${GROK_CONFIG.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: GROK_CONFIG.timeout
+    });
+
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw new Error(`Grok API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+    }
+    throw new Error(`Network error: ${error.message}`);
+  }
+}
+
+// Query enhancement
+async function enhanceSearchQuery(query) {
+  const cacheKey = `enhanced:${query.toLowerCase()}`;
+  
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return cached;
+  } catch (err) {
+    console.warn('Cache read error:', err);
+  }
+
+  const prompt = `
+Enhance this ecommerce search query to improve product matching.
+Original query: "${query}"
+
+Instructions:
+- Keep the core intent
+- Add relevant synonyms
+- Expand abbreviations
+- Remove unnecessary words
+- Make it more specific if possible
+
+Return ONLY the enhanced query, nothing else:
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, { temperature: 0.3 });
+    const enhancedQuery = response.choices[0].message.content.trim();
+    
+    // Cache for 2 hours
+    await redisClient.setex(cacheKey, 7200, enhancedQuery);
+    
+    return enhancedQuery;
+  } catch (error) {
+    console.error('Query enhancement error:', error);
+    return query; // Return original if enhancement fails
+  }
+}
+
+// Product reranking
+async function rerankProducts(products, query, userId) {
+  if (products.length <= 1) return products;
+
+  const prompt = `
+Rank these products based on relevance to the query: "${query}"
+
+Products:
+${products.map((p, i) => `${i+1}. ${p.name} - ${p.description} - $${p.price}`).join('\n')}
+
+Return ONLY a JSON array with product IDs in order of relevance:
+["product_id_1", "product_id_2", ...]
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, {
+      temperature: 0.1,
+      max_tokens: 500
+    });
+
+    const rankedIds = JSON.parse(response.choices[0].message.content.trim());
+    
+    // Reorder products based on ranking
+    return rankedIds
+      .map(id => products.find(p => p.id === id))
+      .filter(Boolean)
+      .concat(products.filter(p => !rankedIds.includes(p.id)));
+  } catch (error) {
+    console.error('Reranking error:', error);
+    return products; // Return original order if reranking fails
+  }
+}
+
+// Generate search suggestions
+async function generateSearchSuggestions(query, filters) {
+  const cacheKey = `suggestions:${query.toLowerCase()}`;
+  
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (err) {
+    console.warn('Cache read error:', err);
+  }
+
+  const prompt = `
+Generate 5 relevant search suggestions for: "${query}"
+
+Consider these filters: ${JSON.stringify(filters)}
+
+Return ONLY a JSON array of strings:
+["suggestion 1", "suggestion 2", ...]
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, {
+      temperature: 0.7,
+      max_tokens: 200
+    });
+
+    const suggestions = JSON.parse(response.choices[0].message.content.trim());
+    
+    // Cache for 1 hour
+    await redisClient.setex(cacheKey, 3600, JSON.stringify(suggestions));
+    
+    return suggestions.slice(0, 5);
+  } catch (error) {
+    console.error('Suggestions error:', error);
+    return [];
+  }
+}
+
+// Generate recommendation message
+async function generateRecommendationMessage(query, count) {
+  const prompt = `
+Generate a friendly recommendation message for ${count} items related to: "${query}"
+
+Keep it concise (1 sentence max) and engaging.
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, {
+      temperature: 0.8,
+      max_tokens: 100
+    });
+    
+    return response.choices[0].message.content.trim();
+  } catch (error) {
+    return `Here are some great ${query} options for you!`;
+  }
+}
+
+// Conversational response generation
+async function generateConversationalResponse(query, history) {
+  const conversationContext = history.slice(-6); // Last 3 exchanges
+  
+  const messages = [
+    {
+      role: 'system',
+      content: `You are a helpful ecommerce assistant for our online store. 
+Help users find products, make recommendations, and answer questions.
+Be friendly, concise, and focus on helping customers shop effectively.
+If you can't help with something, suggest they try searching for products instead.`
+    },
+    ...conversationContext,
+    { role: 'user', content: query }
+  ];
+
+  try {
+    const response = await callGrokAPI(messages, {
+      temperature: 0.7,
+      max_tokens: 300
+    });
+    
+    return response.choices[0].message.content.trim();
+  } catch (error) {
+    return "I'd be happy to help you find what you're looking for! What products are you interested in?";
+  }
+}
+
+// Dynamic filters generation
+async function getDynamicFilters(products) {
+  if (products.length === 0) return {};
+
+  const prompt = `
+Based on these products, suggest relevant filters for the search results:
+
+Products:
+${products.slice(0, 10).map(p => `- ${p.name} (${p.category}, ${p.brand}, $${p.price})`).join('\n')}
+
+Return ONLY a JSON object with filter categories:
+{
+  "price_range": {"min": 0, "max": 1000},
+  "categories": ["category1", "category2"],
+  "brands": ["brand1", "brand2"],
+  "colors": ["color1", "color2"]
+}
+`;
+
+  try {
+    const response = await callGrokAPI(prompt, {
+      temperature: 0.3,
+      max_tokens: 300
+    });
+    
+    return JSON.parse(response.choices[0].message.content.trim());
+  } catch (error) {
+    return {};
+  }
+}
+
+// Conversation history management
+async function getConversationHistory(sessionId) {
+  try {
+    const history = await redisClient.lrange(`conversation:${sessionId}`, 0, -1);
+    return history.map(item => JSON.parse(item));
+  } catch (error) {
+    return [];
+  }
+}
+
+async function saveConversationTurn(sessionId, query, response) {
+  const turn = {
+    role: 'user',
+    content: query,
+    timestamp: new Date().toISOString()
+  };
+  
+  const responseTurn = {
+    role: 'assistant',
+    content: response,
+    timestamp: new Date().toISOString()
+  };
+  
+  try {
+    await redisClient.lpush(`conversation:${sessionId}`, JSON.stringify(turn));
+    await redisClient.lpush(`conversation:${sessionId}`, JSON.stringify(responseTurn));
+    // Keep only last 20 messages
+    await redisClient.ltrim(`conversation:${sessionId}`, 0, 19);
+    // Expire after 24 hours
+    await redisClient.expire(`conversation:${sessionId}`, 86400);
+  } catch (error) {
+    console.error('Conversation save error:', error);
+  }
+}
+
+// Interaction logging
+async function logInteraction(data) {
+  // In production, send to analytics service or data warehouse
+  console.log('Interaction logged:', {
+    timestamp: new Date().toISOString(),
+    ...data
+  });
+}
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Ecommerce AI service running on port ${PORT}`);
+});
+
+module.exports = app;
+```
+
+## 2. Rate Limiting Middleware
+
+```javascript
+// middleware/rateLimit.js
+const redis = require('redis');
+const client = redis.createClient();
+
+const rateLimit = async (req, res, next) => {
+  const userId = req.body.userId || req.ip;
+  const key = `rate_limit:${userId}`;
+  const window = 60; // 1 minute
+  const limit = 30; // 30 requests per minute
+
+  try {
+    const current = await client.incr(key);
+    
+    if (current === 1) {
+      await client.expire(key, window);
+    }
+    
+    if (current > limit) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        retryAfter: window
+      });
+    }
+    
+    res.set('X-RateLimit-Remaining', limit - current);
+    next();
+  } catch (error) {
+    next(); // Fail open
+  }
+};
+
+module.exports = rateLimit;
+```
+
+## 3. Product Service
+
+```javascript
+// services/productService.js
+const axios = require('axios');
+
+class ProductService {
+  static async searchProducts(query, filters = {}) {
+    try {
+      // This would integrate with your actual product database/search engine
+      // Example using Elasticsearch or similar:
+      
+      const searchParams = {
+        query: {
+          bool: {
+            should: [
+              { match: { name: { query, boost: 3 } } },
+              { match: { description: query } },
+              { match: { category: query } },
+              { match: { brand: query } }
+            ],
+            minimum_should_match: 1
+          }
+        },
+        ...filters
+      };
+
+      // Example API call to your product search service
+      const response = await axios.post(
+        `${process.env.PRODUCT_SEARCH_API}/search`,
+        searchParams
+      );
+
+      return response.data.products || [];
+    } catch (error) {
+      console.error('Product search error:', error);
+      return [];
+    }
+  }
+}
+
+module.exports = ProductService;
+```
+
+## 4. Recommendation Service
+
+```javascript
+// services/recommendationService.js
+const axios = require('axios');
+
+class RecommendationService {
+  static async getUserPreferences(userId) {
+    try {
+      const response = await axios.get(
+        `${process.env.RECOMMENDATION_API}/user/${userId}/preferences`
+      );
+      return response.data;
+    } catch (error) {
+      return {};
+    }
+  }
+
+  static async getRecommendations(userId, query = '') {
+    try {
+      const response = await axios.post(
+        `${process.env.RECOMMENDATION_API}/recommend`,
+        { userId, query, limit: 12 }
+      );
+      return response.data.recommendations || [];
+    } catch (error) {
+      return [];
+    }
+  }
+}
+
+module.exports = RecommendationService;
+```
+
+## 5. Frontend Integration
+
+```javascript
+// frontend/searchComponent.js
+class EcommerceSearchAI {
+  constructor(apiUrl) {
+    this.apiUrl = apiUrl;
+    this.sessionId = this.getSessionId();
+    this.debounceTimer = null;
+  }
+
+  getSessionId() {
+    let sessionId = localStorage.getItem('search_session_id');
+    if (!sessionId) {
+      sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('search_session_id', sessionId);
+    }
+    return sessionId;
+  }
+
+  async search(query, filters = {}) {
+    const userId = this.getUserId(); // Implement based on your auth system
+    
+    try {
+      const response = await fetch(`${this.apiUrl}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          userId,
+          sessionId: this.sessionId,
+          filters
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Search error:', error);
+      throw error;
+    }
+  }
+
+  // Debounced search for real-time suggestions
+  searchWithSuggestions(query, callback) {
+    clearTimeout(this.debounceTimer);
+    
+    if (query.length < 2) {
+      callback({ suggestions: [] });
+      return;
+    }
+
+    this.debounceTimer = setTimeout(async () => {
+      try {
+        const result = await this.search(query);
+        callback(result);
+      } catch (error) {
+        callback({ error: error.message });
+      }
+    }, 300);
+  }
+
+  getUserId() {
+    // Implement based on your authentication system
+    return localStorage.getItem('user_id') || 'anonymous';
+  }
+}
+
+// Usage example
+const searchAI = new EcommerceSearchAI('/api');
+
+// Real-time search suggestions
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const query = e.target.value;
+  
+  searchAI.searchWithSuggestions(query, (result) => {
+    if (result.suggestions) {
+      displaySuggestions(result.suggestions);
+    }
+    if (result.products) {
+      displayProducts(result.products);
+    }
+  });
+});
+```
+
+## 6. Environment Configuration
+
+```bash
+# .env
+GROK_API_KEY=your_grok_api_key_here
+REDIS_HOST=localhost
+REDIS_PORT=6379
+PRODUCT_SEARCH_API=https://your-product-search-api.com
+RECOMMENDATION_API=https://your-recommendation-api.com
+PORT=3000
+```
+
+## 7. Docker Setup
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  ecommerce-ai:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - GROK_API_KEY=${GROK_API_KEY}
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+```
+
+## Key Features Implemented:
+
+1. **Multi-modal AI functionality** - Search, recommendations, conversational AI
+2. **Query intent classification** - Automatically routes to appropriate handler
+3. **Caching layer** - Redis for performance optimization
+4. **Rate limiting** - Prevents API abuse
+5. **Error handling** - Graceful fallbacks
+6. **Conversation context** - Maintains chat history
+7. **Dynamic filtering** - AI-generated search filters
+8. **Production-ready logging** - For analytics and debugging
+
+## Best Practices Included:
+
+- **Caching** for performance
+- **Rate limiting** for stability
+- **Error boundaries** for reliability
+- **Structured logging** for monitoring
+- **Environment configuration** for deployment
+- **Docker support** for containerization
+
+This implementation provides a robust, scalable foundation for your ecommerce AI search functionality using Grok.

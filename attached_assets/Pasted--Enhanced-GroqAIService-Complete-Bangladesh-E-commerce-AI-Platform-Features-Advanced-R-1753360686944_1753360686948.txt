@@ -1,0 +1,1270 @@
+/**
+ * Enhanced GroqAIService - Complete Bangladesh E-commerce AI Platform
+ * Features: Advanced Recommendations, Cultural Context, Bengali Support, Complete Conversational AI
+ * Production-ready with comprehensive Bangladesh market intelligence
+ */
+
+import { z } from 'zod';
+import OpenAI from 'openai';
+
+// === ENHANCED CONFIGURATION ===
+const ENHANCED_CONFIG = {
+  TIMEOUTS: {
+    DEFAULT: 3000,
+    FAST: 1500,
+    CONVERSATIONAL: 8000,
+    RECOMMENDATION: 4000,
+    CULTURAL_ANALYSIS: 5000,
+  },
+  TOKEN_LIMITS: {
+    SUGGESTIONS: 300,
+    RECOMMENDATIONS: 600,
+    CONVERSATIONAL: 800,
+    CULTURAL_CONTEXT: 700,
+    COMPARISON: 500,
+    BENGALI_RESPONSE: 600,
+  },
+  MODELS: {
+    FAST: 'llama3-8b-8192',
+    QUALITY: 'llama3-8b-8192',
+    CULTURAL: 'llama3-8b-8192',
+  },
+  BANGLADESH_CONTEXT: {
+    MAJOR_CITIES: ['Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi', 'Khulna', 'Barisal', 'Rangpur', 'Mymensingh'],
+    FESTIVALS: ['Eid ul-Fitr', 'Eid ul-Adha', 'Durga Puja', 'Pohela Boishakh', 'Kali Puja', 'Christmas'],
+    SEASONS: ['Summer', 'Monsoon', 'Winter', 'Pre-monsoon'],
+    LOCAL_BRANDS: ['Walton', 'Symphony', 'Minister', 'Pran', 'Square', 'ACI', 'Bashundhara'],
+    PAYMENT_METHODS: ['bKash', 'Nagad', 'Rocket', 'SureCash', 'Bank Transfer', 'Cash on Delivery'],
+    LANGUAGES: ['Bengali', 'English', 'Chittagonian', 'Sylheti'],
+  },
+} as const;
+
+// === ENHANCED SCHEMAS ===
+const PersonalizedRecommendationSchema = z.object({
+  recommendations: z.array(z.object({
+    productId: z.string(),
+    productName: z.string(),
+    reason: z.string(),
+    confidence: z.number().min(0).max(1),
+    priceRange: z.string(),
+    availability: z.string(),
+    culturalRelevance: z.string().optional(),
+    seasonalFactor: z.string().optional(),
+    localBrandPreference: z.boolean().optional(),
+  })),
+  recommendationType: z.enum(['collaborative', 'content-based', 'hybrid', 'cultural', 'seasonal']),
+  userProfile: z.object({
+    preferences: z.array(z.string()),
+    culturalBackground: z.string().optional(),
+    location: z.string().optional(),
+    budgetRange: z.string().optional(),
+  }),
+  metadata: z.object({
+    algorithm: z.string(),
+    confidence: z.number(),
+    refreshTime: z.string(),
+  }),
+});
+
+const BengaliConversationSchema = z.object({
+  bengaliResponse: z.string(),
+  englishResponse: z.string(),
+  culturalContext: z.array(z.string()),
+  localReferences: z.array(z.string()),
+  confidence: z.number().min(0).max(1),
+  responseType: z.enum(['informational', 'transactional', 'cultural', 'support']),
+  suggestedActions: z.array(z.string()).optional(),
+});
+
+const ProductComparisonSchema = z.object({
+  comparisonMatrix: z.array(z.object({
+    productName: z.string(),
+    features: z.record(z.string()),
+    pros: z.array(z.string()),
+    cons: z.array(z.string()),
+    priceInTaka: z.number(),
+    availability: z.string(),
+    localWarranty: z.boolean(),
+    rating: z.number(),
+  })),
+  recommendation: z.object({
+    bestOverall: z.string(),
+    bestValue: z.string(),
+    bestPremium: z.string(),
+    reasoning: z.string(),
+  }),
+  culturalConsiderations: z.array(z.string()),
+});
+
+const SeasonalRecommendationSchema = z.object({
+  seasonalProducts: z.array(z.object({
+    category: z.string(),
+    products: z.array(z.string()),
+    reason: z.string(),
+    urgency: z.enum(['low', 'medium', 'high']),
+    priceExpectation: z.string(),
+  })),
+  festivalSpecific: z.array(z.object({
+    festival: z.string(),
+    recommendations: z.array(z.string()),
+    culturalSignificance: z.string(),
+    timingAdvice: z.string(),
+  })),
+  weatherConsiderations: z.array(z.string()),
+});
+
+const ShoppingAssistantSchema = z.object({
+  response: z.string(),
+  actionItems: z.array(z.object({
+    action: z.string(),
+    priority: z.enum(['low', 'medium', 'high']),
+    timeframe: z.string(),
+  })),
+  budgetAnalysis: z.object({
+    currentBudget: z.string(),
+    recommendedAllocation: z.record(z.string()),
+    savingTips: z.array(z.string()),
+  }).optional(),
+  paymentSuggestions: z.array(z.object({
+    method: z.string(),
+    benefits: z.array(z.string()),
+    suitability: z.string(),
+  })),
+  deliveryOptions: z.array(z.object({
+    type: z.string(),
+    estimatedTime: z.string(),
+    cost: z.string(),
+    availability: z.string(),
+  })),
+});
+
+// === ENHANCED TYPES ===
+export type PersonalizedRecommendation = z.infer<typeof PersonalizedRecommendationSchema>;
+export type BengaliConversation = z.infer<typeof BengaliConversationSchema>;
+export type ProductComparison = z.infer<typeof ProductComparisonSchema>;
+export type SeasonalRecommendation = z.infer<typeof SeasonalRecommendationSchema>;
+export type ShoppingAssistant = z.infer<typeof ShoppingAssistantSchema>;
+
+interface UserProfile {
+  readonly userId: string;
+  readonly preferences: string[];
+  readonly purchaseHistory: string[];
+  readonly culturalBackground?: string;
+  readonly location?: string;
+  readonly budgetRange?: string;
+  readonly language: 'en' | 'bn';
+  readonly paymentPreferences: string[];
+  readonly deliveryPreferences: string[];
+}
+
+interface CulturalContext {
+  readonly currentSeason: string;
+  readonly upcomingFestivals: string[];
+  readonly regionalPreferences: string[];
+  readonly localTrends: string[];
+}
+
+// === ENHANCED GROQ AI SERVICE ===
+export class EnhancedGroqAIService {
+  private static instance: EnhancedGroqAIService | null = null;
+  private readonly client: OpenAI;
+  private readonly isAvailable: boolean;
+  private readonly cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
+  private readonly userProfiles = new Map<string, UserProfile>();
+  
+  private readonly stats = {
+    totalRequests: 0,
+    successfulRequests: 0,
+    averageResponseTime: 0,
+    errorCount: 0,
+    cacheHits: 0,
+    bengaliRequests: 0,
+    culturalQueries: 0,
+    recommendationRequests: 0,
+  };
+
+  private constructor() {
+    const apiKey = process.env.GROQ_API_KEY || '';
+    
+    if (!apiKey || !apiKey.startsWith('gsk_')) {
+      console.warn('⚠️ GROQ_API_KEY not configured properly');
+      this.isAvailable = false;
+      this.client = {} as OpenAI;
+      return;
+    }
+
+    this.client = new OpenAI({
+      baseURL: 'https://api.groq.com/openai/v1',
+      apiKey: apiKey.trim(),
+      timeout: ENHANCED_CONFIG.TIMEOUTS.DEFAULT,
+    });
+
+    this.isAvailable = true;
+    this.startCacheCleanup();
+    console.log('✅ Enhanced Groq AI Service initialized with Bangladesh context');
+  }
+
+  public static getInstance(): EnhancedGroqAIService {
+    if (!EnhancedGroqAIService.instance) {
+      EnhancedGroqAIService.instance = new EnhancedGroqAIService();
+    }
+    return EnhancedGroqAIService.instance;
+  }
+
+  // === ENHANCED AUTO-SUGGESTIONS WITH USER BEHAVIOR ===
+  public async generatePersonalizedSuggestions(
+    query: string,
+    userProfile: Partial<UserProfile>,
+    behaviorData: { recentSearches: string[]; clickHistory: string[]; purchaseIntent: string }
+  ): Promise<string[]> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `personalized_suggestions_${query}_${userProfile.userId}_${JSON.stringify(behaviorData)}`;
+    const cached = this.getFromCache<string[]>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildPersonalizedSuggestionsPrompt(query, userProfile, behaviorData);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.SUGGESTIONS,
+        temperature: 0.7,
+      });
+
+      const suggestions = this.parseEnhancedSuggestions(response.choices[0].message.content);
+      this.setCache(cacheKey, suggestions);
+      this.updateStats(startTime, true);
+      
+      return suggestions;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Enhanced suggestion service failed');
+    }
+  }
+
+  // === ADVANCED RECOMMENDATION ENGINE ===
+  public async generateAdvancedRecommendations(
+    userProfile: UserProfile,
+    recommendationType: 'collaborative' | 'content-based' | 'hybrid' | 'cultural' | 'seasonal',
+    context: CulturalContext
+  ): Promise<PersonalizedRecommendation> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `recommendations_${userProfile.userId}_${recommendationType}_${JSON.stringify(context)}`;
+    const cached = this.getFromCache<PersonalizedRecommendation>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+    this.stats.recommendationRequests++;
+
+    try {
+      const prompt = this.buildRecommendationPrompt(userProfile, recommendationType, context);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.RECOMMENDATIONS,
+        temperature: 0.4,
+      });
+
+      const recommendations = this.parseRecommendations(response.choices[0].message.content, userProfile, recommendationType);
+      this.setCache(cacheKey, recommendations, 10 * 60 * 1000); // 10 minutes cache
+      this.updateStats(startTime, true);
+      
+      return recommendations;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Advanced recommendation engine failed');
+    }
+  }
+
+  // === FULL CONVERSATIONAL AI WITH BANGLADESH CONTEXT ===
+  public async bengaliConversationalAI(
+    message: string,
+    userProfile: Partial<UserProfile>,
+    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<BengaliConversation> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `bengali_conversation_${message}_${userProfile.location}_${userProfile.culturalBackground}`;
+    const cached = this.getFromCache<BengaliConversation>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+    this.stats.bengaliRequests++;
+    this.stats.culturalQueries++;
+
+    try {
+      const prompt = this.buildBengaliConversationPrompt(message, userProfile, conversationHistory);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.CULTURAL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.BENGALI_RESPONSE,
+        temperature: 0.5,
+      });
+
+      const conversation = this.parseBengaliConversation(response.choices[0].message.content);
+      this.setCache(cacheKey, conversation, 5 * 60 * 1000); // 5 minutes cache
+      this.updateStats(startTime, true);
+      
+      return conversation;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Bengali conversational AI failed');
+    }
+  }
+
+  // === PRODUCT COMPARISON AND ANALYSIS ===
+  public async compareProducts(
+    products: string[],
+    comparisonCriteria: string[],
+    userProfile: Partial<UserProfile>
+  ): Promise<ProductComparison> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `product_comparison_${products.join('_')}_${comparisonCriteria.join('_')}`;
+    const cached = this.getFromCache<ProductComparison>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildProductComparisonPrompt(products, comparisonCriteria, userProfile);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.COMPARISON,
+        temperature: 0.3,
+      });
+
+      const comparison = this.parseProductComparison(response.choices[0].message.content);
+      this.setCache(cacheKey, comparison, 15 * 60 * 1000); // 15 minutes cache
+      this.updateStats(startTime, true);
+      
+      return comparison;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Product comparison service failed');
+    }
+  }
+
+  // === SEASONAL AND CULTURAL RECOMMENDATIONS ===
+  public async getSeasonalRecommendations(
+    currentSeason: string,
+    upcomingFestivals: string[],
+    userLocation: string
+  ): Promise<SeasonalRecommendation> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `seasonal_${currentSeason}_${upcomingFestivals.join('_')}_${userLocation}`;
+    const cached = this.getFromCache<SeasonalRecommendation>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildSeasonalRecommendationPrompt(currentSeason, upcomingFestivals, userLocation);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.CULTURAL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.CULTURAL_CONTEXT,
+        temperature: 0.4,
+      });
+
+      const recommendations = this.parseSeasonalRecommendations(response.choices[0].message.content);
+      this.setCache(cacheKey, recommendations, 60 * 60 * 1000); // 1 hour cache
+      this.updateStats(startTime, true);
+      
+      return recommendations;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Seasonal recommendation service failed');
+    }
+  }
+
+  // === COMPREHENSIVE SHOPPING ASSISTANT ===
+  public async shoppingAssistant(
+    query: string,
+    userProfile: UserProfile,
+    context: { budget?: string; urgency?: string; occasion?: string }
+  ): Promise<ShoppingAssistant> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const cacheKey = `shopping_assistant_${query}_${userProfile.userId}_${JSON.stringify(context)}`;
+    const cached = this.getFromCache<ShoppingAssistant>(cacheKey);
+    if (cached) return cached;
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildShoppingAssistantPrompt(query, userProfile, context);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: ENHANCED_CONFIG.TOKEN_LIMITS.CONVERSATIONAL,
+        temperature: 0.4,
+      });
+
+      const assistant = this.parseShoppingAssistant(response.choices[0].message.content);
+      this.setCache(cacheKey, assistant, 10 * 60 * 1000); // 10 minutes cache
+      this.updateStats(startTime, true);
+      
+      return assistant;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Shopping assistant service failed');
+    }
+  }
+
+  // === PRICE PREDICTION AND TRACKING ===
+  public async predictPriceTrends(
+    productCategory: string,
+    timeframe: string,
+    marketContext: { season: string; festivals: string[]; economicFactors: string[] }
+  ): Promise<{
+    currentPriceRange: string;
+    predictedTrend: 'increasing' | 'decreasing' | 'stable';
+    confidence: number;
+    factors: string[];
+    recommendations: string[];
+    bestTimeToBuy: string;
+  }> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildPricePredictionPrompt(productCategory, timeframe, marketContext);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 400,
+        temperature: 0.3,
+      });
+
+      const prediction = this.parsePricePrediction(response.choices[0].message.content);
+      this.updateStats(startTime, true);
+      
+      return prediction;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Price prediction service failed');
+    }
+  }
+
+  // === MARKET TREND ANALYSIS ===
+  public async analyzeMarketTrends(
+    category: string,
+    region: string = 'Bangladesh'
+  ): Promise<{
+    trendDirection: 'growing' | 'declining' | 'stable';
+    popularProducts: string[];
+    emergingBrands: string[];
+    consumerSentiment: string;
+    marketOpportunities: string[];
+    culturalInfluences: string[];
+  }> {
+    if (!this.isAvailable) throw new Error('Service not available');
+
+    const startTime = Date.now();
+    this.stats.totalRequests++;
+
+    try {
+      const prompt = this.buildMarketAnalysisPrompt(category, region);
+      
+      const response = await this.client.chat.completions.create({
+        model: ENHANCED_CONFIG.MODELS.QUALITY,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
+        temperature: 0.4,
+      });
+
+      const analysis = this.parseMarketAnalysis(response.choices[0].message.content);
+      this.updateStats(startTime, true);
+      
+      return analysis;
+    } catch (error) {
+      this.updateStats(startTime, false);
+      throw new Error('Market trend analysis failed');
+    }
+  }
+
+  // === PROMPT BUILDERS ===
+  
+  private buildPersonalizedSuggestionsPrompt(
+    query: string,
+    userProfile: Partial<UserProfile>,
+    behaviorData: { recentSearches: string[]; clickHistory: string[]; purchaseIntent: string }
+  ): string {
+    return `Generate 10 personalized search suggestions for Bangladesh e-commerce user.
+
+Query: "${query}"
+User Profile:
+- Location: ${userProfile.location || 'Bangladesh'}
+- Language: ${userProfile.language || 'en'}
+- Budget Range: ${userProfile.budgetRange || 'moderate'}
+- Cultural Background: ${userProfile.culturalBackground || 'Bangladeshi'}
+- Previous Purchases: ${userProfile.purchaseHistory?.join(', ') || 'none'}
+
+Behavior Data:
+- Recent Searches: ${behaviorData.recentSearches.join(', ')}
+- Click History: ${behaviorData.clickHistory.join(', ')}
+- Purchase Intent: ${behaviorData.purchaseIntent}
+
+Bangladesh Context:
+- Current Season: ${this.getCurrentSeason()}
+- Upcoming Festivals: ${this.getUpcomingFestivals().join(', ')}
+- Local Brands: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.LOCAL_BRANDS.join(', ')}
+- Payment Methods: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.PAYMENT_METHODS.join(', ')}
+
+Requirements:
+- Include local Bangladesh brands and products
+- Consider cultural and seasonal relevance
+- Factor in user's purchase history and behavior
+- Include price-conscious alternatives
+- Mix product names, categories, and intent-based suggestions
+
+Return as JSON array: ["suggestion 1", "suggestion 2", ...]`;
+  }
+
+  private buildRecommendationPrompt(
+    userProfile: UserProfile,
+    type: string,
+    context: CulturalContext
+  ): string {
+    return `Generate ${type} recommendations for Bangladesh e-commerce user.
+
+User Profile:
+- ID: ${userProfile.userId}
+- Preferences: ${userProfile.preferences.join(', ')}
+- Purchase History: ${userProfile.purchaseHistory.join(', ')}
+- Location: ${userProfile.location}
+- Budget: ${userProfile.budgetRange}
+- Language: ${userProfile.language}
+- Cultural Background: ${userProfile.culturalBackground}
+
+Cultural Context:
+- Current Season: ${context.currentSeason}
+- Upcoming Festivals: ${context.upcomingFestivals.join(', ')}
+- Regional Preferences: ${context.regionalPreferences.join(', ')}
+- Local Trends: ${context.localTrends.join(', ')}
+
+Bangladesh Market Context:
+- Local Brands: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.LOCAL_BRANDS.join(', ')}
+- Major Cities: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.MAJOR_CITIES.join(', ')}
+- Popular Festivals: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.FESTIVALS.join(', ')}
+
+Return JSON with this structure:
+{
+  "recommendations": [
+    {
+      "productId": "unique_id",
+      "productName": "product name",
+      "reason": "personalized reasoning",
+      "confidence": 0.85,
+      "priceRange": "৳X,XXX - ৳X,XXX",
+      "availability": "in stock/pre-order/seasonal",
+      "culturalRelevance": "cultural significance",
+      "seasonalFactor": "seasonal relevance",
+      "localBrandPreference": true/false
+    }
+  ],
+  "recommendationType": "${type}",
+  "userProfile": {
+    "preferences": [],
+    "culturalBackground": "",
+    "location": "",
+    "budgetRange": ""
+  },
+  "metadata": {
+    "algorithm": "algorithm used",
+    "confidence": 0.XX,
+    "refreshTime": "timestamp"
+  }
+}`;
+  }
+
+  private buildBengaliConversationPrompt(
+    message: string,
+    userProfile: Partial<UserProfile>,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>
+  ): string {
+    return `You are GetIt's bilingual AI shopping assistant with deep Bangladesh cultural knowledge.
+
+User Message: "${message}"
+User Location: ${userProfile.location || 'Bangladesh'}
+Cultural Background: ${userProfile.culturalBackground || 'Bangladeshi'}
+Language Preference: ${userProfile.language || 'mixed (Bengali + English)'}
+
+Conversation History:
+${history.map(h => `${h.role}: ${h.content}`).join('\n')}
+
+Bangladesh Cultural Context:
+- Local Brands: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.LOCAL_BRANDS.join(', ')}
+- Payment Methods: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.PAYMENT_METHODS.join(', ')}
+- Current Season: ${this.getCurrentSeason()}
+- Upcoming Festivals: ${this.getUpcomingFestivals().join(', ')}
+- Regional Considerations: Consider Dhaka, Chittagong, Sylhet variations
+
+Instructions:
+- Respond in both Bengali and English
+- Include cultural context and local references
+- Mention relevant festivals, seasons, local brands
+- Consider local shopping habits and preferences
+- Include practical advice for Bangladesh market
+- Be conversational and culturally aware
+
+Return JSON:
+{
+  "bengaliResponse": "বাংলা উত্তর",
+  "englishResponse": "English response",
+  "culturalContext": ["cultural reference 1", "cultural reference 2"],
+  "localReferences": ["local brand/place", "payment method"],
+  "confidence": 0.XX,
+  "responseType": "informational/transactional/cultural/support",
+  "suggestedActions": ["action 1", "action 2"]
+}`;
+  }
+
+  private buildProductComparisonPrompt(
+    products: string[],
+    criteria: string[],
+    userProfile: Partial<UserProfile>
+  ): string {
+    return `Compare these products for Bangladesh market:
+
+Products: ${products.join(', ')}
+Comparison Criteria: ${criteria.join(', ')}
+User Location: ${userProfile.location || 'Bangladesh'}
+Budget Range: ${userProfile.budgetRange || 'flexible'}
+
+Bangladesh Market Considerations:
+- Local availability and warranty
+- Import duties and taxes
+- Local service centers
+- Popular local alternatives
+- Payment method compatibility
+- Delivery feasibility across Bangladesh
+
+Return detailed comparison as JSON:
+{
+  "comparisonMatrix": [
+    {
+      "productName": "Product Name",
+      "features": {"feature1": "value", "feature2": "value"},
+      "pros": ["advantage 1", "advantage 2"],
+      "cons": ["limitation 1", "limitation 2"],
+      "priceInTaka": 50000,
+      "availability": "readily available/import required/seasonal",
+      "localWarranty": true/false,
+      "rating": 4.2
+    }
+  ],
+  "recommendation": {
+    "bestOverall": "Product Name",
+    "bestValue": "Product Name",
+    "bestPremium": "Product Name",
+    "reasoning": "detailed explanation"
+  },
+  "culturalConsiderations": ["consideration 1", "consideration 2"]
+}`;
+  }
+
+  private buildSeasonalRecommendationPrompt(
+    season: string,
+    festivals: string[],
+    location: string
+  ): string {
+    return `Generate seasonal recommendations for Bangladesh e-commerce.
+
+Current Season: ${season}
+Upcoming Festivals: ${festivals.join(', ')}
+Location: ${location}
+
+Bangladesh Seasonal Context:
+- Summer (March-June): AC, cooling products, light clothing
+- Monsoon (June-October): waterproof items, umbrellas, indoor entertainment
+- Winter (November-February): warm clothing, heaters, festival items
+- Pre-monsoon (February-March): preparation items
+
+Festival Considerations:
+- Eid: traditional wear, gifts, food items, decorations
+- Durga Puja: traditional items, jewelry, home decoration
+- Pohela Boishakh: traditional Bengali items, cultural products
+- Christmas: gifts, decorations, winter items
+
+Return JSON:
+{
+  "seasonalProducts": [
+    {
+      "category": "Electronics/Clothing/Home",
+      "products": ["product1", "product2"],
+      "reason": "seasonal need explanation",
+      "urgency": "low/medium/high",
+      "priceExpectation": "price trend info"
+    }
+  ],
+  "festivalSpecific": [
+    {
+      "festival": "festival name",
+      "recommendations": ["item1", "item2"],
+      "culturalSignificance": "why important",
+      "timingAdvice": "when to buy"
+    }
+  ],
+  "weatherConsiderations": ["weather factor 1", "weather factor 2"]
+}`;
+  }
+
+  private buildShoppingAssistantPrompt(
+    query: string,
+    userProfile: UserProfile,
+    context: { budget?: string; urgency?: string; occasion?: string }
+  ): string {
+    return `Act as a comprehensive shopping assistant for Bangladesh e-commerce.
+
+User Query: "${query}"
+User Profile:
+- Location: ${userProfile.location}
+- Budget Range: ${userProfile.budgetRange}
+- Language: ${userProfile.language}
+- Payment Preferences: ${userProfile.paymentPreferences.join(', ')}
+- Delivery Preferences: ${userProfile.deliveryPreferences.join(', ')}
+
+Context:
+- Budget: ${context.budget || 'flexible'}
+- Urgency: ${context.urgency || 'normal'}
+- Occasion: ${context.occasion || 'general'}
+
+Bangladesh Shopping Context:
+- Payment Methods: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.PAYMENT_METHODS.join(', ')}
+- Major Cities: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.MAJOR_CITIES.join(', ')}
+- Local Brands: ${ENHANCED_CONFIG.BANGLADESH_CONTEXT.LOCAL_BRANDS.join(', ')}
+
+Provide comprehensive shopping assistance including:
+- Product recommendations
+- Budget analysis and allocation
+- Payment method suggestions
+- Delivery options and timing
+- Cultural considerations
+
+Return JSON:
+{
+  "response": "comprehensive shopping advice",
+  "actionItems": [
+    {
+      "action": "specific action",
+      "priority": "low/medium/high",
+      "timeframe": "when to do it"
+    }
+  ],
+  "budgetAnalysis": {
+    "currentBudget": "budget assessment",
+    "recommendedAllocation": {"category1": "amount", "category2": "amount"},
+    "savingTips": ["tip1", "tip2"]
+  },
+  "paymentSuggestions": [
+    {
+      "method": "payment method",
+      "benefits": ["benefit1", "benefit2"],
+      "suitability": "why suitable for this purchase"
+    }
+  ],
+  "deliveryOptions": [
+    {
+      "type": "delivery type",
+      "estimatedTime": "time estimate",
+      "cost": "cost estimate",
+      "availability": "availability in user location"
+    }
+  ]
+}`;
+  }
+
+  private buildPricePredictionPrompt(
+    category: string,
+    timeframe: string,
+    context: { season: string; festivals: string[]; economicFactors: string[] }
+  ): string {
+    return `Analyze price trends for ${category} in Bangladesh market.
+
+Timeframe: ${timeframe}
+Current Season: ${context.season}
+Upcoming Festivals: ${context.festivals.join(', ')}
+Economic Factors: ${context.economicFactors.join(', ')}
+
+Bangladesh Market Factors:
+- Import dependency
+- Local manufacturing capacity
+- Seasonal demand patterns
+- Festival shopping cycles
+- Economic conditions
+- Currency fluctuations
+
+Provide price trend analysis as JSON:
+{
+  "currentPriceRange": "৳X,XXX - ৳X,XXX",
+  "predictedTrend": "increasing/decreasing/stable",
+  "confidence": 0.XX,
+  "factors": ["factor affecting price"],
+  "recommendations": ["advice for buyers"],
+  "bestTimeToBuy": "timing recommendation"
+}`;
+  }
+
+  private buildMarketAnalysisPrompt(category: string, region: string): string {
+    return `Analyze market trends for ${category} in ${region}.
+
+Focus Areas:
+- Consumer preferences and behavior
+- Popular products and brands
+- Emerging market opportunities
+- Cultural influences on purchasing
+- Regional variations within Bangladesh
+- Competition landscape
+
+Bangladesh Market Context:
+- Digital payment adoption
+- E-commerce growth patterns
+- Mobile commerce trends
+- Rural vs urban preferences
+- Cultural shopping patterns
+
+Return comprehensive analysis as JSON:
+{
+  "trendDirection": "growing/declining/stable",
+  "popularProducts": ["product1", "product2"],
+  "emergingBrands": ["brand1", "brand2"],
+  "consumerSentiment": "market sentiment description",
+  "marketOpportunities": ["opportunity1", "opportunity2"],
+  "culturalInfluences": ["influence1", "influence2"]
+}`;
+  }
+
+  // === ENHANCED PARSERS ===
+  
+  private parseEnhancedSuggestions(content: string): string[] {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\[.*\]/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return parsed.filter((item: unknown) => typeof item === 'string' && item.trim().length > 0);
+      }
+      
+      return this.getDefaultBangladeshSuggestions();
+    } catch (error) {
+      console.error('Error parsing enhanced suggestions:', error);
+      return this.getDefaultBangladeshSuggestions();
+    }
+  }
+
+  private parseRecommendations(content: string, userProfile: UserProfile, type: string): PersonalizedRecommendation {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return PersonalizedRecommendationSchema.parse(parsed);
+      }
+      
+      return this.getDefaultRecommendation(userProfile, type);
+    } catch (error) {
+      console.error('Error parsing recommendations:', error);
+      return this.getDefaultRecommendation(userProfile, type);
+    }
+  }
+
+  private parseBengaliConversation(content: string): BengaliConversation {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return BengaliConversationSchema.parse(parsed);
+      }
+      
+      return this.getDefaultBengaliResponse();
+    } catch (error) {
+      console.error('Error parsing Bengali conversation:', error);
+      return this.getDefaultBengaliResponse();
+    }
+  }
+
+  private parseProductComparison(content: string): ProductComparison {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return ProductComparisonSchema.parse(parsed);
+      }
+      
+      return this.getDefaultComparison();
+    } catch (error) {
+      console.error('Error parsing product comparison:', error);
+      return this.getDefaultComparison();
+    }
+  }
+
+  private parseSeasonalRecommendations(content: string): SeasonalRecommendation {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return SeasonalRecommendationSchema.parse(parsed);
+      }
+      
+      return this.getDefaultSeasonalRecommendation();
+    } catch (error) {
+      console.error('Error parsing seasonal recommendations:', error);
+      return this.getDefaultSeasonalRecommendation();
+    }
+  }
+
+  private parseShoppingAssistant(content: string): ShoppingAssistant {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return ShoppingAssistantSchema.parse(parsed);
+      }
+      
+      return this.getDefaultShoppingAssistant();
+    } catch (error) {
+      console.error('Error parsing shopping assistant:', error);
+      return this.getDefaultShoppingAssistant();
+    }
+  }
+
+  private parsePricePrediction(content: string): any {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      return {
+        currentPriceRange: '৳10,000 - ৳50,000',
+        predictedTrend: 'stable' as const,
+        confidence: 0.7,
+        factors: ['Market stability', 'Seasonal demand'],
+        recommendations: ['Compare prices from multiple sellers'],
+        bestTimeToBuy: 'Current prices are reasonable',
+      };
+    } catch (error) {
+      console.error('Error parsing price prediction:', error);
+      return {
+        currentPriceRange: '৳10,000 - ৳50,000',
+        predictedTrend: 'stable' as const,
+        confidence: 0.7,
+        factors: ['Market analysis pending'],
+        recommendations: ['Check multiple sources'],
+        bestTimeToBuy: 'Monitor market trends',
+      };
+    }
+  }
+
+  private parseMarketAnalysis(content: string): any {
+    try {
+      const cleaned = content.trim().replace(/```json|```/g, '');
+      const jsonMatch = cleaned.match(/\{.*\}/s);
+      
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      return {
+        trendDirection: 'growing' as const,
+        popularProducts: ['Local brand products', 'Imported premium items'],
+        emergingBrands: ['New local startups', 'International entries'],
+        consumerSentiment: 'Positive growth in digital adoption',
+        marketOpportunities: ['Rural market expansion', 'Digital payment growth'],
+        culturalInfluences: ['Festival shopping patterns', 'Local brand preference'],
+      };
+    } catch (error) {
+      console.error('Error parsing market analysis:', error);
+      return {
+        trendDirection: 'stable' as const,
+        popularProducts: ['Analysis pending'],
+        emergingBrands: ['Data being collected'],
+        consumerSentiment: 'Market research in progress',
+        marketOpportunities: ['Opportunities being identified'],
+        culturalInfluences: ['Cultural factors being analyzed'],
+      };
+    }
+  }
+
+  // === DEFAULT RESPONSES ===
+  
+  private getDefaultBangladeshSuggestions(): string[] {
+    return [
+      'Samsung Galaxy smartphones under 50000 taka',
+      'Walton refrigerator with warranty',
+      'Eid collection traditional wear',
+      'Monsoon waterproof electronics',
+      'bKash payment compatible products',
+      'Winter clothing sale Bangladesh',
+      'Local brand electronics deals',
+      'Festival special offers'
+    ];
+  }
+
+  private getDefaultRecommendation(userProfile: UserProfile, type: string): PersonalizedRecommendation {
+    return {
+      recommendations: [
+        {
+          productId: 'rec-001',
+          productName: 'Popular Bangladesh product',
+          reason: `Recommended based on ${type} algorithm and your location in ${userProfile.location}`,
+          confidence: 0.75,
+          priceRange: '৳5,000 - ৳25,000',
+          availability: 'Available in major cities',
+          culturalRelevance: 'Suitable for Bangladesh market',
+          seasonalFactor: 'Good for current season',
+          localBrandPreference: true,
+        }
+      ],
+      recommendationType: type as any,
+      userProfile: {
+        preferences: userProfile.preferences,
+        culturalBackground: userProfile.culturalBackground,
+        location: userProfile.location,
+        budgetRange: userProfile.budgetRange,
+      },
+      metadata: {
+        algorithm: `${type}_recommendation_v1`,
+        confidence: 0.75,
+        refreshTime: new Date().toISOString(),
+      },
+    };
+  }
+
+  private getDefaultBengaliResponse(): BengaliConversation {
+    return {
+      bengaliResponse: 'আমি আপনার প্রশ্ন বুঝতে পারছি। GetIt বাংলাদেশে আমরা সেরা পণ্য এবং সেবা প্রদান করি।',
+      englishResponse: 'I understand your question. At GetIt Bangladesh, we provide the best products and services.',
+      culturalContext: ['Bangladesh e-commerce', 'Local brand preference'],
+      localReferences: ['bKash payment', 'Dhaka delivery'],
+      confidence: 0.8,
+      responseType: 'informational',
+      suggestedActions: ['Browse categories', 'Check offers'],
+    };
+  }
+
+  private getDefaultComparison(): ProductComparison {
+    return {
+      comparisonMatrix: [
+        {
+          productName: 'Product comparison data being analyzed',
+          features: { 'Analysis': 'In progress' },
+          pros: ['Detailed comparison coming soon'],
+          cons: ['Data being collected'],
+          priceInTaka: 0,
+          availability: 'Checking availability',
+          localWarranty: false,
+          rating: 0,
+        }
+      ],
+      recommendation: {
+        bestOverall: 'Analysis in progress',
+        bestValue: 'Evaluation pending',
+        bestPremium: 'Assessment ongoing',
+        reasoning: 'Detailed comparison will be available shortly',
+      },
+      culturalConsiderations: ['Bangladesh market factors being considered'],
+    };
+  }
+
+  private getDefaultSeasonalRecommendation(): SeasonalRecommendation {
+    return {
+      seasonalProducts: [
+        {
+          category: 'Seasonal',
+          products: ['Current season appropriate items'],
+          reason: 'Based on current weather and cultural calendar',
+          urgency: 'medium',
+          priceExpectation: 'Competitive seasonal pricing',
+        }
+      ],
+      festivalSpecific: [
+        {
+          festival: 'Upcoming festivals',
+          recommendations: ['Festival appropriate items'],
+          culturalSignificance: 'Traditional and cultural importance',
+          timingAdvice: 'Plan ahead for best selection',
+        }
+      ],
+      weatherConsiderations: ['Current weather patterns', 'Seasonal changes'],
+    };
+  }
+
+  private getDefaultShoppingAssistant(): ShoppingAssistant {
+    return {
+      response: 'I\'m here to help you with your shopping needs in Bangladesh. Let me know what you\'re looking for!',
+      actionItems: [
+        {
+          action: 'Specify your requirements',
+          priority: 'high',
+          timeframe: 'Now',
+        }
+      ],
+      budgetAnalysis: {
+        currentBudget: 'Please share your budget range',
+        recommendedAllocation: { 'Product': '80%', 'Delivery': '20%' },
+        savingTips: ['Compare prices', 'Look for offers'],
+      },
+      paymentSuggestions: [
+        {
+          method: 'bKash',
+          benefits: ['Instant payment', 'Widely accepted'],
+          suitability: 'Perfect for Bangladesh online shopping',
+        }
+      ],
+      deliveryOptions: [
+        {
+          type: 'Standard delivery',
+          estimatedTime: '2-3 business days',
+          cost: '৳60-100',
+          availability: 'Available nationwide',
+        }
+      ],
+    };
+  }
+
+  // === UTILITY METHODS ===
+  
+  private getCurrentSeason(): string {
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 6) return 'Summer';
+    if (month >= 6 && month <= 10) return 'Monsoon';
+    if (month >= 11 || month <= 2) return 'Winter';
+    return 'Pre-monsoon';
+  }
+
+  private getUpcomingFestivals(): string[] {
+    const month = new Date().getMonth() + 1;
+    const festivals = {
+      1: ['Saraswati Puja'],
+      2: ['Pohela Boishakh'],
+      3: ['Holi'],
+      4: ['Bengali New Year'],
+      5: ['Buddha Purnima'],
+      6: ['Eid ul-Fitr'],
+      7: ['Eid ul-Adha'],
+      8: ['Independence Day'],
+      9: ['Durga Puja'],
+      10: ['Kali Puja', 'Diwali'],
+      11: ['Bhai Phota'],
+      12: ['Christmas', 'Victory Day'],
+    };
+    
+    return festivals[month as keyof typeof festivals] || ['Cultural celebrations'];
+  }
+
+  // === CACHE AND STATS MANAGEMENT ===
+  
+  private getFromCache<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      this.stats.cacheHits++;
+      return cached.data as T;
+    }
+    if (cached) this.cache.delete(key);
+    return null;
+  }
+
+  private setCache(key: string, data: unknown, ttl: number = 5 * 60 * 1000): void {
+    if (this.cache.size >= 1000) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, { data, timestamp: Date.now(), ttl });
+  }
+
+  private startCacheCleanup(): void {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, cached] of this.cache.entries()) {
+        if (now - cached.timestamp >= cached.ttl) {
+          this.cache.delete(key);
+        }
+      }
+    }, 60000);
+  }
+
+  private updateStats(startTime: number, success: boolean): void {
+    const duration = Date.now() - startTime;
+    if (success) {
+      this.stats.successfulRequests++;
+      this.stats.averageResponseTime = 
+        (this.stats.averageResponseTime * (this.stats.successfulRequests - 1) + duration) / 
+        this.stats.successfulRequests;
+    } else {
+      this.stats.errorCount++;
+    }
+  }
+
+  // === PUBLIC API METHODS ===
+  
+  public getServiceAvailability(): boolean {
+    return this.isAvailable;
+  }
+
+  public getEnhancedStats() {
+    return {
+      ...this.stats,
+      cacheSize: this.cache.size,
+      uptime: this.isAvailable ? 'Available' : 'Unavailable',
+      bengaliSupport: true,
+      culturalIntelligence: true,
+      bangladeshContext: true,
+    };
+  }
+
+  public clearCache(): void {
+    this.cache.clear();
+    console.log('Enhanced Groq AI Service cache cleared');
+  }
+
+  public addUserProfile(profile: UserProfile): void {
+    this.userProfiles.set(profile.userId, profile);
+  }
+
+  public getUserProfile(userId: string): UserProfile | undefined {
+    return this.userProfiles.get(userId);
+  }
+
+  public updateUserProfile(userId: string, updates: Partial<UserProfile>): void {
+    const existing = this.userProfiles.get(userId);
+    if (existing) {
+      this.userProfiles.set(userId, { ...existing, ...updates });
+    }
+  }
+}

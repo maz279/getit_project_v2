@@ -1,0 +1,587 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-web
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: frontend-service
+    platform: getit-bangladesh
+    tier: frontend
+    domain: customer
+  annotations:
+    description: "Customer Web Application for GetIt Bangladesh"
+    contact: "frontend-team@getit.com.bd"
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 6
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 3
+  selector:
+    matchLabels:
+      app: customer-web
+  template:
+    metadata:
+      labels:
+        app: customer-web
+        component: frontend-service
+        platform: getit-bangladesh
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: customer-web
+        image: getit-bangladesh/customer-web:2.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        # Application Configuration
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "8080"
+        - name: APP_NAME
+          value: "GetIt Bangladesh Customer"
+        - name: APP_VERSION
+          value: "2.0.0"
+        
+        # API Gateway Configuration
+        - name: API_BASE_URL
+          value: "https://api.getit.com.bd"
+        - name: API_GATEWAY_URL
+          value: "http://api-gateway:3000"
+        - name: WEBSOCKET_URL
+          value: "wss://api.getit.com.bd/ws"
+        
+        # Performance Configuration
+        - name: CACHE_TTL
+          value: "300"
+        - name: STATIC_CACHE_TTL
+          value: "86400"
+        - name: IMAGE_CACHE_TTL
+          value: "604800"
+        - name: PWA_CACHE_TTL
+          value: "2592000"
+        
+        # Feature Flags
+        - name: ENABLE_PWA
+          value: "true"
+        - name: ENABLE_PUSH_NOTIFICATIONS
+          value: "true"
+        - name: ENABLE_OFFLINE_MODE
+          value: "true"
+        - name: ENABLE_DARK_MODE
+          value: "true"
+        - name: ENABLE_VOICE_SEARCH
+          value: "true"
+        - name: ENABLE_VISUAL_SEARCH
+          value: "true"
+        - name: ENABLE_AR_VIEW
+          value: "true"
+        - name: ENABLE_SOCIAL_LOGIN
+          value: "true"
+        
+        # Bangladesh Configuration
+        - name: DEFAULT_CURRENCY
+          value: "BDT"
+        - name: DEFAULT_LANGUAGE
+          value: "bn"
+        - name: SUPPORTED_LANGUAGES
+          value: "bn,en,hi,ar"
+        - name: DEFAULT_TIMEZONE
+          value: "Asia/Dhaka"
+        - name: COUNTRY_CODE
+          value: "BD"
+        
+        # Payment Gateway Configuration
+        - name: BKASH_ENABLED
+          value: "true"
+        - name: NAGAD_ENABLED
+          value: "true"
+        - name: ROCKET_ENABLED
+          value: "true"
+        - name: COD_ENABLED
+          value: "true"
+        - name: BANK_TRANSFER_ENABLED
+          value: "true"
+        - name: INTERNATIONAL_CARDS_ENABLED
+          value: "true"
+        
+        # Bangladesh Mobile Banking
+        - name: BKASH_MERCHANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: bangladesh-payment-secrets
+              key: bkash-merchant-id
+        - name: NAGAD_MERCHANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: bangladesh-payment-secrets
+              key: nagad-merchant-id
+        - name: ROCKET_MERCHANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: bangladesh-payment-secrets
+              key: rocket-merchant-id
+        
+        # SEO & Analytics Configuration
+        - name: GOOGLE_ANALYTICS_ID
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: google-analytics-id
+        - name: FACEBOOK_PIXEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: facebook-pixel-id
+        - name: GOOGLE_TAG_MANAGER_ID
+          valueFrom:
+            secretKeyRef:
+              name: analytics-secrets
+              key: google-tag-manager-id
+        
+        # CDN & Static Assets
+        - name: CDN_BASE_URL
+          value: "https://cdn.getit.com.bd"
+        - name: STATIC_ASSETS_URL
+          value: "https://static.getit.com.bd"
+        - name: IMAGE_CDN_URL
+          value: "https://images.getit.com.bd"
+        
+        # Security Configuration
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: session-secret
+        - name: CSRF_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-secrets
+              key: csrf-secret
+        
+        # Social Media Integration
+        - name: FACEBOOK_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: social-secrets
+              key: facebook-app-id
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: social-secrets
+              key: google-client-id
+        - name: APPLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: social-secrets
+              key: apple-client-id
+        
+        # Cultural Features
+        - name: ENABLE_PRAYER_TIMES
+          value: "true"
+        - name: ENABLE_FESTIVAL_THEMES
+          value: "true"
+        - name: ENABLE_BENGALI_KEYBOARD
+          value: "true"
+        - name: ENABLE_ISLAMIC_CALENDAR
+          value: "true"
+        
+        # Performance & Monitoring
+        - name: ENABLE_SERVICE_WORKER
+          value: "true"
+        - name: ENABLE_LAZY_LOADING
+          value: "true"
+        - name: ENABLE_IMAGE_OPTIMIZATION
+          value: "true"
+        - name: ENABLE_BUNDLE_SPLITTING
+          value: "true"
+        
+        volumeMounts:
+        - name: customer-uploads
+          mountPath: /app/uploads
+        - name: temp-storage
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        
+        resources:
+          requests:
+            memory: "800Mi"
+            cpu: "400m"
+          limits:
+            memory: "3Gi"
+            cpu: "1.5"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      
+      - name: nginx-sidecar
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+          name: nginx
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      
+      volumes:
+      - name: customer-uploads
+        persistentVolumeClaim:
+          claimName: customer-uploads-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: nginx-cache
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: nginx-config
+        configMap:
+          name: customer-web-nginx-config
+      
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: frontend
+      
+      tolerations:
+      - key: "frontend-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - customer-web
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-web
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: frontend-service
+    platform: getit-bangladesh
+  annotations:
+    description: "Customer Web Service for GetIt Bangladesh"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: nginx
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: customer-web
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: customer-web
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: frontend-service
+    platform: getit-bangladesh
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: customer-uploads-pvc
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: storage
+    platform: getit-bangladesh
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-storage
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: customer-web-pdb
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: frontend-service
+    platform: getit-bangladesh
+spec:
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app: customer-web
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customer-web-nginx-config
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: frontend-service
+    platform: getit-bangladesh
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        access_log /var/log/nginx/access.log main;
+        
+        # Performance
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 100M;
+        
+        # Gzip Compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1000;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/javascript
+            application/xml+rss
+            application/json
+            image/svg+xml;
+        
+        # Security Headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+        
+        # Rate Limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+        
+        upstream customer_web_backend {
+            server localhost:8080;
+        }
+        
+        server {
+            listen 80;
+            server_name localhost;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            # Security
+            server_tokens off;
+            
+            # Static Assets Caching
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                add_header X-Cache-Status "STATIC";
+            }
+            
+            # API Proxy
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                proxy_pass http://customer_web_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+            }
+            
+            # Health Check
+            location /health {
+                proxy_pass http://customer_web_backend;
+                access_log off;
+            }
+            
+            # Root and SPA Routes
+            location / {
+                try_files $uri $uri/ /index.html;
+                add_header X-Cache-Status "SPA";
+            }
+            
+            # Bangladesh specific routes
+            location /bn/ {
+                try_files $uri $uri/ /index.html;
+                add_header Content-Language "bn";
+            }
+            
+            # Service Worker
+            location /sw.js {
+                add_header Cache-Control "no-cache";
+                proxy_pass http://customer_web_backend;
+            }
+        }
+    }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: customer-web-network-policy
+  namespace: getit-production
+  labels:
+    app: customer-web
+    component: security
+    platform: getit-bangladesh
+spec:
+  podSelector:
+    matchLabels:
+      app: customer-web
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    ports:
+    - protocol: TCP
+      port: 3000
+  - to:
+    - podSelector:
+        matchLabels:
+          component: core-service
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 3003
+    - protocol: TCP
+      port: 3004
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

@@ -1,0 +1,39 @@
+[ANALYTICS] Suggestion clicked: {type: 'suggestion_click', query: 'shampoo', suggestionText: 'shampoo for hair fall', suggestionType: 'trending', position: 0, …}
+SearchAnalyticsService.ts:326 [ANALYTICS] Event tracked: {type: 'suggestion_click', query: 'shampoo', suggestionText: 'shampoo for hair fall', suggestionType: 'trending', position: 0, …}
+SearchResultsPage.tsx:174 Search error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+overrideMethod @ hook.js:608
+(anonymous) @ SearchResultsPage.tsx:174
+await in (anonymous)
+(anonymous) @ SearchResultsPage.tsx:195
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=0ebebf42:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=0ebebf42:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=0ebebf42:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=0ebebf42:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=0ebebf42:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=0ebebf42:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=0ebebf42:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=0ebebf42:19328
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this error
+PerformanceMonitoringService.ts:299 [HEALTH CHECK] System performance is degraded: {status: 'degraded', score: 0.8, metrics: {…}, alerts: Array(0), uptime: 30002, …}
+overrideMethod @ hook.js:608
+(anonymous) @ PerformanceMonitoringService.ts:299
+setInterval
+startHealthMonitoring @ PerformanceMonitoringService.ts:293
+PerformanceMonitoringService @ PerformanceMonitoringService.ts:45
+getInstance @ PerformanceMonitoringService.ts:50
+(anonymous) @ AISearchBar.tsx:52
+renderWithHooks @ chunk-RPCDYKBN.js?v=0ebebf42:11548
+updateFunctionComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14582
+updateSimpleMemoComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14463
+updateMemoComponent @ chunk-RPCDYKBN.js?v=0ebebf42:14366
+beginWork @ chunk-RPCDYKBN.js?v=0ebebf42:15977
+beginWork$1 @ chunk-RPCDYKBN.js?v=0ebebf42:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=0ebebf42:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=0ebebf42:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=0ebebf42:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=0ebebf42:18678
+workLoop @ chunk-RPCDYKBN.js?v=0ebebf42:197
+flushWork @ chunk-RPCDYKBN.js?v=0ebebf42:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=0ebebf42:384Understand this warning

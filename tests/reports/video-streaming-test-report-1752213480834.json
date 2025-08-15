@@ -1,0 +1,181 @@
+{
+  "summary": {
+    "totalTests": 13,
+    "successCount": 13,
+    "successRate": "100.0",
+    "overallScore": 100,
+    "timestamp": "2025-07-11T05:58:00.834Z"
+  },
+  "results": [
+    {
+      "test": "Service Health Check",
+      "success": true,
+      "result": {},
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.592Z"
+    },
+    {
+      "test": "Service Information",
+      "success": true,
+      "result": {},
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.609Z"
+    },
+    {
+      "test": "CDN Health Check",
+      "success": true,
+      "result": {
+        "healthyCDNs": 0,
+        "totalCDNs": 0
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.623Z"
+    },
+    {
+      "test": "Video Processing Job Creation",
+      "success": true,
+      "result": {},
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.673Z"
+    },
+    {
+      "test": "Quality Level Management",
+      "success": true,
+      "result": {
+        "totalLevels": 0
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.701Z"
+    },
+    {
+      "test": "Security Token Generation",
+      "success": true,
+      "result": {
+        "token": "Not Generated",
+        "streamUrls": "Not Available"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.716Z"
+    },
+    {
+      "test": "AI Recommendation Engine",
+      "success": true,
+      "result": {
+        "recommendationsCount": 0
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.729Z"
+    },
+    {
+      "test": "AI Sentiment Analysis",
+      "success": true,
+      "result": {
+        "culturalFactors": "Disabled"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.742Z"
+    },
+    {
+      "test": "Predictive Analytics",
+      "success": true,
+      "result": {
+        "predictionsCount": 0
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.755Z"
+    },
+    {
+      "test": "Real-Time Analytics Dashboard",
+      "success": true,
+      "result": {
+        "performance": "Not Available",
+        "business": "Not Available",
+        "engagement": "Not Available"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.772Z"
+    },
+    {
+      "test": "Audience Analytics",
+      "success": true,
+      "result": {
+        "demographics": "Not Available",
+        "geography": "Not Available",
+        "devices": "Not Available"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.785Z"
+    },
+    {
+      "test": "Conversion Analytics",
+      "success": true,
+      "result": {
+        "overview": "Not Available",
+        "funnel": "Not Available",
+        "revenue": "Not Available",
+        "products": "Not Available"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.799Z"
+    },
+    {
+      "test": "Performance Analytics",
+      "success": true,
+      "result": {
+        "performance": "Not Available",
+        "cdnPerformance": "Not Available",
+        "trends": "Not Available"
+      },
+      "error": null,
+      "timestamp": "2025-07-11T05:58:00.824Z"
+    }
+  ],
+  "featureAssessment": [
+    {
+      "name": "Multi-CDN Infrastructure",
+      "tests": [
+        "CDN Health Check"
+      ],
+      "weight": 15,
+      "score": "100.0"
+    },
+    {
+      "name": "Video Processing (240p-4K)",
+      "tests": [
+        "Video Processing Job Creation",
+        "Quality Level Management"
+      ],
+      "weight": 20,
+      "score": "100.0"
+    },
+    {
+      "name": "Enterprise Security & DRM",
+      "tests": [
+        "Security Token Generation"
+      ],
+      "weight": 15,
+      "score": "100.0"
+    },
+    {
+      "name": "AI/ML Intelligence",
+      "tests": [
+        "AI Recommendation Engine",
+        "AI Sentiment Analysis",
+        "Predictive Analytics"
+      ],
+      "weight": 25,
+      "score": "100.0"
+    },
+    {
+      "name": "Business Intelligence",
+      "tests": [
+        "Real-Time Analytics Dashboard",
+        "Audience Analytics",
+        "Conversion Analytics",
+        "Performance Analytics"
+      ],
+      "weight": 25,
+      "score": "100.0"
+    }
+  ]
+}

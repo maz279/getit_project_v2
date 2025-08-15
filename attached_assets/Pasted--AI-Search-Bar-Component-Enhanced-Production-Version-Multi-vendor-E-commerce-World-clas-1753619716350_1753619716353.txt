@@ -1,0 +1,1668 @@
+/**
+ * AI Search Bar Component - Enhanced Production Version
+ * Multi-vendor E-commerce World-class Implementation
+ * 
+ * Features:
+ * - Advanced search with AI/ML capabilities
+ * - Voice search with multi-language support
+ * - Image search with visual recognition
+ * - QR code scanning
+ * - Real-time suggestions with intelligent caching
+ * - Conversational AI integration
+ * - Enhanced security and performance
+ * - Full accessibility support
+ * - Progressive enhancement
+ */
+
+import React, { 
+  useState, 
+  useRef, 
+  useEffect, 
+  useCallback, 
+  useMemo,
+  memo,
+  useLayoutEffect,
+  useReducer,
+  Suspense,
+  lazy,
+} from 'react';
+import { 
+  Search, 
+  Mic, 
+  Camera, 
+  Brain, 
+  QrCode, 
+  Loader2, 
+  X, 
+  Navigation, 
+  ExternalLink, 
+  AlertTriangle,
+  Settings,
+  TrendingUp,
+  History,
+  ShoppingBag,
+  Globe,
+  Sparkles,
+} from 'lucide-react';
+import { Button } from '@/shared/ui/button';
+import { Card, CardContent } from '@/shared/ui/card';
+import { Badge } from '@/shared/ui/badge';
+import { useToast } from '@/shared/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useDebounce, useThrottle } from '@/shared/hooks';
+
+// Lazy load heavy components
+const UnifiedSearchResults = lazy(() => import('./UnifiedSearchResults'));
+const QRScanner = lazy(() => import('./QRScanner'));
+
+// === CONSTANTS ===
+const SEARCH_DEBOUNCE_MS = 300;
+const SUGGESTION_DEBOUNCE_MS = 150;
+const MAX_SEARCH_HISTORY = 10;
+const MAX_SUGGESTIONS = 20;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MIN_QUERY_LENGTH = 2;
+const MAX_QUERY_LENGTH = 200;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
+
+// === TYPES & INTERFACES ===
+interface SearchSuggestion {
+  readonly id: string;
+  readonly text: string;
+  readonly type: 'product' | 'category' | 'brand' | 'intent' | 'history' | 'trending' | 'phonetic' | 'page' | 'vendor';
+  readonly frequency?: number;
+  readonly relevance?: number;
+  readonly count?: number;
+  readonly metadata?: {
+    readonly bengaliPhonetic?: string;
+    readonly icon?: string;
+    readonly color?: string;
+    readonly vendorId?: string;
+    readonly categoryPath?: string[];
+    readonly priceRange?: { min: number; max: number };
+  };
+  readonly navigationItem?: NavigationItem;
+}
+
+interface NavigationItem {
+  readonly id: string;
+  readonly route: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly category?: string;
+  readonly icon?: string;
+  readonly priority?: number;
+}
+
+interface SearchResult {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly type: 'product' | 'page' | 'menu' | 'faq' | 'external' | 'vendor' | 'category';
+  readonly relevanceScore: number;
+  readonly thumbnail?: string;
+  readonly url?: string;
+  readonly price?: string;
+  readonly originalPrice?: string;
+  readonly discount?: number;
+  readonly rating?: number;
+  readonly reviewCount?: number;
+  readonly badge?: string;
+  readonly category?: string;
+  readonly vendor?: {
+    readonly id: string;
+    readonly name: string;
+    readonly rating?: number;
+    readonly verified?: boolean;
+  };
+  readonly availability?: 'in_stock' | 'out_of_stock' | 'limited';
+  readonly isNavigationItem?: boolean;
+  readonly metadata?: Record<string, unknown>;
+}
+
+interface ConversationalResponse {
+  readonly message: string;
+  readonly intent?: string;
+  readonly confidence?: number;
+  readonly suggestedActions?: Array<{
+    readonly label: string;
+    readonly action: string;
+    readonly data?: unknown;
+  }>;
+  readonly relatedProducts?: string[];
+}
+
+interface SearchState {
+  readonly query: string;
+  readonly suggestions: SearchSuggestion[];
+  readonly results: SearchResult[];
+  readonly conversationalResponse?: ConversationalResponse;
+  readonly isLoading: boolean;
+  readonly isLoadingSuggestions: boolean;
+  readonly error: string | null;
+  readonly searchHistory: string[];
+  readonly lastSearchType?: SearchType;
+}
+
+type SearchType = 'text' | 'voice' | 'image' | 'ai' | 'qr' | 'visual';
+
+type SearchAction = 
+  | { type: 'SET_QUERY'; payload: string }
+  | { type: 'SET_SUGGESTIONS'; payload: SearchSuggestion[] }
+  | { type: 'SET_RESULTS'; payload: SearchResult[] }
+  | { type: 'SET_CONVERSATIONAL_RESPONSE'; payload: ConversationalResponse }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_LOADING_SUGGESTIONS'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'ADD_TO_HISTORY'; payload: string }
+  | { type: 'SET_LAST_SEARCH_TYPE'; payload: SearchType }
+  | { type: 'CLEAR_SEARCH' }
+  | { type: 'RESET' };
+
+interface AISearchBarProps {
+  readonly onSearch?: (query: string, data: {
+    searchResults?: SearchResult[];
+    conversationalResponse?: ConversationalResponse;
+    navigationResults?: NavigationItem[];
+  }) => void;
+  readonly onSearchWithResults?: (query: string, results: SearchResult[]) => void;
+  readonly onSearchLoading?: (loading: boolean) => void;
+  readonly placeholder?: string;
+  readonly language?: 'en' | 'bn' | 'hi' | 'ur';
+  readonly className?: string;
+  readonly disabled?: boolean;
+  readonly autoFocus?: boolean;
+  readonly showHistory?: boolean;
+  readonly showTrending?: boolean;
+  readonly enableVoice?: boolean;
+  readonly enableImage?: boolean;
+  readonly enableQR?: boolean;
+  readonly enableAI?: boolean;
+  readonly maxSuggestions?: number;
+}
+
+// === ENHANCED UTILITY CLASSES ===
+class EnhancedRequestManager {
+  private activeRequests = new Map<string, AbortController>();
+  private requestQueue: Array<{ id: string; priority: number; execute: () => Promise<void> }> = [];
+  private isProcessing = false;
+  private rateLimiter = new Map<string, number>();
+  private readonly MAX_REQUESTS_PER_MINUTE = 60;
+
+  public createRequest(id: string, priority: number = 0): AbortController {
+    this.cancelRequest(id);
+    
+    if (!this.checkRateLimit(id)) {
+      throw new Error('Rate limit exceeded');
+    }
+    
+    const controller = new AbortController();
+    this.activeRequests.set(id, controller);
+    return controller;
+  }
+
+  private checkRateLimit(id: string): boolean {
+    const now = Date.now();
+    const minute = Math.floor(now / 60000);
+    const key = `${id}-${minute}`;
+    
+    const count = this.rateLimiter.get(key) || 0;
+    if (count >= this.MAX_REQUESTS_PER_MINUTE) {
+      return false;
+    }
+    
+    this.rateLimiter.set(key, count + 1);
+    
+    // Clean old entries
+    for (const [k] of this.rateLimiter) {
+      const [, timestamp] = k.split('-');
+      if (parseInt(timestamp) < minute - 1) {
+        this.rateLimiter.delete(k);
+      }
+    }
+    
+    return true;
+  }
+
+  public cancelRequest(id: string): void {
+    const controller = this.activeRequests.get(id);
+    if (controller && !controller.signal.aborted) {
+      controller.abort();
+      this.activeRequests.delete(id);
+    }
+  }
+
+  public cancelAllRequests(): void {
+    for (const [id, controller] of this.activeRequests.entries()) {
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    }
+    this.activeRequests.clear();
+    this.requestQueue = [];
+  }
+
+  public async addToQueue(id: string, priority: number, execute: () => Promise<void>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.requestQueue.push({ 
+        id, 
+        priority, 
+        execute: async () => {
+          try {
+            await execute();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        }
+      });
+      this.requestQueue.sort((a, b) => b.priority - a.priority);
+      this.processQueue();
+    });
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.requestQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+    
+    while (this.requestQueue.length > 0) {
+      const request = this.requestQueue.shift();
+      if (request) {
+        try {
+          await request.execute();
+        } catch (error) {
+          console.error(`Request ${request.id} failed:`, error);
+        }
+      }
+    }
+    
+    this.isProcessing = false;
+  }
+
+  public getActiveRequestCount(): number {
+    return this.activeRequests.size;
+  }
+
+  public destroy(): void {
+    this.cancelAllRequests();
+    this.requestQueue = [];
+    this.rateLimiter.clear();
+  }
+}
+
+class AdvancedInputValidator {
+  private static readonly VALID_CHARS = /^[\p{L}\p{N}\s\-_.,!?()[\]{}@#$%&*+=:;।॥।०-९]+$/u;
+  private static readonly SQL_INJECTION_PATTERNS = [
+    /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/gi,
+    /(--|\/\*|\*\/|;|'|")/g,
+  ];
+  private static readonly XSS_PATTERNS = [
+    /<script[^>]*>[\s\S]*?<\/script>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi,
+    /<iframe[^>]*>/gi,
+    /eval\s*\(/gi,
+    /expression\s*\(/gi,
+    /<object[^>]*>/gi,
+    /<embed[^>]*>/gi,
+    /<link[^>]*>/gi,
+  ];
+
+  public static validate(input: string): { 
+    isValid: boolean; 
+    sanitizedInput: string; 
+    risks: string[]; 
+    severity: 'low' | 'medium' | 'high' 
+  } {
+    const risks: string[] = [];
+    let severity: 'low' | 'medium' | 'high' = 'low';
+    
+    if (typeof input !== 'string') {
+      return { 
+        isValid: false, 
+        sanitizedInput: '', 
+        risks: ['Invalid input type'], 
+        severity: 'high' 
+      };
+    }
+    
+    let sanitizedInput = input.trim();
+    
+    // Length validation
+    if (sanitizedInput.length < MIN_QUERY_LENGTH) {
+      return { 
+        isValid: false, 
+        sanitizedInput: '', 
+        risks: ['Input too short'], 
+        severity: 'low' 
+      };
+    }
+    
+    if (sanitizedInput.length > MAX_QUERY_LENGTH) {
+      sanitizedInput = sanitizedInput.substring(0, MAX_QUERY_LENGTH);
+      risks.push('Input truncated');
+    }
+    
+    // SQL Injection check
+    for (const pattern of this.SQL_INJECTION_PATTERNS) {
+      if (pattern.test(sanitizedInput)) {
+        risks.push('Potential SQL injection detected');
+        severity = 'high';
+        sanitizedInput = sanitizedInput.replace(pattern, '');
+      }
+    }
+    
+    // XSS check
+    for (const pattern of this.XSS_PATTERNS) {
+      if (pattern.test(sanitizedInput)) {
+        risks.push('Potential XSS detected');
+        severity = 'high';
+        sanitizedInput = sanitizedInput.replace(pattern, '');
+      }
+    }
+    
+    // Character validation
+    if (!this.VALID_CHARS.test(sanitizedInput)) {
+      risks.push('Invalid characters detected');
+      severity = severity === 'low' ? 'medium' : severity;
+      sanitizedInput = sanitizedInput.replace(/[^\p{L}\p{N}\s\-_.,!?()[\]{}@#$%&*+=:;।॥।०-९]/gu, '');
+    }
+    
+    // HTML entity encoding
+    sanitizedInput = this.encodeHTMLEntities(sanitizedInput);
+
+    return {
+      isValid: risks.length === 0 || severity === 'low',
+      sanitizedInput,
+      risks,
+      severity
+    };
+  }
+
+  private static encodeHTMLEntities(text: string): string {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+      '/': '&#x2F;',
+    };
+    
+    return text.replace(/[&<>"'\/]/g, (match) => entities[match] || match);
+  }
+
+  public static sanitizeFileName(fileName: string): string {
+    return fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  }
+}
+
+class SmartCacheManager<T> {
+  private cache = new Map<string, {
+    data: T;
+    timestamp: number;
+    ttl: number;
+    accessCount: number;
+    size: number;
+  }>();
+  private totalSize = 0;
+  private readonly maxSize: number;
+  private readonly maxSizeBytes: number;
+  private readonly defaultTTL: number;
+
+  constructor(
+    maxSize: number = MAX_CACHE_SIZE, 
+    maxSizeBytes: number = 50 * 1024 * 1024, // 50MB
+    defaultTTL: number = CACHE_TTL
+  ) {
+    this.maxSize = maxSize;
+    this.maxSizeBytes = maxSizeBytes;
+    this.defaultTTL = defaultTTL;
+  }
+
+  public set(key: string, data: T, ttl: number = this.defaultTTL): void {
+    const size = this.estimateSize(data);
+    
+    // Check if adding this would exceed size limits
+    if (this.totalSize + size > this.maxSizeBytes || this.cache.size >= this.maxSize) {
+      this.evict();
+    }
+
+    const existing = this.cache.get(key);
+    if (existing) {
+      this.totalSize -= existing.size;
+    }
+
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl,
+      accessCount: 1,
+      size,
+    });
+    
+    this.totalSize += size;
+  }
+
+  public get(key: string): T | null {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return null;
+    }
+    
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.delete(key);
+      return null;
+    }
+    
+    entry.accessCount++;
+    entry.timestamp = Date.now(); // Update last access time
+    
+    return entry.data;
+  }
+
+  private delete(key: string): void {
+    const entry = this.cache.get(key);
+    if (entry) {
+      this.totalSize -= entry.size;
+      this.cache.delete(key);
+    }
+  }
+
+  private evict(): void {
+    // LRU with frequency consideration
+    const entries = Array.from(this.cache.entries());
+    entries.sort((a, b) => {
+      const scoreA = a[1].accessCount / (Date.now() - a[1].timestamp);
+      const scoreB = b[1].accessCount / (Date.now() - b[1].timestamp);
+      return scoreA - scoreB;
+    });
+    
+    // Remove least valuable items (20% of cache)
+    const toRemove = Math.max(1, Math.floor(this.cache.size * 0.2));
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      this.delete(entries[i][0]);
+    }
+  }
+
+  private estimateSize(data: unknown): number {
+    // Rough estimation of object size in bytes
+    const str = JSON.stringify(data);
+    return new Blob([str]).size;
+  }
+
+  public clear(): void {
+    this.cache.clear();
+    this.totalSize = 0;
+  }
+
+  public getStats(): {
+    size: number;
+    maxSize: number;
+    sizeBytes: number;
+    maxSizeBytes: number;
+    hitRate: number;
+  } {
+    let hits = 0;
+    let total = 0;
+    
+    for (const entry of this.cache.values()) {
+      total += entry.accessCount;
+      if (entry.accessCount > 1) {
+        hits += entry.accessCount - 1;
+      }
+    }
+    
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+      sizeBytes: this.totalSize,
+      maxSizeBytes: this.maxSizeBytes,
+      hitRate: total > 0 ? hits / total : 0,
+    };
+  }
+
+  public cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        this.delete(key);
+      }
+    }
+  }
+}
+
+// === CUSTOM HOOKS ===
+const useSmartDebounce = <T>(value: T, delay: number, immediate: boolean = false): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (immediate && !timeoutRef.current) {
+      setDebouncedValue(value);
+    }
+
+    const handler = () => {
+      setDebouncedValue(value);
+    };
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(handler, delay);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [value, delay, immediate]);
+
+  return debouncedValue;
+};
+
+const useSpeechRecognition = (
+  language: string,
+  onResult: (transcript: string) => void,
+  onError: (error: string) => void
+) => {
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setIsSupported(false);
+      return;
+    }
+
+    setIsSupported(true);
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+    
+    const languageMap: Record<string, string> = {
+      'en': 'en-US',
+      'bn': 'bn-BD',
+      'hi': 'hi-IN',
+      'ur': 'ur-PK',
+    };
+    
+    recognition.lang = languageMap[language] || 'en-US';
+    
+    recognition.onresult = (event: any) => {
+      const results = event.results[event.results.length - 1];
+      if (results.isFinal) {
+        const transcript = results[0].transcript;
+        onResult(transcript);
+      }
+    };
+    
+    recognition.onerror = (event: any) => {
+      setIsListening(false);
+      onError(event.error);
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [language, onResult, onError]);
+
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current || isListening) return;
+    
+    try {
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (error) {
+      console.error('Failed to start speech recognition:', error);
+      onError('Failed to start speech recognition');
+    }
+  }, [isListening, onError]);
+
+  const stopListening = useCallback(() => {
+    if (!recognitionRef.current || !isListening) return;
+    
+    try {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } catch (error) {
+      console.error('Failed to stop speech recognition:', error);
+    }
+  }, [isListening]);
+
+  return {
+    isSupported,
+    isListening,
+    startListening,
+    stopListening,
+  };
+};
+
+// === REDUCER ===
+const searchReducer = (state: SearchState, action: SearchAction): SearchState => {
+  switch (action.type) {
+    case 'SET_QUERY':
+      return { ...state, query: action.payload };
+    case 'SET_SUGGESTIONS':
+      return { ...state, suggestions: action.payload };
+    case 'SET_RESULTS':
+      return { ...state, results: action.payload };
+    case 'SET_CONVERSATIONAL_RESPONSE':
+      return { ...state, conversationalResponse: action.payload };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_LOADING_SUGGESTIONS':
+      return { ...state, isLoadingSuggestions: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
+    case 'ADD_TO_HISTORY':
+      const newHistory = [action.payload, ...state.searchHistory.filter(h => h !== action.payload)];
+      return { 
+        ...state, 
+        searchHistory: newHistory.slice(0, MAX_SEARCH_HISTORY) 
+      };
+    case 'SET_LAST_SEARCH_TYPE':
+      return { ...state, lastSearchType: action.payload };
+    case 'CLEAR_SEARCH':
+      return {
+        ...state,
+        query: '',
+        suggestions: [],
+        results: [],
+        conversationalResponse: undefined,
+        error: null,
+      };
+    case 'RESET':
+      return initialSearchState;
+    default:
+      return state;
+  }
+};
+
+const initialSearchState: SearchState = {
+  query: '',
+  suggestions: [],
+  results: [],
+  conversationalResponse: undefined,
+  isLoading: false,
+  isLoadingSuggestions: false,
+  error: null,
+  searchHistory: [],
+  lastSearchType: undefined,
+};
+
+// === MAIN COMPONENT ===
+export const AISearchBar = memo<AISearchBarProps>(({
+  onSearch,
+  onSearchWithResults,
+  onSearchLoading,
+  placeholder,
+  language = 'en',
+  className = '',
+  disabled = false,
+  autoFocus = false,
+  showHistory = true,
+  showTrending = true,
+  enableVoice = true,
+  enableImage = true,
+  enableQR = true,
+  enableAI = true,
+  maxSuggestions = MAX_SUGGESTIONS,
+}) => {
+  // === STATE & REFS ===
+  const [state, dispatch] = useReducer(searchReducer, initialSearchState);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // === MANAGERS ===
+  const requestManagerRef = useRef(new EnhancedRequestManager());
+  const cacheManagerRef = useRef(new SmartCacheManager<SearchSuggestion[]>());
+  
+  // === HOOKS ===
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const debouncedQuery = useSmartDebounce(state.query, SUGGESTION_DEBOUNCE_MS);
+  
+  // API Configuration
+  const API_BASE = useMemo(() => import.meta.env.VITE_API_BASE_URL || '', []);
+  const API_ENDPOINTS = useMemo(() => ({
+    suggestions: `${API_BASE}/api/search/suggestions`,
+    enhanced: `${API_BASE}/api/search/enhanced`,
+    voice: `${API_BASE}/api/search/voice`,
+    conversational: `${API_BASE}/api/conversational-ai/ask`,
+    trending: `${API_BASE}/api/search/trending`,
+    imageSearch: `${API_BASE}/api/search/image-upload`,
+    navigation: `${API_BASE}/api/search/navigation-search`,
+    autocomplete: `${API_BASE}/api/search/autocomplete`,
+    visual: `${API_BASE}/api/search/visual`,
+  }), [API_BASE]);
+
+  // Speech Recognition
+  const {
+    isSupported: isVoiceSupported,
+    isListening,
+    startListening,
+    stopListening,
+  } = useSpeechRecognition(
+    language,
+    (transcript) => {
+      const validation = AdvancedInputValidator.validate(transcript);
+      if (validation.isValid) {
+        dispatch({ type: 'SET_QUERY', payload: validation.sanitizedInput });
+        performSearch(validation.sanitizedInput, 'voice');
+      } else {
+        handleValidationError(validation);
+      }
+    },
+    (error) => {
+      console.error('Speech recognition error:', error);
+      toast({
+        title: language === 'bn' ? 'ভয়েস ত্রুটি' : 'Voice Error',
+        description: getVoiceErrorMessage(error, language),
+        variant: 'destructive',
+      });
+    }
+  );
+
+  // === MEMOIZED VALUES ===
+  const filteredSuggestions = useMemo(() => {
+    return state.suggestions.slice(0, maxSuggestions);
+  }, [state.suggestions, maxSuggestions]);
+
+  const suggestionGroups = useMemo(() => {
+    const groups: Record<string, SearchSuggestion[]> = {};
+    
+    filteredSuggestions.forEach(suggestion => {
+      if (!groups[suggestion.type]) {
+        groups[suggestion.type] = [];
+      }
+      groups[suggestion.type].push(suggestion);
+    });
+    
+    return groups;
+  }, [filteredSuggestions]);
+
+  // === UTILITY FUNCTIONS ===
+  const handleValidationError = useCallback((validation: ReturnType<typeof AdvancedInputValidator.validate>) => {
+    const severityMap = {
+      low: 'default' as const,
+      medium: 'default' as const,
+      high: 'destructive' as const,
+    };
+    
+    toast({
+      title: language === 'bn' ? 'অবৈধ ইনপুট' : 'Invalid Input',
+      description: validation.risks.join(', '),
+      variant: severityMap[validation.severity],
+    });
+    
+    dispatch({ type: 'SET_ERROR', payload: validation.risks.join(', ') });
+  }, [language, toast]);
+
+  const getVoiceErrorMessage = (error: string, lang: string): string => {
+    const messages: Record<string, Record<string, string>> = {
+      'no-speech': {
+        'en': 'No speech was detected. Please try again.',
+        'bn': 'কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।',
+      },
+      'audio-capture': {
+        'en': 'Could not access microphone. Please check permissions.',
+        'bn': 'মাইক্রোফোন অ্যাক্সেস করা যায়নি। অনুমতি পরীক্ষা করুন।',
+      },
+      'not-allowed': {
+        'en': 'Microphone permission is required for voice search.',
+        'bn': 'ভয়েস অনুসন্ধানের জন্য মাইক্রোফোন অনুমতি প্রয়োজন।',
+      },
+    };
+    
+    return messages[error]?.[lang] || messages['no-speech'][lang];
+  };
+
+  const isConversationalQuery = useCallback((query: string): boolean => {
+    const conversationalPatterns = [
+      /^(what|how|why|when|where|which|who|whom|whose)\s/i,
+      /^(can|could|would|should|may|might|must|shall|will)\s(i|you|we)\s/i,
+      /^(tell|show|find|help|explain|describe|suggest|recommend)\s/i,
+      /\b(best|better|versus|vs|difference|compare|recommend|suggest|advice)\b/i,
+      /\?$/,
+      // Bengali patterns
+      /^(কী|কীভাবে|কেন|কখন|কোথায়|কোন|কে|কার)\s/i,
+      /^(আমি|আমাকে|আমরা|তুমি|আপনি)\s/i,
+      // Hindi patterns
+      /^(क्या|कैसे|क्यों|कब|कहाँ|कौन|किसका)\s/i,
+    ];
+    
+    return conversationalPatterns.some(pattern => pattern.test(query.trim()));
+  }, []);
+
+  // === API FUNCTIONS ===
+  const performSearch = useCallback(async (
+    searchQuery: string, 
+    searchType: SearchType = 'text'
+  ): Promise<void> => {
+    // Validation
+    const validation = AdvancedInputValidator.validate(searchQuery);
+    if (!validation.isValid && validation.severity === 'high') {
+      handleValidationError(validation);
+      return;
+    }
+
+    const sanitizedQuery = validation.sanitizedInput;
+    if (!sanitizedQuery) return;
+
+    // Check cache
+    const cacheKey = `search-${searchType}-${sanitizedQuery}-${language}`;
+    const cachedResults = cacheManagerRef.current.get(cacheKey);
+    
+    if (cachedResults && searchType !== 'ai') {
+      dispatch({ type: 'SET_SUGGESTIONS', payload: cachedResults });
+      setShowSuggestions(false);
+      return;
+    }
+
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    onSearchLoading?.(true);
+
+    try {
+      const controller = requestManagerRef.current.createRequest('search', 10);
+      const isConversational = isConversationalQuery(sanitizedQuery) || searchType === 'ai';
+      
+      // Build requests
+      const requests: Promise<Response>[] = [];
+      
+      // Main search request
+      if (searchType === 'image' && uploadedImage) {
+        const formData = new FormData();
+        formData.append('image', uploadedImage);
+        formData.append('query', sanitizedQuery);
+        formData.append('language', language);
+        formData.append('includeConversational', String(isConversational));
+        
+        requests.push(
+          fetch(API_ENDPOINTS.visual, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          })
+        );
+      } else {
+        requests.push(
+          fetch(API_ENDPOINTS.enhanced, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: sanitizedQuery,
+              type: searchType,
+              language,
+              includeConversational: isConversational,
+              filters: {},
+              context: {
+                history: state.searchHistory.slice(0, 5),
+                lastSearchType: state.lastSearchType,
+              },
+            }),
+            signal: controller.signal,
+          })
+        );
+      }
+      
+      // Navigation search
+      requests.push(
+        fetch(API_ENDPOINTS.navigation, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: sanitizedQuery, language }),
+          signal: controller.signal,
+        })
+      );
+      
+      // Conversational AI request
+      if (isConversational) {
+        requests.push(
+          fetch(API_ENDPOINTS.conversational, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: sanitizedQuery,
+              language,
+              context: {
+                searchType,
+                history: state.searchHistory.slice(0, 3),
+              },
+            }),
+            signal: controller.signal,
+          })
+        );
+      }
+      
+      // Execute requests
+      const responses = await Promise.all(requests);
+      const [mainResponse, navResponse, conversationalResponse] = responses;
+      
+      if (!mainResponse.ok) {
+        throw new Error(`Search failed: ${mainResponse.status}`);
+      }
+      
+      const mainData = await mainResponse.json();
+      
+      // Process navigation results
+      let navigationResults: NavigationItem[] = [];
+      if (navResponse.ok) {
+        const navData = await navResponse.json();
+        if (navData.success && navData.data?.navigationResults) {
+          navigationResults = navData.data.navigationResults;
+        }
+      }
+      
+      // Process conversational response
+      let conversationalData: ConversationalResponse | undefined;
+      if (conversationalResponse?.ok) {
+        const convData = await conversationalResponse.json();
+        if (convData.success && convData.data) {
+          conversationalData = convData.data;
+          dispatch({ type: 'SET_CONVERSATIONAL_RESPONSE', payload: convData.data });
+        }
+      }
+      
+      // Process main results
+      if (mainData.success && mainData.data) {
+        const results: SearchResult[] = mainData.data.results || [];
+        const suggestions: SearchSuggestion[] = mainData.data.suggestions || [];
+        
+        dispatch({ type: 'SET_RESULTS', payload: results });
+        dispatch({ type: 'SET_SUGGESTIONS', payload: suggestions });
+        dispatch({ type: 'ADD_TO_HISTORY', payload: sanitizedQuery });
+        dispatch({ type: 'SET_LAST_SEARCH_TYPE', payload: searchType });
+        
+        // Cache results
+        cacheManagerRef.current.set(cacheKey, suggestions);
+        
+        setShowSuggestions(false);
+        
+        // Notify parent
+        onSearch?.(sanitizedQuery, {
+          searchResults: results,
+          conversationalResponse: conversationalData,
+          navigationResults,
+        });
+        onSearchWithResults?.(sanitizedQuery, results);
+      } else {
+        throw new Error(mainData.error || 'Search failed');
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Search request cancelled');
+          return;
+        }
+        
+        console.error('Search error:', error);
+        dispatch({ type: 'SET_ERROR', payload: error.message });
+        
+        if (error.message.includes('Rate limit')) {
+          toast({
+            title: language === 'bn' ? 'অনুরোধ সীমা অতিক্রম' : 'Rate Limit Exceeded',
+            description: language === 'bn' ? 
+              'অনুগ্রহ করে কিছুক্ষণ পরে আবার চেষ্টা করুন।' : 
+              'Please try again in a few moments.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: language === 'bn' ? 'অনুসন্ধান ত্রুটি' : 'Search Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }
+      }
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      onSearchLoading?.(false);
+    }
+  }, [
+    language, 
+    state.searchHistory, 
+    state.lastSearchType,
+    isConversationalQuery,
+    handleValidationError,
+    onSearch, 
+    onSearchWithResults, 
+    onSearchLoading,
+    toast,
+    uploadedImage,
+    API_ENDPOINTS,
+  ]);
+
+  const loadSuggestions = useCallback(async (query: string): Promise<void> => {
+    if (query.length < MIN_QUERY_LENGTH) {
+      setShowSuggestions(false);
+      return;
+    }
+
+    const cacheKey = `suggestions-${query.toLowerCase()}-${language}`;
+    const cached = cacheManagerRef.current.get(cacheKey);
+    
+    if (cached) {
+      dispatch({ type: 'SET_SUGGESTIONS', payload: cached });
+      setShowSuggestions(true);
+      return;
+    }
+
+    dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: true });
+
+    try {
+      const controller = requestManagerRef.current.createRequest('suggestions', 5);
+      
+      const [suggestResponse, autoCompleteResponse] = await Promise.all([
+        fetch(`${API_ENDPOINTS.suggestions}?q=${encodeURIComponent(query)}&lang=${language}&limit=${maxSuggestions}`, {
+          signal: controller.signal,
+        }),
+        fetch(`${API_ENDPOINTS.autocomplete}?q=${encodeURIComponent(query)}&lang=${language}`, {
+          signal: controller.signal,
+        }),
+      ]);
+      
+      const suggestData = await suggestResponse.json();
+      const autoCompleteData = await autoCompleteResponse.json();
+      
+      const allSuggestions: SearchSuggestion[] = [];
+      
+      // Process regular suggestions
+      if (suggestData.success && suggestData.data) {
+        allSuggestions.push(...suggestData.data);
+      }
+      
+      // Process autocomplete
+      if (autoCompleteData.success && autoCompleteData.data) {
+        allSuggestions.push(...autoCompleteData.data.filter(
+          (ac: SearchSuggestion) => !allSuggestions.find(s => s.text === ac.text)
+        ));
+      }
+      
+      // Sort by relevance and frequency
+      allSuggestions.sort((a, b) => {
+        const scoreA = (a.relevance || 0) * 0.7 + (a.frequency || 0) * 0.3;
+        const scoreB = (b.relevance || 0) * 0.7 + (b.frequency || 0) * 0.3;
+        return scoreB - scoreA;
+      });
+      
+      dispatch({ type: 'SET_SUGGESTIONS', payload: allSuggestions });
+      cacheManagerRef.current.set(cacheKey, allSuggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Suggestions error:', error);
+      }
+    } finally {
+      dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: false });
+    }
+  }, [language, maxSuggestions, API_ENDPOINTS]);
+
+  // === EVENT HANDLERS ===
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    dispatch({ type: 'SET_QUERY', payload: value });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    setSelectedSuggestionIndex(-1);
+    
+    if (value.length === 0) {
+      setShowSuggestions(false);
+      dispatch({ type: 'SET_SUGGESTIONS', payload: [] });
+    }
+  }, []);
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (state.query.trim() && !state.isLoading) {
+      performSearch(state.query.trim(), 'text');
+    }
+  }, [state.query, state.isLoading, performSearch]);
+
+  const handleSuggestionClick = useCallback((suggestion: SearchSuggestion) => {
+    if (suggestion.type === 'page' && suggestion.navigationItem) {
+      navigate(suggestion.navigationItem.route);
+      toast({
+        title: language === 'bn' ? 'পেজে যাওয়া হচ্ছে' : 'Navigating',
+        description: suggestion.navigationItem.title,
+      });
+    } else {
+      dispatch({ type: 'SET_QUERY', payload: suggestion.text });
+      performSearch(suggestion.text, suggestion.type === 'intent' ? 'ai' : 'text');
+    }
+    setShowSuggestions(false);
+  }, [navigate, performSearch, language, toast]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || filteredSuggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < filteredSuggestions.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev > 0 ? prev - 1 : filteredSuggestions.length - 1
+        );
+        break;
+      case 'Enter':
+        if (selectedSuggestionIndex >= 0) {
+          e.preventDefault();
+          handleSuggestionClick(filteredSuggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  }, [showSuggestions, filteredSuggestions, selectedSuggestionIndex, handleSuggestionClick]);
+
+  const handleVoiceSearch = useCallback(() => {
+    if (!enableVoice || !isVoiceSupported) {
+      toast({
+        title: language === 'bn' ? 'ভয়েস অনুপলব্ধ' : 'Voice Unavailable',
+        description: language === 'bn' ? 
+          'ভয়েস অনুসন্ধান সমর্থিত নয়।' : 
+          'Voice search is not supported.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [enableVoice, isVoiceSupported, isListening, startListening, stopListening, language, toast]);
+
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      toast({
+        title: language === 'bn' ? 'অবৈধ ফাইল' : 'Invalid File',
+        description: language === 'bn' ? 
+          'শুধুমাত্র JPEG, PNG, WebP এবং GIF ছবি সমর্থিত।' : 
+          'Only JPEG, PNG, WebP and GIF images are supported.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: language === 'bn' ? 'ফাইল খুব বড়' : 'File Too Large',
+        description: language === 'bn' ? 
+          'ছবির আকার ১০এমবির কম হতে হবে।' : 
+          'Image size must be less than 10MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadedImage(file);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+      performSearch(`Visual search: ${file.name}`, 'image');
+    };
+    
+    reader.onerror = () => {
+      toast({
+        title: language === 'bn' ? 'ছবি ত্রুটি' : 'Image Error',
+        description: language === 'bn' ? 
+          'ছবি পড়তে সমস্যা হয়েছে।' : 
+          'Failed to read the image.',
+        variant: 'destructive',
+      });
+    };
+    
+    reader.readAsDataURL(file);
+  }, [language, performSearch, toast]);
+
+  const handleQRResult = useCallback((result: string) => {
+    dispatch({ type: 'SET_QUERY', payload: result });
+    performSearch(result, 'qr');
+    setShowQRScanner(false);
+  }, [performSearch]);
+
+  const clearSearch = useCallback(() => {
+    dispatch({ type: 'CLEAR_SEARCH' });
+    setUploadedImage(null);
+    setImagePreview(null);
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+    requestManagerRef.current.cancelAllRequests();
+    inputRef.current?.focus();
+  }, []);
+
+  // === EFFECTS ===
+  useEffect(() => {
+    if (debouncedQuery) {
+      loadSuggestions(debouncedQuery);
+    }
+  }, [debouncedQuery, loadSuggestions]);
+
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      requestManagerRef.current.destroy();
+      cacheManagerRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    // Auto-focus if enabled
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [autoFocus]);
+
+  useEffect(() => {
+    // Handle click outside to close suggestions
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // === RENDER HELPERS ===
+  const renderSuggestionIcon = (type: SearchSuggestion['type']) => {
+    const icons: Record<SearchSuggestion['type'], React.ReactNode> = {
+      product: <ShoppingBag className="h-4 w-4" />,
+      category: <Navigation className="h-4 w-4" />,
+      brand: <Badge className="h-4 w-4" />,
+      intent: <Brain className="h-4 w-4" />,
+      history: <History className="h-4 w-4" />,
+      trending: <TrendingUp className="h-4 w-4" />,
+      phonetic: <Globe className="h-4 w-4" />,
+      page: <ExternalLink className="h-4 w-4" />,
+      vendor: <Sparkles className="h-4 w-4" />,
+    };
+    
+    return icons[type] || <Search className="h-4 w-4" />;
+  };
+
+  const getSuggestionTypeLabel = (type: SearchSuggestion['type']) => {
+    const labels: Record<SearchSuggestion['type'], Record<string, string>> = {
+      product: { en: 'Product', bn: 'পণ্য' },
+      category: { en: 'Category', bn: 'বিভাগ' },
+      brand: { en: 'Brand', bn: 'ব্র্যান্ড' },
+      intent: { en: 'Smart Search', bn: 'স্মার্ট অনুসন্ধান' },
+      history: { en: 'Recent', bn: 'সাম্প্রতিক' },
+      trending: { en: 'Trending', bn: 'ট্রেন্ডিং' },
+      phonetic: { en: 'Did you mean', bn: 'আপনি কি বোঝাতে চেয়েছেন' },
+      page: { en: 'Page', bn: 'পেজ' },
+      vendor: { en: 'Vendor', bn: 'বিক্রেতা' },
+    };
+    
+    return labels[type]?.[language] || type;
+  };
+
+  return (
+    <div className={`relative w-full max-w-4xl ${className}`}>
+      <form onSubmit={handleSubmit} className="relative">
+        <div className="relative flex items-center bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-lg focus-within:shadow-lg transition-all duration-200">
+          {/* Search Icon */}
+          <div className="pl-5 pr-2">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+
+          {/* Search Input */}
+          <input
+            ref={inputRef}
+            type="text"
+            value={state.query}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => state.query && setShowSuggestions(true)}
+            placeholder={placeholder || (
+              language === 'bn' 
+                ? 'পণ্য, ব্র্যান্ড, বিক্রেতা বা বিভাগ অনুসন্ধান করুন...' 
+                : 'Search for products, brands, vendors or categories...'
+            )}
+            disabled={disabled || state.isLoading}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            className="flex-1 px-2 py-4 bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base"
+            aria-label="Search"
+            aria-autocomplete="list"
+            aria-expanded={showSuggestions}
+            aria-controls="search-suggestions"
+            aria-describedby={state.error ? "search-error" : undefined}
+          />
+
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-1 pr-3">
+            {/* Voice Search */}
+            {enableVoice && isVoiceSupported && (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleVoiceSearch}
+                    disabled={disabled || state.isLoading}
+                    className={`p-2 rounded-full transition-colors ${
+                      isListening 
+                        ? 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 animate-pulse' 
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title={language === 'bn' ? 'ভয়েস অনুসন্ধান' : 'Voice Search'}
+                    aria-label={language === 'bn' ? 'ভয়েস অনুসন্ধান' : 'Voice Search'}
+                    aria-pressed={isListening}
+                  >
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                </motion.div>
+              </AnimatePresence>
+            )}
+
+            {/* Image Search */}
+            {enableImage && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || state.isLoading}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={language === 'bn' ? 'ছবি দিয়ে অনুসন্ধান' : 'Search with Image'}
+                aria-label={language === 'bn' ? 'ছবি দিয়ে অনুসন্ধান' : 'Search with Image'}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* AI Search */}
+            {enableAI && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => state.query && performSearch(state.query, 'ai')}
+                disabled={disabled || state.isLoading || !state.query}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={language === 'bn' ? 'AI অনুসন্ধান' : 'AI Search'}
+                aria-label={language === 'bn' ? 'AI অনুসন্ধান' : 'AI Search'}
+              >
+                <Brain className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </Button>
+            )}
+
+            {/* QR Code */}
+            {enableQR && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowQRScanner(true)}
+                disabled={disabled || state.isLoading}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={language === 'bn' ? 'QR কোড স্ক্যান' : 'QR Code Scan'}
+                aria-label={language === 'bn' ? 'QR কোড স্ক্যান' : 'QR Code Scan'}
+              >
+                <QrCode className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Clear Button */}
+            <AnimatePresence>
+              {state.query && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSearch}
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    title={language === 'bn' ? 'সাফ করুন' : 'Clear Search'}
+                    aria-label={language === 'bn' ? 'সাফ করুন' : 'Clear Search'}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Search Button */}
+            <Button
+              type="submit"
+              size="default"
+              disabled={disabled || !state.query.trim() || state.isLoading}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full flex items-center space-x-2 transition-all duration-200 transform hover:scale-105"
+            >
+              {state.isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Search className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {language === 'bn' ? 'অনুসন্ধান' : 'Search'}
+                  </span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={SUPPORTED_IMAGE_TYPES.join(',')}
+          onChange={handleImageUpload}
+          className="hidden"
+          aria-label="Upload image for search"
+        />
+      </form>
+
+      {/* Error Display */}
+      <AnimatePresence>
+        {state.error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-full left-0 right-0 z-50 mt-2"
+            id="search-error"
+          >
+            <Card className="p-4 border-red-200 bg-red-50 dark:bg-red-900/20">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                <span className="text-sm text-red-700 dark:text-red-300">
+                  {state.error}
+                </span>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Suggestions Dropdown */}
+      <AnimatePresence>
+        {showSuggestions && filteredSuggestions.length > 0 && (
+          <motion.div
+            ref={suggestionsRef}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-full left-0 right-0 z-[200] mt-2"
+            id="search-suggestions"
+          >
+            <Card className="max-h-96 overflow-y-auto shadow-xl border-2">
+              <CardContent className="p-0">
+                {Object.entries(suggestionGroups).map(([type, suggestions]) => (
+                  <div key={type} className="border-b last:border-b-0">
+                    <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                      <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center space-x-2">
+                        {renderSuggestionIcon(type as SearchSuggestion['type'])}
+                        <span>{getSuggestionTypeLabel(type as SearchSuggestion['type'])}</span>
+                      </h4>
+                    </div>
+                    {suggestions.map((suggestion, index) => {
+                      const globalIndex = filteredSuggestions.indexOf(suggestion);
+                      const isSelected = globalIndex === selectedSuggestionIndex;
+                      
+                      return (
+                        <button
+                          key={suggestion.id}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          onMouseEnter={() => setSelectedSuggestionIndex(globalIndex)}
+                          className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
+                            isSelected 
+                              ? 'bg-blue-50 dark:bg-blue-900/20' 
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                          }`}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          <div className="flex items-center space-x-3 flex-1">
+                            <span className="text-sm text-gray-900 dark:text-gray-100">
+                              {suggestion.text}
+                            </span>
+                            {suggestion.metadata?.bengaliPhonetic && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                ({suggestion.metadata.bengaliPhonetic})
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {suggestion.frequency && suggestion.frequency > 80 && (
+                              <Badge variant="secondary" className="text-xs">
+                                <TrendingUp className="h-3 w-3 mr-1" />
+                                Trending
+                              </Badge>
+                            )}
+                            {suggestion.metadata?.vendorId && (
+                              <Badge variant="outline" className="text-xs">
+                                Vendor
+                              </Badge>
+                            )}
+                            {suggestion.type === 'page' && (
+                              <ExternalLink className="h-3 w-3 text-gray-400" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Loading Overlay */}
+      <AnimatePresence>
+        {(state.isLoading || state.isLoadingSuggestions) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10"
+          >
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Scanner Modal */}
+      <AnimatePresence>
+        {showQRScanner && (
+          <Suspense fallback={<Loader2 className="animate-spin" />}>
+            <QRScanner
+              onResult={handleQRResult}
+              onClose={() => setShowQRScanner(false)}
+              language={language}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* Search Results */}
+      <AnimatePresence>
+        {state.results.length > 0 && (
+          <Suspense fallback={<Loader2 className="animate-spin" />}>
+            <UnifiedSearchResults
+              results={state.results}
+              conversationalResponse={state.conversationalResponse}
+              language={language}
+              onClose={() => dispatch({ type: 'SET_RESULTS', payload: [] })}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+// Display name for debugging
+AISearchBar.displayName = 'AISearchBar';
+
+// Type extensions for browser APIs
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+export default AISearchBar;
